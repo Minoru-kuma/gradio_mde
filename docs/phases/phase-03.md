@@ -29,7 +29,8 @@ Slurm、Tracking、完全な multi-view geometry evaluation、model × backend r
 
 Phase 01 / 02、[Model adapter spec](../model-adapter-spec.md)、
 [Environment strategy](../environment-strategy.md)、検証する upstream revisions / weights。
-既存の個別実行コードが読めるなら必ず再利用候補を調査する。
+clean-start を前提とし、過去の個別実行コードは必要に応じて参考資料として確認する。
+repository の既存 production implementation としての取り込みや、取得を必須 gate にしない。
 
 ## Implementation tasks
 

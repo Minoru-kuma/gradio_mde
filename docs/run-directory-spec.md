@@ -76,6 +76,12 @@ root job を retry で書き換えず、新 attempt の JobSpec はその attemp
 `run.json.selected_attempt_id` で表示対象を選び、root output への壊れやすい symlink は必須にしない。
 実装時は成功に必要な最小 file から作り、optional file の空生成はしない。
 
+01A は 1 Run / `attempt-0001` / 1 view のみを使う。入力、JobSpec / handle / status / JobResult、
+raw `depth.npy`、`metadata.json`、worker `result.json`、stdout / stderr を保存して最初の成功を
+確認する。追加 attempt、tracking record、evaluation、benchmark、optional geometry artifacts を
+先に実装しない。01B は基本的な失敗・cancel / timeout と保存結果の検証を拡張し、retry controller
+や active job の再起動復旧は Phase 06 以降に扱う。layout / ID はこれらの拡張でも維持する。
+
 ## Job and result wire formats
 
 `job.json` は [JobSpec](execution-backend-spec.md#jobspec)、worker `result.json` は
@@ -125,11 +131,12 @@ publication 手順:
 2. dimensions、units、checksums、required depth を検証して metadata を保存する。
 3. `result.json` を temporary file から atomic rename し、これを worker report の確定マーカーにする。
 4. Backend は execution 成功と report / 必須 artifacts を再確認して JobResult を確定する。
-5. Runner は JobResult を使って logical run と Tracking を更新する。
+5. Runner は JobResult を使って logical run を更新する。Tracking 更新は導入後の Phase 04。
 
 異なる filesystem 間の rename は atomic と仮定しない。atomic rename も NFS client 間の即時可視性や
-停電時 durability を保証しない。bounded publication grace / checksum / reader retry を設け、
-研究室 NFS の実挙動を Phase 08 で検証する。half-written report を成功として読まない。
+停電時 durability を保証しない。01A は Local の atomic publication と基本検証を実装し、
+NFS 向け bounded publication grace / reader retry は Phase 06–08 で検証する。
+研究室 NFS の実挙動は Phase 08 で確認する。half-written report を成功として読まない。
 
 WorkerResult がない crash / OOM / cancel は Backend が診断 JobResult を生成する。
 worker は FAILED report を可能な範囲で保存するが、強制 kill 後の report を要求しない。
@@ -145,8 +152,9 @@ stdout / stderr の partial log も保持する。terminal JobResult は確定�
 - UI download は selected finalized attempt の reference に限定する。
 - cleanup は別の明示的 retention policy。実行中 Run と唯一の成果物を自動削除しない。
   容量対策として points / confidence 等の保存は requested outputs と policy で制御する。
-- application 再起動は run / handle / terminal result を読み直す。stale RUNNING は process / scheduler を
-  調べて reconcile し、directory だけを根拠に再 submit しない。
+- 保存済み terminal result の再読込・再 collect は 01B の検証対象。active job の application
+  restart recovery / stale RUNNING の reconciliation は Phase 06 以降とし、01A の exit 条件に
+  含めない。directory だけを根拠に再 submit しない。
 
 ## Decisions
 

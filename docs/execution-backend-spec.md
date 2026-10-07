@@ -22,6 +22,8 @@ backend を変えた比較実行は provenance を分けるため新しい Run I
 ## ExecutionBackend interface
 
 signature は概念仕様。concrete class / function はまだ作成しない。
+以下は最終的な共通契約。01A の最小実装と 01B / 06 の追加範囲を
+[Phase 01](phases/phase-01.md) と本書の LocalBackend 節で区別する。
 
 ```text
 submit(spec: JobSpec) -> JobHandle
@@ -34,12 +36,15 @@ collect(handle: JobHandle) -> JobResult
 | --- | --- |
 | `submit` | 非同期に受理する。戻り値は推論完了ではない。schema / reference / resource を検証し handle を保存する |
 | `status` | 非破壊の観測。backend raw state と正規化状態、観測時刻を返す。通信障害で FAILED を捏造しない |
-| `cancel` | 終了要求を返す。冪等。受理と実際の CANCELLED を分け、process / scheduler 確認まで terminal としない |
+| `cancel` | 対応 backend は冪等な終了要求を返す。受理と実際の CANCELLED を分け、process / scheduler 確認まで terminal としない。未対応は明示エラー |
 | `collect` | terminal Job の共通結果と artifact refs を返す。再呼び出し可能で artifact を移動・削除しない |
 
 非 terminal の collect は `ResultNotReady`、不明 handle は `UnknownJob`、schema 不一致は
 `UnsupportedSchema` 等の明示エラーにする。poll timeout は job 実行 timeout と区別する。
 FAILED / CANCELLED でも診断情報を collect できる。collect はモデルを再実行しない。
+01A は interface の signature を保ちつつ `supports_cancel=false` を公開し、cancel 呼び出しは
+`UnsupportedOperation` とする。未対応操作を成功扱いしない。execution timeout 対応も 01B に
+追加し、01A で walltime を指定された場合は unsupported resource として submit 前に拒否する。
 
 ## Common types
 
@@ -87,11 +92,13 @@ GPU type を Slurm GRES にどう対応させるかは site profile を確認す
 `submission_time`、`idempotency_key`、Run relative location、backend profile ID を持つ。
 Local PID だけを永続 identity にしない。process start identity / manager instance を別 metadata に
 持たせ、PID 再利用を区別する。Slurm job ID は backend_job_id として保存する。
-client 再起動後に読み戻せる JSON とし、MLflow run ID を job handle に代用しない。
+保存形式は読み戻せる JSON とし、MLflow run ID を job handle に代用しない。
+handle の保存は 01A から行うが、application 再起動後の active job の監視・停止・復旧を
+01A の保証に含めない。高度な recovery / reconciliation は Phase 06 以降に検証する。
 
 ### JobStatus and JobStatusSnapshot
 
-必須 lifecycle states:
+共通 lifecycle states（01A で queue 管理や cancel 対応を全て実装することは意味しない）:
 
 | Status | 意味 |
 | --- | --- |
@@ -142,19 +149,30 @@ metrics は units と measurement scope を伴い、未計測を 0 として補�
 
 ## LocalBackend
 
-Phase 01 で実装する最小範囲:
+### Phase 01A — Minimum Local E2E
 
-1. Job を受理・記録し QUEUED を返す。ResourceSpec を検証し GPU ごとに原則 1 worker。
-2. Worker Manager が target profile から selected environment を解決する。
+1. 単一 Job を検証・受理・記録し、worker を起動して JobHandle を返す。
+   QUEUED は起動までの状態として使えるが、待ち行列や GPU lease を作らない。
+2. 薄い Worker Manager / launcher が target profile から 1 つの selected environment を解決する。
 3. 共通 worker を argv により起動し、stdout / stderr を attempt 別に保存する。
-4. process exit code と WorkerResult / artifact integrity を照合し terminal を確定する。
-5. cancel は process group に終了を要求し、grace period 後に必要なら強制終了する。
-   CUDA / child process の終了まで確認して resource lease を解放する。
+4. status で process を観測し、exit code と WorkerResult / 必須 depth・metadata の基本検証で
+   terminal を確定する。collect は保存済み JobResult / artifacts を返す。
 
-起動遅延・queue / load / prediction / serialization の時間を別記録する。
-Runner / Gradio が直接 subprocess を呼ぶ経路は作らない。application 再起動時は保存 handle を読み、
-プロセス identity と result を確認する。初期版で未回復の queue は orphaned と記録し、黙って
-再 submit しない。OS 強制 quota・複数 host 調停・worker pool は初期の保証範囲外。
+利用者が 1 job を起動する運用を前提とし、他 process との GPU 調停や並列 submit の保証はしない。
+cancel / execution timeout は未対応として明示する。自動 retry は 0、active job の restart recovery
+は対象外。Runner / Gradio が直接 subprocess を呼ぶ経路は作らず、backend 境界は最初から保つ。
+
+### Phase 01B — Local robustness
+
+cancel / timeout は process group に終了を要求し、必要に応じて grace period 後に強制終了する。
+Conda wrapper と子 worker の終了を確認してから terminal とする。同一 Backend instance の
+実行中の追加 submit は busy として拒否し、単純な二重起動を防ぐ。queue や分散 lease は導入しない。
+欠落 / 破損 artifacts、繰り返し collect、異常終了を検証し、基本 timing / allocator memory と
+環境の再現手順を整える。保存済み terminal result の再読込と active job の復旧は区別する。
+
+高度な retry / submission reconciliation / application restart recovery / concurrency 制御は
+Phase 06 以降。GPU lease はその必要性と scope を改めて判断する。
+OS 強制 quota・複数 host 調停・worker pool は Phase 01 の保証範囲外。
 
 ## Future SlurmBackend
 
@@ -177,6 +195,10 @@ clock / executor / command adapter を注入して以下をローカルで再現
 実時間の長い sleep や本物の sbatch を必要としない。Mock 成功は実際の Slurm / NFS の保証ではない。
 
 ## Failure, cancellation and retry contracts
+
+以下は段階的に検証する契約。01A は基本失敗判定と保存・同一実行中の submission 同一性を扱い、
+cancel / timeout は 01B、応答喪失・再起動をまたぐ照合や高度な retry は 06 以降とする。
+新 attempt を作れる schema を先に定義しても、retry controller を 01A に実装する必要はない。
 
 - idempotency は run / attempt / request digest で判断する。同じ key の受理済み submit は同じ
   handle を返す。異なる spec に同じ key を使う場合は conflict。

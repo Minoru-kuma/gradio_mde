@@ -19,6 +19,8 @@ shell activation を application の前提にしない。
 名前は例であり固定値ではない。各 environment は独立の Python、torch、CUDA userspace runtime、
 native extension を持てる。application はモデル package / torch の必須依存にしない。
 共通 worker distribution は UI / MLflow extras を要求せず、schema の同じ互換 major を使う。
+01A では選定した 1 モデルの独立環境を用意する。control 側には既存の適切な Python を使え、
+`mde-ui` 環境や Gradio / MLflow の導入を最初の E2E 成功条件にしない。
 
 ## Environment contracts
 
@@ -49,11 +51,14 @@ Local の prefix を Slurm node の prefix として再利用しない。未登�
 
 Phase 01 以降に各 `models/<model_name>/environment.yml` を整備する。含める項目は
 Python、channels / priority 方針、Conda dependencies、pip dependencies、モデル revision。
-torch build / CUDA runtime と extension の組合せは既存の動作版と実機の互換性を確認して pin する。
+torch build / CUDA runtime と extension の組合せは採用 upstream の要件と実機の互換性を確認して
+pin する。過去の動作コード・環境情報は必要に応じて参考にし、取得を必須 gate にしない。
 
 environment.yml は再作成の宣言であり、解決結果が永遠に同じである保証ではない。
 検証した OS / arch ごとの resolved package list / lock、pip freeze、定義 hash、upstream commit、
 checkpoint revision / SHA-256 を追加記録する。GPU model / driver も結果に残す。
+01A は environment.yml、定義 hash、採用 revision、実行時の Python / torch / device 等の基本情報を
+保存する。詳細な package fingerprint、計測、環境再作成の検証は 01B で整える。
 個人の絶対 `prefix`、base 環境丸ごとの export、credentials を共有定義に入れない。
 複数 platform 向けの from-history export だけで pip / 全推移依存の再現性を保証したとはしない。
 [Conda の環境管理仕様](https://docs.conda.io/projects/conda/en/stable/user-guide/tasks/manage-environments.html)
@@ -97,13 +102,16 @@ prefix 指定。shell の `source activate` 文字列を Runner に埋め込ま�
 `--no-capture-output` により process の stdout / stderr を共通 log collector に渡せる。
 [Conda run 公式仕様](https://docs.conda.io/projects/conda/en/stable/commands/run.html)
 
-WorkerLaunchSpec は executable / argv、cwd、許可した environment variables、timeout、log paths。
-Worker Manager が process group を監視し、cancel 時は wrapper だけでなく子 worker まで終了する。
-JSON Job / result、progress、stdout / stderr の責務は共通 protocol に置く。
+WorkerLaunchSpec は executable / argv、cwd、許可した environment variables、log paths を持つ。
+01A は選定環境で worker を起動して process exit / report を確認する薄い launcher とする。
+timeout と process group の終了制御は 01B に追加し、cancel 時は wrapper だけでなく子 worker まで
+終了する。JSON Job / result、stdout / stderr の責務は共通 protocol に置く。
+structured progress や多環境 provider の汎用化を 01A の前提にしない。
 
 model worker は Gradio や MLflow を import せず、JSON / numeric artifacts を返す。
-load time、CUDA-synchronized prediction time、serialization time、peak allocator memory を共通 worker が
-測る。environment fingerprint に device 名、driver、torch / runtime、package list digest を含める。
+load time、CUDA-synchronized prediction time、serialization time、peak allocator memory の共通計測は
+01B に整える。詳細 environment fingerprint に device 名、driver、torch / runtime、package list
+digest を含める。未測定値を 01A の成功条件にしたり 0 で補完したりしない。
 `CUDA_VISIBLE_DEVICES` は backend の割当てを尊重し、worker 内では見えている logical device を使う。
 
 再現に必要な環境変数を明示し、credential 等を job / logs / fingerprint にコピーしない。
@@ -126,6 +134,7 @@ container 等を追加する場合も Environment と ExecutionBackend を混ぜ
 | 定義と実測 fingerprint を両方保存 | 宣言だけでは実行環境を確定できない | provenance が増える | platform lock / offline mirror |
 | target 側で environment 解決 | Local と Slurm の prefix 差を吸収する | site profile を用意する必要 | 複数 cluster / launcher |
 
-Phase 01: 初期モデルの pin、minimal worker packaging、launcher 実機検証。
+Phase 01A: 初期モデルの pin、minimal worker packaging、launcher と 1 画像の実機推論。
+Phase 01B: cancel / timeout、基本計測、詳細 fingerprint、環境再作成手順の検証。
 Phase 03: 3 環境の独立性、capability / runtime matrix。Phase 07–08: module、node driver、offline cache、
 共有 prefix と node-local prefix の選択。現在はいずれも設定済みではない。

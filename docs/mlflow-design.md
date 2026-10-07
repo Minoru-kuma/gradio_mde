@@ -9,7 +9,9 @@ model environment の必須依存にはしない。
 
 worker は標準 report / artifacts を Run Store に保存する。ExperimentRunner が JobResult を受け取り、
 TrackingSink を通して MLflow client に渡す。モデル package は MLflow を呼ばない。
-Phase 01–03 は NoOpTracking、Phase 04 以降も Tracking を optional にできる。
+01A では TrackingSink / NoOpTracking の実装・組込自体を E2E の前提にしない。
+01B / Phase 03 までに必要なら NoOpTracking を接続し、Phase 04 で MLflow を追加する。
+Phase 04 以降も Tracking を optional にできる。
 
 概念 interface は `start_attempt(context)`、`log_result(job_result)`、
 `log_evaluation(evaluation_result)`、`finish_attempt(status)`、`flush_pending()`。
@@ -56,6 +58,9 @@ DA3 等の multi-view における view ごとの processed / output size は JS
 単一 size として誤記録しない。request と fingerprint が違う場合は warning と双方を保持する。
 
 ## Metrics
+
+詳細な timing / GPU memory 計測は 01B の計画であり、01A の exit 条件にはしない。
+Phase 04 では取得済みの測定値だけを記録し、未測定の項目は省略と理由を保存する。
 
 | Key | 単位 / 定義 |
 | --- | --- |

@@ -1,18 +1,21 @@
 # Phase 00 — Foundation / Architecture
 
-Status: **文書整備済み / 既存実装調査保留**。今回唯一の承認 phase。
+Status: **COMPLETE**。2026-10-07、ユーザーの clean-start 決定と exit 再評価により完了。
+Phase 01 の計画更新は承認済み、production code の実装は未承認。
 管理: [PLANS.md](../../PLANS.md)。
 
 ## Goal
 
-現在の repository を把握し、既存資産を再利用する方針、共通契約、責務の分離、
+現在の repository を把握し、clean-start の出発点、過去資産の参考方針、共通契約、責務の分離、
 段階的な開発計画を文書として整える。コード実装は始めない。
 
 ## Background
 
 ユーザーは MoGe / UniK3D / DA3 の個別実行経験があるが、UI と Slurm の同時開発で複雑化した。
-今回の可視 workspace には空の保護 directory 以外の既存コードがなく、Git metadata も読めない。
-調査結果と要求に基づく暫定設計を分け、再利用確認を完了したと誤記しない。
+初回の可視 workspace には空の保護 directory 以外の既存コードがなく、Git metadata も読めなかった。
+ユーザーがこの repository を新規実験基盤の clean-start と正式に確認した。
+過去コードは存在するが、この repository の production implementation として取り込まれていない。
+そのため mandatory reuse の調査を完了条件にせず、必要な参考確認を Phase 01 / 03 に移す。
 
 ## Scope
 
@@ -28,7 +31,8 @@ Phase 01 へ自動移行しない。
 ## Dependencies
 
 ユーザーの今回の要件、workspace の可視性、[調査記録](../architecture.md#repository-investigation)。
-Phase 00 全体の完了には既存コードの所在確認、または空 workspace を出発点にする確認が必要。
+source audit gate は「repository 内に再利用必須の実装なし、clean-start を正式採用」という
+ユーザーの確認で充足した。過去のモデルコードの取得・詳細調査は Phase 00 の残条件ではない。
 GPU / Conda / Slurm / MLflow の起動は文書作成の依存ではない。
 
 ## Implementation tasks
@@ -40,8 +44,9 @@ GPU / Conda / Slurm / MLflow の起動は文書作成の依存ではない。
 - [x] Adapter / capabilities / depth convention、Job / state / resources の契約を定義。
 - [x] Conda / process / file protocol / Run ID / Tracking / Slurm の設計を記載。
 - [x] 全 phase の scope / tests / exit / deferred decisions を記載。
-- [ ] 既存コードが得られた場合の実行方法・依存・再利用箇所を調査して反映。
-- [ ] Source audit 完了、または空 workspace で開始する確認を記録して全体 exit を判定。
+- [x] ユーザーの clean-start 決定と repository 内の mandatory reuse 不在を記録。
+- [x] 過去コードの確認を Phase 01 / 03 の必要時の参考作業として位置付け。
+- [x] source audit gate と exit を再評価し、Phase 00 を COMPLETE とする。
 
 ## Tests
 
@@ -58,19 +63,23 @@ model / GPU / scheduler / MLflow integration tests は今回未実行であり�
 
 - [x] 文書が揃い、公開契約と phase の依存関係を追える。
 - [x] no-code scope が保持され、未実装 / 未確認を区別している。
-- [ ] 既存資産の具体的再利用判断、または空 workspace から始める確認が記録されている。
-- [ ] 追加調査の結果が architecture / README / PLANS に反映されている。
+- [x] repository 内に再利用必須の production implementation がなく、clean-start で始める決定が記録されている。
+- [x] 決定と Phase 00 の完了状態が architecture / README / PLANS / 作業ルールに反映されている。
+- [x] Phase 01 の計画が最小 E2E と後段の robustness に分かれ、コード実装は未開始。
 
-文書の納品と Phase 00 全体の完了は別。上の保留項目を黙って完了にしない。
+再評価: 文書の存在・静的検証、責務 / 契約の整合、no-code scope、ユーザーの出発点確認を根拠に
+全条件を充足。過去の実装を実見した、または新基盤でモデルが動作済みとは判断していない。
 
 ## Known risks
 
-既存コードが不可視で、API の適合や compatibility を現時点で検証できない。
-最新 upstream が過去の動作版と違う可能性、依存 pin の未確定、NFS / Slurm 条件未確認がある。
+新基盤の実モデル API・依存 pin・checkpoint・GPU はまだ未検証。
+最新 upstream と過去の動作版の差、NFS / Slurm 条件未確認は後続 phase のリスクであり、
+Phase 00 の source audit blocker ではない。
 
 ## Decisions deferred to later phases
 
-Phase 01: 初期モデル・checkpoint・revision、package topology の具体化、環境 pin。
+Phase 01A: 初期モデル・checkpoint・revision、最小 worker / adapter / backend、環境 pin。
+Phase 01B: 基本 cancel / timeout・計測・validation。Phase 06: 高度な復旧 / concurrency。
 Phase 02: Gradio version / visualization library。Phase 03: 複数モデルの native convention 確認。
 Phase 04: MLflow deployment。Phase 05: datasets / evaluation protocol。
 Phase 07–08: 研究室の全 site 設定と実機検証。
@@ -79,5 +88,5 @@ Phase 07–08: 研究室の全 site 設定と実機検証。
 
 | Decision | Reason | Trade-off | Future extension |
 | --- | --- | --- | --- |
-| 文書を完成させ、source audit を保留として残す | 不可視のコードに適合済みと主張しない | Phase 00 全体は部分完了 | source 取得後の追加調査 |
+| repository を正式な clean-start とし source audit gate を完了 | ユーザーが mandatory reuse 不在を確認 | legacy 実装・CLI の移行保証を初期条件にしない | 過去コードは Phase 01 / 03 の必要時に参考確認 |
 | 19 文書に要求を分割する | 入口を簡潔にし契約の詳細を参照可能にする | 相互リンクの保守が必要 | interface 更新時の docs 同期 |
