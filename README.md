@@ -23,9 +23,9 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 
 ## 現在の開発状況
 
-**2026-10-07: Phase 00 COMPLETE。clean-start を正式決定し、Phase 01 の計画を整理済みです。**
+**2026-10-11: Phase 00 COMPLETE、01A COMPLETE、01B NOT_STARTED。Phase 01 全体は IN_PROGRESS です。**
 
-調査対象 `/home/mizki/workdir/gradio_mde` では、文書作成前に空の `.git`、`.agents`、
+調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
 見えず、`git status` / `git log` は Git repository として認識されませんでした。
 その後、ユーザーがこの repository 内に再利用必須の既存 production implementation はなく、
@@ -34,21 +34,29 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 Phase 01 / Phase 03 の必要時に参考資料として確認します。
 
 source audit gate と文書の exit criteria を再評価し、Phase 00 を COMPLETE としました。
-Phase 01 は計画のみで、01A / 01B とも実装未着手・未承認です。環境作成、package install、推論、Gradio、
-Slurm job、MLflow server は今回実行していません。
+現在は 01A のみ承認済みです。CLI / Runner / LocalBackend / Conda worker / ModelAdapter / RunStore の
+最小経路を実装し、独立環境 `mde-moge` と固定 checkpoint を準備しました。
+ユーザーの CPU 選択に従い、MoGe-2 ViT-S Normal × sample 1枚 × LocalBackend の実推論が成功しました。
+Run ID は `9c5b6556-30d3-43ae-827f-7bd8b0a47580`。raw depth は float32 `[256,256]` の
+`z_depth / metric / m` で、metadata / WorkerResult / JobResult / stdout / stderr を保存・読み戻し済みです。
+実測環境は Python 3.11.14、PyTorch 2.6.0+cu124、torch の CUDA runtime 12.4、device は CPU。
+NVIDIA GPU は見えず `cuda_available=false` であり、GPU 実行・driver 互換性は未検証です。
+依存導入後の fake / contract tests は8件成功（17.025秒）。depth の意味と実行経路の確認であり、精度評価は行っていません。
+checkpoint / wheels / runs は Git 管理外です。固定版と実測証拠は [Phase 01](docs/phases/phase-01.md) に記録しています。
+01B、Gradio、Slurm、MLflow、Benchmark は未着手です。
 初回調査の根拠と clean-start 決定は [architecture](docs/architecture.md#repository-investigation) を参照してください。
 
 ## 対応予定モデル
 
 | モデル | このプロジェクトでの対応状況 | 備考 |
 | --- | --- | --- |
-| MoGe | 計画のみ | Phase 01 の最初のモデル候補。実際の世代・checkpoint は未決定 |
+| MoGe | 01A CPU の single-image E2E を確認 | 固定した MoGe-2 ViT-S Normal。GPU / 他 variant は未検証。詳細・環境手順は [plugin README](models/moge/README.md) |
 | UniK3D | 計画のみ | Phase 03。非 pinhole camera と rays の扱いを含む |
 | Depth Anything V3 / Depth Anything 3（DA3） | 計画のみ | Phase 03。variant と single / multi-view の能力を分ける |
 
 上記モデルをユーザーが過去に動作させたことと、この基盤が対応済みであることは別です。
-upstream の公式情報を設計参考として確認しましたが、このリポジトリ内の実行実績として
-扱いません。詳細は [ModelAdapter spec](docs/model-adapter-spec.md) に記載しています。
+upstream の公式情報と、このリポジトリ内の実測結果は分けて記録します。
+詳細は [ModelAdapter spec](docs/model-adapter-spec.md) に記載しています。
 
 ## アーキテクチャ概要
 
@@ -64,17 +72,40 @@ flowchart TD
     Worker --> Adapter[ModelAdapter in model Conda environment]
     Runner --> Store[Artifact Storage / Run Directory]
     Runner --> Tracking[TrackingSink / MLflow: future]
-    Adapter --> Store
+    Worker --> Store
 ```
 
-図は将来構成の概念図です。Slurm の Worker Manager は計算ノード側で環境を解決します。
+図は将来拡張を含む概念図です。01A は CLI → Runner → LocalBackend → Conda worker → adapter のみ。
+artifact の保存は worker / RunStore の責務で、ModelAdapter は Storage に依存しません。
+Slurm の Worker Manager は将来、計算ノード側で環境を解決します。
 Model は「何を」、Environment は「どの依存環境で」、Backend は「どこで」、
 Tracking は「どう記録」、UI は「どう操作」を担当します。
 UI は Registry / Runner / 公開 backend metadata を利用し、推論の submit は Runner に集約します。
 
 ## 概念的な利用手順
 
-以下は設計上の手順であり、現在実行できるコマンドではありません。
+現在の最小実行手順は [MoGe plugin README](models/moge/README.md) を参照してください。
+control process は stdlib のみで動き、torch / MoGe は別の Conda worker が import します。
+今回確認した CPU 実行は以下です。device を明示して選択します。
+
+```bash
+PYTHONPATH=src python -m mde.cli run --model moge --input tests/assets/sample.png \
+  --device cpu --checkpoint .local/weights/moge-2-vits-normal.pt
+```
+
+GPU が利用できる実行先では `--device cuda:0` を選択できますが、この機材では未検証です。
+CLI の既定 device は `cuda:0`。CUDA が使えない場合は FAILED となり、CPU に自動切替しません。
+`--run-root` → `MDE_RUN_ROOT` → project root の `./runs` の順に保存先を解決します。
+入力は現在 PNG 1 枚、出力は raw depth / metadata / result / stdout / stderr です。
+sample の出典・license は [tests/assets/README.md](tests/assets/README.md) に記録しています。
+
+GPU 不要の contract tests（NumPy / Pillow を持つ独立モデル環境が必要）:
+
+```bash
+PYTHONPATH=src python -m unittest discover -s tests -v
+```
+
+以下は将来の UI / tracking / benchmark も含む概念的な手順です。
 
 1. Registry から model / variant と capability を選び、backend と実行条件を選ぶ。
 2. Runner が入力を Run Directory に保存し、Run ID と JobSpec を作る。
@@ -92,7 +123,7 @@ UI は Registry / Runner / 公開 backend metadata を利用し、推論の subm
 | フェーズ | 内容 | 状態 |
 | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
-| [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | 計画整理済み、実装未着手 |
+| [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | IN_PROGRESS。01A COMPLETE（CPU E2E）、01B NOT_STARTED / 未承認 |
 | [02](docs/phases/phase-02.md) | Gradio Single Model UI | 未着手 |
 | [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 未着手 |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |

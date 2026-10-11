@@ -5,9 +5,12 @@
 [phase 文書](docs/phases/) と変更対象の仕様を読む。
 
 1. 作業は phase 単位で行う。ユーザーが指示していない phase に進まない。
-   今回の承認範囲は Phase 00 完了・Phase 01 計画、README 名称の文書更新と commit / push のみ。
-   production code、環境作成、
-   package install、モデル推論、Slurm job、MLflow server は今回の範囲外。
+   現在の承認範囲は Phase 01A の最小実装・1モデルの独立 Conda 環境作成・依存導入・
+   fake tests・実モデル推論・docs 更新。exit を満たした作業単位の commit / push も承認済み。
+   Phase 01B / 02 以降、Gradio、Slurm、MLflow、Benchmark、他モデルは範囲外。
+   2026-10-11 の自宅 Wi-Fi 接続後の指示により、依存 download と実モデル smoke を再開する。
+   GPU のないノート PC では明示した CPU 推論を利用する。CUDA 要求時の自動 CPU fallback は行わない。
+   01A は CPU E2E と成果物検証により COMPLETE。現在は成果の docs / Git 整理までとし、次 milestone に進まない。
 2. 大規模変更前に PLANS.md の目的・範囲・手順・検証・リスクを更新する。
    plan の更新や前 phase の完了は、次 phase を開始する許可を意味しない。
 3. model-specific logic は `models/<model_name>/` に閉じ込める。

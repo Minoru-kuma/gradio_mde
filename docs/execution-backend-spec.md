@@ -1,6 +1,7 @@
 # Execution backend specification
 
-Status: 未実装の共通契約。初期運用は LocalBackend のみ。
+Status: Phase 01A の LocalBackend / 共通型を実装し、Conda worker の fake tests と MoGe CPU E2E を確認済み。
+cancel / timeout は未対応。Slurm / Mock backend と以下の高度な契約は将来設計。
 関連: [Architecture](architecture.md)、[Environment](environment-strategy.md)、
 [Run Directory](run-directory-spec.md)、[Slurm](slurm-integration.md)。
 
@@ -21,8 +22,8 @@ backend を変えた比較実行は provenance を分けるため新しい Run I
 
 ## ExecutionBackend interface
 
-signature は概念仕様。concrete class / function はまだ作成しない。
-以下は最終的な共通契約。01A の最小実装と 01B / 06 の追加範囲を
+submit / status / collect の signature は最小実装と共通。cancel の CancelReceipt は将来仕様。
+以下は全体の共通契約。01A の最小実装と 01B / 06 の追加範囲を
 [Phase 01](phases/phase-01.md) と本書の LocalBackend 節で区別する。
 
 ```text
@@ -112,6 +113,8 @@ Snapshot は `status`、`last_known_status`、`backend_state`、`observed_at`、
 `started_at`、`finished_at`、`cancel_requested`、`reason`、diagnostics を持つ。
 観測不能時は補助状態 `UNKNOWN` と last_known を返す。UNKNOWN は実行状態の逆戻りではない。
 query 失敗と worker 失敗、job 不在と未登録 handle を区別する。
+01A の Local snapshot は status / backend_state / observed_at / sequence / timestamps /
+cancel_requested / reason の subset。UNKNOWN / CANCELLED の enum は保持するが状態遷移は未実装。
 
 ```mermaid
 stateDiagram-v2
@@ -161,6 +164,10 @@ metrics は units と measurement scope を伴い、未計測を 0 として補�
 利用者が 1 job を起動する運用を前提とし、他 process との GPU 調停や並列 submit の保証はしない。
 cancel / execution timeout は未対応として明示する。自動 retry は 0、active job の restart recovery
 は対象外。Runner / Gradio が直接 subprocess を呼ぶ経路は作らず、backend 境界は最初から保つ。
+実装は same backend instance の handle / process をメモリに保持する。status / collect は終了後に
+JSON / hash / NPY header を stdlib で検証する。terminal collect の繰返しは再推論しない。
+cpu_count は要求記録のみで thread quota を強制せず、host / GPU memory quota と GPU type mapping は
+未対応。walltime は明示 UnsupportedOperation。GPU count は 0–1 のみ。
 
 ### Phase 01B — Local robustness
 
@@ -183,7 +190,8 @@ sbatch / squeue / sacct / scancel の違いはこの backend と command adapter
 
 ## MockSlurmBackend / fake backend
 
-Phase 01 の fake backend は Runner の契約検証用。Phase 06 の MockSlurmBackend は、
+01A の tests は fake adapter と実 LocalBackend / Conda subprocess を利用する。
+fake backend はまだ実装しない。Phase 06 の MockSlurmBackend は、
 clock / executor / command adapter を注入して以下をローカルで再現する。
 
 - QUEUED → RUNNING → COMPLETED / FAILED / CANCELLED。

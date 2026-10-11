@@ -1,6 +1,8 @@
 # Run Directory specification
 
-Status: 設計のみ。今回 `runs/` や実データを作成しない。
+Status: Phase 01A の1 Run / 1 attempt / 1 view の最小 layout を実装し、fake 出力の保存・読戻しを確認。
+MoGe CPU の実推論成果物も保存・読み戻し確認済み。証拠は [Phase 01](phases/phase-01.md)。
+optional geometry / tracking / evaluation / retry は将来設計。
 関連: [Job contracts](execution-backend-spec.md)、[MDEOutput](model-adapter-spec.md)、
 [MLflow](mlflow-design.md)、[Slurm](slurm-integration.md)。
 
@@ -155,6 +157,13 @@ stdout / stderr の partial log も保持する。terminal JobResult は確定�
 - 保存済み terminal result の再読込・再 collect は 01B の検証対象。active job の application
   restart recovery / stale RUNNING の reconciliation は Phase 06 以降とし、01A の exit 条件に
   含めない。directory だけを根拠に再 submit しない。
+
+01A の NPY は little-endian float32 `[H,W]` / C order、invalid は NaN。
+control は NumPy を import せず NPY header / payload size / checksum を検証する。
+同一 backend instance の repeated collect は検証済みで、process 再起動後の collect は未実装。
+Git metadata が見えない実行では `git_commit=unknown` と `.py / .json / .yml` の source digest を残す。
+metadata は actual Python / Conda prefix / device と、adapter が観測した torch / runtime / GPU を持つ。
+machine-specific path はローカル生成結果に限り、repository に commit しない。
 
 ## Decisions
 

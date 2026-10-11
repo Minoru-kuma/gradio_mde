@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "model_id": "fake",
+  "display_name": "Test-only constant depth adapter",
+  "adapter_entrypoint": "tests.fixtures.fake:FakeAdapter",
+  "upstream_revision": "test-fixture",
+  "default_variant": "fake-depth",
+  "variants": [{"variant_id": "fake-depth", "checkpoint": null}],
+  "capabilities": {"depth": {"status": "supported"}},
+  "environment_refs": [{"environment_id": "mde-moge", "definition_ref": "models/moge/environment.yml"}],
+  "supported_devices": ["cpu"],
+  "supported_dtypes": ["float32"],
+  "parameter_schema": {"properties": {
+    "action": {"type": "string", "enum": ["success", "raise", "missing_depth", "missing_result"], "default": "success"}
+  }}
+}

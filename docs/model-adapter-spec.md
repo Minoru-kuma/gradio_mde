@@ -1,6 +1,8 @@
 # Model adapter specification
 
-Status: 設計のみ。共通 schema の初期案は `1.0`。実装・manifest・モデル環境はまだない。
+Status: schema `1.0` の最小型と MoGe adapter / manifest を Phase 01A で実装。
+fake tests と MoGe の CPU 実推論・depth 保存を確認済み。GPU は未検証。
+optional geometry の保存・複数モデルは将来仕様。
 関連: [Architecture](architecture.md)、[Execution](execution-backend-spec.md)、
 [Environment](environment-strategy.md)、[Run Directory](run-directory-spec.md)。
 
@@ -63,7 +65,7 @@ Registry は plugin ID の重複、entrypoint の欠落、未知の必須 schema
 
 ## ModelAdapter lifecycle
 
-以下は signature の文書案であり、production interface の実装ではない。
+以下の signature は `src/mde/contracts.py` の最小 ModelAdapter に実装する。
 
 ```text
 load(context: ModelLoadContext) -> LoadedModelInfo
@@ -79,6 +81,11 @@ unload() -> None
   requested outputs。配列は worker 内部の受け渡しであり JobSpec に巨大配列を載せない。
 - `PredictionBatch`: `views: list[MDEOutput]` と任意の共通 scene metadata。
   最初は 1 view。独立した複数画像の Benchmark は別 job とし、multi-view と混ぜない。
+
+01A は load parameters / camera input の拡張をまだ持たず、PredictionRequest は view ID、RGB array、
+parameters、requested outputs のみ。capability は JSON dict、ModelInfo は manifest を保持する薄い型。
+Registry は選択された `models/<id>/manifest.json` のみ読む。parameter schema は
+integer / number / boolean / string、enum、minimum / maximum、default / required に限定する。
 
 状態は `UNLOADED → LOADED → PREDICTING → LOADED → UNLOADED`。
 未 load の predict、同じ adapter への同時 predict を拒否する。初期 worker は 1 job / 1 process。
@@ -113,6 +120,9 @@ metadata は深度の解釈に必要な共通項目であり、モデルの追�
 
 出力の dense maps は同じ `[H, W]` を使用する。配列を CPU に移し共通 dtype に変換した後で
 serialization する。推論 dtype と保存 dtype は別々に記録する。
+01A の worker は depth のみ保存し、optional mask は finite-positive 判定に併用する。
+optional fields / extras の型は保持するが geometry 配列の exporter は未実装。
+MoGe の採用版・checkpoint / native output は [plugin README](../models/moge/README.md) を参照する。
 
 ### Geometric conventions
 

@@ -1,11 +1,12 @@
 # Architecture
 
-Status: Phase 00 COMPLETE。記載する package / interface は未実装。
-clean-start を正式な出発点とし、Phase 01 の実装はまだ承認されていない。
+Status: Phase 00 COMPLETE。Phase 01A の最小経路を実装し、fake tests を確認済み。
+MoGe の明示 CPU E2E と成果物検証により 01A COMPLETE。GPU は未検証。
+01B 以降は未着手・未承認。以下の全体図には将来設計も含む。
 
 ## Repository investigation
 
-調査日: 2026-10-07。対象: `/home/mizki/workdir/gradio_mde`。
+調査日: 2026-10-07。対象: `gradio_mde` の repository root。
 
 | 調査項目 | 方法 | 確認結果 | 設計への影響 |
 | --- | --- | --- | --- |
@@ -97,7 +98,7 @@ LocalBackend / worker の経路だけを実装対象とし、UI、TrackingSink�
 
 ## Public application interfaces
 
-UI / CLI / Benchmark は共通 application service を使う。以下は概念 signature で、未実装。
+UI / CLI / Benchmark は共通 application service を使う。以下は将来の概念 signature。
 
 ```text
 Registry.list_models() -> list[ModelInfo]
@@ -118,9 +119,15 @@ UI は raw file publication や worker report を直接見て完了判定しな�
 公開 artifacts は確定した selected attempt の検証済み reference とする。
 BackendCatalog は利用可能な profile と準備状態の metadata を返し、UI が Backend を直接起動しない。
 
+01A の実装済み subset は `ModelRegistry.get_model(model_id)` と
+`ExperimentRunner.submit(model_id, image, variant_id=None, device, dtype, parameters)`。
+submit は `JobHandle`、status は `JobStatusSnapshot`、collect は `JobResult` を返す。
+CLI が LocalBackend を構成し、Runner は ExecutionBackend の公開契約のみを使う。
+RunRequest / RunHandle wrapper、catalog / discovery / tracking はまだ実装しない。
+
 ## Planned package topology
 
-以下は将来の配置案。今回作成するのは Markdown 文書だけ。
+以下は将来の配置案。01A では各責務を同名の小さな `.py` module に実装する。
 01A で全 directory / service を完成させる必要はなく、責務の境界を保った最小構成から始める。
 
 ```text
@@ -147,7 +154,9 @@ models/<model_name>/
 upstream / variant、capability、logical environment、params schema を宣言する。
 利用者は environment provisioning を別途行う必要があり、directory を追加しただけで
 GPU / dependency が準備済みになるわけではない。新しい出力種別が必要な場合だけ共通契約を
-版付きで拡張する。Python packaging の具体方式は Phase 01 で最小限選定する。
+版付きで拡張する。01A は source checkout + `PYTHONPATH=src` を基準とし、worker へ src / project root
+の import path を渡す。control の pyproject dependencies は空。adapter は `models/` 内の namespace
+module であり、source checkout を伴わない wheel 単体配布は現時点では保証しない。
 
 ## End-to-end lifecycle
 
@@ -188,7 +197,7 @@ BenchmarkCoordinator（Phase 05）は image × model × config を複数の通�
 | A04 | JSON + file artifacts の Run protocol | Local / NFS と別環境で同じ契約 | 小さな対話 RPC より遅い | optional streaming progress、Store backend |
 | A05 | local Run Store を一次記録にする | Tracking 障害で成果を失わない | MLflow に複製・再送が必要 | remote artifact service / policy-based retention |
 | A06 | metric / relative と camera convention を明示 | 不公平な評価と幾何変換の誤りを避ける | adapter の変換責務が増える | rays / multi-view / 新 camera model |
-| A07 | 初期モデルは MoGe を候補とし未確定 | ユーザーの動作経験を優先する | 01A 開始時に upstream / checkpoint / 環境 pin の選定が必要 | 実機成功後に検証済み条件を保存 |
+| A07 | 初期モデルは固定版 MoGe-2 ViT-S Normal | 最小公開 checkpoint と metric scale の API を使う | 最新 MoGe-3 / 大きな variant は未検証 | Phase 03 で variant 追加、実測は PLANS に記録 |
 | A08 | Slurm は contract と確認表まで | 現地仕様・アクセスが不明 | 現地まで実機保証できない | 07 / 08 の site plugin と integration test |
 | A09 | 今後導入する interface / 保存形式の互換性を維持 | clean-start 後に蓄積する実験結果を読めるようにする | schema reader / 移行手順の維持 | deprecation を明示し major schema で変更 |
 | A10 | clean-start、外部の過去コードは必要時の参考資料 | repository 内に再利用必須実装がないとユーザーが確認 | 既存実装への適合や旧 baseline は保証しない | 01 / 03 で参考処理を adapter 内へ接続 |
@@ -196,7 +205,7 @@ BenchmarkCoordinator（Phase 05）は image × model × config を複数の通�
 
 ## Open decisions
 
-初期 model / checkpoint / upstream revision、Python / torch / CUDA build、
-UI package pin、GPU 性能、GT dataset / evaluation protocol、MLflow version / URI、
+初期 model / checkpoint / upstream revision は [PLANS](../PLANS.md) に固定した。
+GPU 実行の互換性・性能、UI package pin、GT dataset / evaluation protocol、MLflow version / URI、
 研究室設定は未確定。各仕様・phase に判断時点を割り当て、値を仮定してコード化しない。
 外部の過去コードの所在・利用可否は、参考資料が必要になった 01 / 03 で確認する。

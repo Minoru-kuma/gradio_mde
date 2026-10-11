@@ -1,7 +1,10 @@
 # Phase 01 — Single Model + Local Execution + Miniconda
 
-Status: **計画整理済み / production code 未着手・未承認**。
-01A / 01B は内部 milestone。今回行うのは計画更新だけで、実装開始にはユーザーの指示が必要。
+Status: **Phase 01 — IN_PROGRESS**（2026-10-11）。
+**01A — COMPLETE、01B — NOT_STARTED / NOT_AUTHORIZED**。
+ユーザーの自宅 Wi-Fi 接続後の再開・CPU 選択指示により、MoGe の CPU E2E が成功。
+raw depth / JSON reports / logs の保存・読み戻しと、依存導入後の8件の fake tests を確認した。
+Phase 01 全体は 01B が未着手のため IN_PROGRESS。01A 完了を次 milestone の承認としない。
 管理: [PLANS.md](../../PLANS.md)。
 
 ## Goal
@@ -27,8 +30,10 @@ ModelAdapter → MDEOutput → Run Directory → collect。
 ## Background
 
 UI / cluster より前に推論、環境分離、結果契約を確認する。
-候補はユーザーの動作経験がある MoGe。ただし具体的な世代・weights・既存スクリプトは未確認で、
-latest を自動採用しない。この repository は正式な clean-start で、既存 production implementation の
+ユーザーの動作経験がある MoGe を最初のモデルとし、公式 upstream を調査して
+MoGe-2 ViT-S Normal の source / checkpoint を固定した。latest を自動採用しない。
+選定根拠と固定版は [PLANS](../../PLANS.md#01a-selection--preflight) と
+[plugin README](../../models/moge/README.md)。この repository は正式な clean-start で、既存 production implementation の
 取り込み・互換移行を開始条件にしない。過去の動作コードは必要に応じた参考資料として確認する。
 
 ## Scope
@@ -70,7 +75,8 @@ retry / reconciliation、application restart recovery、複雑な concurrency、
 ## Dependencies
 
 Phase 00 は COMPLETE、source audit gate は解消済み。
-01A の実装指示、初期モデル / variant / checkpoint の選定、利用可能な Miniconda / Conda と GPU / driver。
+01A は承認済み、初期モデル / variant / checkpoint と Miniconda / Conda は確認済み。
+GPU / driver は利用できず、ユーザー指示に基づいて CPU を明示選択し実推論を確認した。
 [Adapter](../model-adapter-spec.md)、[Environment](../environment-strategy.md)、
 [Backend](../execution-backend-spec.md)、[Run Directory](../run-directory-spec.md) の契約。
 ユーザーが CPU を選ぶ場合は対応 variant の確認が必要で、GPU 不可時に黙って CPU fallback しない。
@@ -81,16 +87,16 @@ Phase 00 は COMPLETE、source audit gate は解消済み。
 
 ### 01A tasks — first inference success
 
-- [ ] 初期 model / variant / checkpoint / upstream revision と 1 枚の input を選定して plan に記録。
-- [ ] selected model の manifest / environment.yml と最小 adapter を用意。
-- [ ] common contracts を用意し、adapter import / torch / model dependency を worker 側に閉じる。
-- [ ] configurable Run Root と初回 `attempt-0001` の input / JobSpec / output / logs を準備。
-- [ ] logical environment を Local profile に解決し、argv で Conda subprocess worker を起動。
-- [ ] worker で load → predict → serialize を行い、正常時・通常例外の finally で unload。
-- [ ] raw depth、depth kind / scale / units / shape、model / environment / device metadata、report を保存。
-- [ ] stdout / stderr を捕捉し、worker 非ゼロ終了・欠落 report を成功にしない。
-- [ ] LocalBackend.submit / status / collect を thin Runner / CLI から使い、1 枚の実推論を成功させる。
-- [ ] 証拠の Run ID / artifacts / 起動条件と 01A の能力制限を docs に残す。
+- [x] 初期 model / variant / checkpoint / upstream revision と 1 枚の input を選定して plan に記録。
+- [x] selected model の manifest / environment.yml と最小 adapter を用意。
+- [x] common contracts を用意し、adapter import / torch / model dependency を worker 側に閉じる。
+- [x] configurable Run Root と初回 `attempt-0001` の input / JobSpec / output / logs を準備。
+- [x] logical environment を Local profile に解決し、argv で Conda subprocess worker を起動。
+- [x] worker で load → predict → serialize を行い、正常時・通常例外の finally で unload（fake 検証）。
+- [x] raw depth、depth kind / scale / units / shape、model / environment / device metadata、report の保存を実装（fake 検証）。
+- [x] stdout / stderr を捕捉し、worker 非ゼロ終了・欠落 report を成功にしない。
+- [x] LocalBackend.submit / status / collect を thin Runner / CLI から使い、1 枚の実推論を成功させる。
+- [x] 証拠の Run ID / artifacts / 起動条件と 01A の能力制限を docs に残す。
 
 ### 01B tasks — after 01A acceptance
 
@@ -105,7 +111,8 @@ Phase 00 は COMPLETE、source audit gate は解消済み。
 
 ## Tests
 
-以下は今後の実装時の検証計画であり、今回実行する tests ではない。
+01A は下記の contract / fake tests と実モデル CPU smoke を確認済み。それぞれの証拠を分けて記録する。
+01B tests は将来計画であり今回実行しない。
 
 ### 01A tests
 
@@ -128,7 +135,53 @@ Phase 00 は COMPLETE、source audit gate は解消済み。
 実機結果と fake tests を分け、実モデル推論を実行していない場合に成功を主張しない。
 CPU を明示選択して実行した結果は CPU と記録し、GPU 実行済みとは扱わない。
 
+### Current evidence — 2026-10-09
+
+独立 `mde-moge` の Python 3.11.14 で fake worker を起動し、8件の contract tests が成功（22.269秒）。
+必須 depth / result 欠落と通常例外を FAILED とし、stdout / stderr と cleanup を確認した。
+終了コード0でも depth file / result が欠けるケースを FAILED と確認した。
+raw depth の fake 出力は float32 256×256 / relative / arbitrary で、実モデルの出力ではない。
+source / checkpoint は固定、checkpoint の SHA-256 は照合済み。
+MoGe real inference は未実行。NVIDIA device / driver が見えず、CPU を黙って代用しない。
+real Run ID / torch runtime / GPU / raw depth の証拠は成功時に追記する。
+Markdown のリンク / 必須節 / fenced blocks と、Python AST / JSON / TOML の静的検証も成功。
+
+### Pre-inference preparation evidence — 2026-10-11
+
+- 中断後の現行コードで fake suite 8件が成功（18.968秒）。ログを Git 管理外の `.local/validation/` に保持。
+- checkpoint の SHA-256 を再照合して一致。実モデル job は未投入、real Run ID / raw depth はまだない。
+- 独立 `mde-moge` に Python 3.11.14 / MoGe 2.0.0 / utils3d 1.3 / 基本推論依存は存在する。
+  torch / torchvision は未導入。既存 CUDA wheel 5個は cache に保持している。
+- 残り依存導入、native API import、GPU / CPU の明示的な実行先確認、実モデル E2E と成果物検証を
+  再開後に行う。fake 成功と準備完了を実モデル成功と扱わない。
+- exit 未達のため completion commit / push はまだ行わない。01B / 02 以降には進まない。
+
 ## Exit criteria
+
+### 01A acceptance evidence — 2026-10-11
+
+| 項目 | 確認結果 |
+| --- | --- |
+| 実モデル / 入力 / backend | MoGe-2 ViT-S Normal × NASA sample RGB 256×256 1枚 × LocalBackend |
+| Run ID | `9c5b6556-30d3-43ae-827f-7bd8b0a47580` |
+| Upstream revision | `07444410f1e33f402353b99d6ccd26bd31e469e8`、package 2.0.0 |
+| Checkpoint | `Ruicheng/moge-2-vits-normal` / `model.pt`、revision `26b477f41595707c5db6770294c0d1721e8ed4ed` |
+| Checkpoint SHA-256 | `79a16621928c2bf0ed04659218c55c01075e950507f40bb3332fb4c873d3e1dc` |
+| 独立 environment / Python | `mde-moge` / CPython 3.11.14。control とは別 prefix / process |
+| torch / torchvision / runtime | 2.6.0+cu124 / 0.21.0+cu124 / torch.version.cuda=12.4 |
+| 実行 device / GPU | 明示 CPU（Intel Core Ultra 5 125U）、cuda_available=false、GPU / driver=null。GPU 実行は未検証 |
+| raw depth | `runs/<run_id>/output/attempt-0001/views/view-0001/depth.npy`、float32 `[256,256]` |
+| depth semantics | z_depth / metric / m、OpenCV camera frame。65,536 pixel 有効、invalid 0。値域 0.8110444–4.2878127 m |
+| WorkerResult / JobResult | outcome / status は COMPLETED、worker exit_code=0。metadata の実行情報とも一致 |
+| Run Directory | 必須12 file、全 JSON の Run ID、JobSpec snapshots、checksum、NPY header と NumPy 読戻しを確認 |
+| stdout / stderr / cleanup | load / predict / saved / unload の stdout と upstream CPU autocast 警告の stderr を保存 |
+| Contract tests | 依存導入後8件成功（17.025秒）。制御側には torch / MoGe / NumPy / Pillow の import なし |
+| Provenance | git_commit=unknown、source_digest を保存。workspace の Git metadata が利用不可 |
+
+Goal の9要素をすべて通ったため 01A は COMPLETE とする。GT / benchmark のない smoke であり、
+metric accuracy や GPU / driver 互換性を保証しない。CPU float32 に対する upstream autocast 警告は
+autocast が無効化されたという通知で、明示した device / dtype は維持されている。
+ローカル証拠は `.local/validation/` と `runs/<run_id>/` に保持し、Git に実験生成物を含めない。
 
 ### 01A exit
 

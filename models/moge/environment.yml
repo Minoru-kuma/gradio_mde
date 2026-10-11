@@ -1,0 +1,21 @@
+name: mde-moge
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11.14
+  - pip=25.0.1
+  - setuptools=75.8.0
+  - wheel=0.45.1
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu124
+      - torch==2.6.0+cu124
+      - torchvision==0.21.0+cu124
+      - numpy==1.26.4
+      - pillow==11.1.0
+      - scipy==1.14.1
+      - opencv-python-headless==4.10.0.84
+      - huggingface-hub==0.28.1
+      - tqdm==4.67.1
+# Pinned upstream --no-deps commands: README.md; source/checkpoint identity: manifest.json.
+# Conda owns Python / bootstrap. pip owns inference packages. No driver / UI packages.

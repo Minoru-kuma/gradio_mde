@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "model_id": "moge",
+  "display_name": "MoGe-2 ViT-S Normal",
+  "adapter_entrypoint": "models.moge.adapter:MoGeAdapter",
+  "adapter_version": "0.1.0",
+  "upstream_url": "https://github.com/microsoft/MoGe",
+  "upstream_revision": "07444410f1e33f402353b99d6ccd26bd31e469e8",
+  "default_variant": "moge-2-vits-normal",
+  "variants": [{
+    "variant_id": "moge-2-vits-normal",
+    "model_version": "2.0.0",
+    "checkpoint": {
+      "repo_id": "Ruicheng/moge-2-vits-normal",
+      "revision": "26b477f41595707c5db6770294c0d1721e8ed4ed",
+      "filename": "model.pt",
+      "sha256": "79a16621928c2bf0ed04659218c55c01075e950507f40bb3332fb4c873d3e1dc"
+    },
+    "capabilities": {
+      "depth": {"status": "supported"},
+      "metric_depth": {"status": "supported", "condition": "selected metric scale-head checkpoint; accuracy not guaranteed"},
+      "points": {"status": "conditional", "condition": "native output; 01A does not export"},
+      "intrinsics": {"status": "conditional", "condition": "native normalized K; pixel conversion/export deferred"},
+      "normals": {"status": "conditional", "condition": "native normal; 01A does not export"},
+      "mask": {"status": "conditional", "condition": "used for depth validity; standalone export deferred"},
+      "point_cloud": {"status": "unsupported"},
+      "rays": {"status": "unsupported"},
+      "camera_pose": {"status": "unsupported"},
+      "confidence": {"status": "unsupported"},
+      "multi_view": {"status": "unsupported"}
+    }
+  }],
+  "capabilities": {"depth": {"status": "supported"}, "metric_depth": {"status": "supported"}},
+  "environment_refs": [{"environment_id": "mde-moge", "definition_ref": "models/moge/environment.yml", "worker_protocol_version": "1.0"}],
+  "supported_devices": ["cuda:0", "cpu"],
+  "supported_dtypes": ["float32"],
+  "input_constraints": {"min_views": 1, "max_views": 1, "format": "PNG", "worker_mode": "RGB"},
+  "parameter_schema": {"type": "object", "additionalProperties": false, "properties": {
+    "num_tokens": {"type": "integer", "minimum": 1200, "maximum": 2500, "default": 1200}
+  }},
+  "license": "MIT (DINOv2 components: Apache-2.0)",
+  "weights_license": "MIT"
+}

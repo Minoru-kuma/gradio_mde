@@ -1,7 +1,8 @@
 # Environment strategy
 
-Status: 設計のみ。Conda 環境の作成、package install、environment.yml の追加は今回行わない。
-既存環境の実態・Python / PyTorch / CUDA build は可視コードから確認できていない。
+Status: Phase 01A で独立環境 `mde-moge`、定義、Resolver / Conda launcher を追加。
+Conda subprocess の fake tests と MoGe CPU 実推論は確認済み。GPU 互換性は未検証。
+作成手順と固定版は [MoGe README](../models/moge/README.md)、実測状態は [PLANS](../PLANS.md)。
 
 ## Why Miniconda / Conda
 
@@ -46,6 +47,12 @@ Model は推奨 environment を宣言できるが、特定の backend やホス�
 Runner は logical reference を JobSpec に保存し、backend の Worker Manager が target で解決する。
 Local の prefix を Slurm node の prefix として再利用しない。未登録・未作成・revision 不一致なら
 明示的な environment error とする。別環境や CPU へ黙って fallback しない。
+
+01A の薄い実装は `EnvironmentProfile(environment_id, name | prefix)` と
+`EnvironmentResolver.resolve(reference) -> EnvironmentProfile`、`CondaLauncher.argv(...)`。
+name / prefix はどちらか一方。`base` と control と同じ Python prefix の worker を拒否する。
+CLI の `--conda-env / --conda-prefix / --conda-exe`、または PATH / `MDE_CONDA_EXE` で解決し、
+Miniconda の絶対 path は application code / 共有定義に保存しない。
 
 ## environment.yml and reproducibility
 
@@ -92,7 +99,10 @@ pip 導入後の Conda 変更は環境を再作成して検証する方針とし
 driver の更新を application や推論 worker の仕事にしない。
 [NVIDIA の互換性の説明](https://docs.nvidia.com/deploy/cuda-compatibility/latest/why-cuda-compatibility.html)
 
-具体的な CUDA / minimum driver の数字は現状未確認のため決定しない。
+01A では公式 PyTorch 2.6.0+cu124 / torchvision 0.21.0+cu124 を導入し、明示 CPU で実推論した。
+実測 torch.version.cuda=12.4、cuda.is_available()=false、GPU / driver=null。
+torch.version.cuda と cuda.is_available() を別々に記録し、CUDA library が存在しても
+GPU 実行の成功とは扱わない。採用ホストの minimum driver / 実機互換性は未検証。
 
 ## Subprocess workers
 
@@ -137,4 +147,4 @@ container 等を追加する場合も Environment と ExecutionBackend を混ぜ
 Phase 01A: 初期モデルの pin、minimal worker packaging、launcher と 1 画像の実機推論。
 Phase 01B: cancel / timeout、基本計測、詳細 fingerprint、環境再作成手順の検証。
 Phase 03: 3 環境の独立性、capability / runtime matrix。Phase 07–08: module、node driver、offline cache、
-共有 prefix と node-local prefix の選択。現在はいずれも設定済みではない。
+共有 prefix と node-local prefix の選択。複数モデル / micromamba / cluster profile は未設定。
