@@ -11,6 +11,6 @@
   "supported_devices": ["cpu"],
   "supported_dtypes": ["float32"],
   "parameter_schema": {"properties": {
-    "action": {"type": "string", "enum": ["success", "raise", "missing_depth", "missing_result"], "default": "success"}
+    "action": {"type": "string", "enum": ["success", "raise", "missing_depth", "missing_result", "block", "stubborn", "orphan", "gentle"], "default": "success"}
   }}
 }

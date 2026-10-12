@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from mde.backends import LocalBackend
-from mde.contracts import JobStatus, UnsupportedOperation
+from mde.contracts import JobStatus, UnknownJob
 from mde.environments import CondaLauncher, EnvironmentProfile, EnvironmentResolver, WorkerManager
 from mde.registry import ModelRegistry
 from mde.runner import ExperimentRunner
@@ -23,11 +23,19 @@ class LocalContractTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.store = RunStore(PROJECT, self.temporary.name)
         env_name = os.environ.get("MDE_TEST_CONDA_ENV", "mde-moge")
-        resolver = EnvironmentResolver({"mde-moge": EnvironmentProfile("mde-moge", name=env_name)})
+        env_prefix = os.environ.get("MDE_TEST_CONDA_PREFIX")
+        resolver = EnvironmentResolver({"mde-moge": EnvironmentProfile(
+            "mde-moge", name=None if env_prefix else env_name, prefix=env_prefix)})
         manager = WorkerManager(PROJECT, resolver, CondaLauncher())
         self.backend = LocalBackend(self.store.root, manager)
         self.runner = ExperimentRunner(ModelRegistry(PROJECT / "tests/fixtures/models"),
                                         self.backend, self.store, PROJECT)
+        self.addCleanup(self.stop_workers)
+
+    def stop_workers(self):
+        for job in list(self.backend._jobs.values()):
+            if job.worker and (job.worker.process.poll() is None or job.worker.group_alive()):
+                job.worker.stop(0.1)
 
     def run_fake(self, action="success"):
         handle = self.runner.submit("fake", PROJECT / "tests/assets/sample.png", device="cpu",
@@ -44,7 +52,12 @@ class LocalContractTests(unittest.TestCase):
         self.assertEqual(result.status, "COMPLETED")
         self.assertNotEqual(result.execution["worker_pid"], os.getpid())
         self.assertNotEqual(result.execution["python_prefix"], sys.prefix)
-        self.assertEqual(result.execution["conda_environment"], os.environ.get("MDE_TEST_CONDA_ENV", "mde-moge"))
+        if os.environ.get("MDE_TEST_CONDA_PREFIX"):
+            self.assertEqual(Path(result.execution["python_prefix"]).resolve(),
+                             Path(os.environ["MDE_TEST_CONDA_PREFIX"]).resolve())
+        else:
+            self.assertEqual(result.execution["conda_environment"],
+                             os.environ.get("MDE_TEST_CONDA_ENV", "mde-moge"))
         depth = run / result.outputs[0]["depth"]["path"]
         self.assertEqual(inspect_depth(depth), {"shape": [256, 256], "dtype": "float32"})
         with depth.open("rb") as stream:
@@ -107,9 +120,9 @@ class LocalContractTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(RunStore(PROJECT).root, PROJECT / "runs")
 
-    def test_cancel_is_explicitly_unsupported(self):
-        self.assertFalse(self.backend.supports_cancel)
-        with self.assertRaises(UnsupportedOperation):
+    def test_cancel_capability_and_unknown_handle(self):
+        self.assertTrue(self.backend.supports_cancel)
+        with self.assertRaises(UnknownJob):
             self.backend.cancel(None)
 
 

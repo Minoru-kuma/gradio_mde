@@ -2,17 +2,15 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 01A — COMPLETE、成果物・docs・Git の最終確認**（2026-10-11）。
-- Authorization: 01A の production code、1モデル環境の作成・依存導入、fake tests、実モデル推論、
-  docs 更新。exit 達成時のまとまった commit / push。01B 以降は未承認。
-- 再開範囲: 残り依存 download / install、native API import、明示した CPU による実モデル smoke、
-  成果物検証、docs / Git hygiene、exit 達成時の commit / push。01B 以降へは進まない。
+- Current work: **Phase 01B — COMPLETE、docs / Git 最終整理**（2026-10-12）。
+- Authorization: Local robustness、環境再作成・依存導入、01A regression、明示 CPU MoGe smoke、
+  docs 更新。01B exit 達成時の commit / 現在 branch への push。Phase 02 以降は未承認。
 - Phase 00: **COMPLETE**。ユーザーの正式な clean-start 決定により source audit gate は充足。
-- Phase 01: **IN_PROGRESS**。01A: **COMPLETE**。01B: **NOT_STARTED / NOT_AUTHORIZED**。
+- Phase 01: **COMPLETE**。01A: **COMPLETE**。01B: **COMPLETE**。
 - Phase 02–08: **NOT_STARTED / NOT_AUTHORIZED**。
 - Source policy: repository 内に再利用必須の既存 production implementation は存在しない。
   過去のモデルコードは Phase 01 / 03 の必要時に参考資料として確認する。
-- 今回禁止: 01B の cancel / timeout 完成、lease / queue / recovery / retry、Gradio、Slurm、
+- 今回禁止: GPU lease / queue / active recovery / retry controller、Gradio、Slurm、
   MLflow、Benchmark、他モデル、warm worker / distributed inference。
 
 ## Phase management
@@ -31,7 +29,7 @@ Tests、Exit criteria、Known risks、Decisions deferred to later phases を維�
 | Phase | 前提 | 主要 exit | 現状 |
 | --- | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | clean-start の正式確認 | 調査記録・共通契約・段階計画の整合 | COMPLETE |
-| [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | IN_PROGRESS、01A のみ承認 |
+| [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | COMPLETE、01A / 01B exit 達成 |
 | [02](docs/phases/phase-02.md) | 01 | 1 モデルの Gradio、状態表示と保存結果 | 未着手 |
 | [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 未着手 |
 | [04](docs/phases/phase-04.md) | 03 | Runner から MLflow、失敗時にも結果保存 | 未着手 |
@@ -49,17 +47,63 @@ Phase 06 は abstraction の初導入ではなく、backend の可搬性を検�
 | Milestone | 優先する成果 | Exit に含めないもの | 状態 |
 | --- | --- | --- | --- |
 | 01A — Minimum Local E2E | 1 model × 1 image × 1 独立 Conda 環境、subprocess、ModelAdapter、LocalBackend、MDEOutput、Run Directory、raw depth / metadata / result / logs | GPU lease、queue、cancel / timeout API の完成、性能計測、retry、active job recovery、複雑な concurrency | COMPLETE（明示 CPU、2026-10-11） |
-| 01B — Local robustness | 基本 cancel / timeout、子 process 終了、単一 worker の busy guard、artifact validation、基本計測と再現手順 | 高度な retry / reconciliation、application restart recovery、分散 lease / multi-GPU queue | NOT_STARTED、未承認 |
+| 01B — Local robustness | 基本 cancel / timeout、子 process 終了、単一 worker の busy guard、artifact validation、基本計測と再現手順 | 高度な retry / reconciliation、application restart recovery、分散 lease / multi-GPU queue | COMPLETE、2026-10-12 |
 
 まず 01A の実モデル推論成功を証拠付きで確定し、その前に 01B の要件を追加しない。
 01A / 01B は既存 Phase 01 の内部 milestone であり、Phase 02–08 の番号と architecture は維持する。
 Phase 01 全体の COMPLETE は 01A / 01B 双方の exit を満たした時点とし、01A 単独の完了を区別する。
 01A 完了は 01B または Phase 02 の実装を自動承認しない。
 
-現在の作業手順と rollback は下記 01A implementation plan を使う。
+現在の作業手順と rollback は下記 01B implementation plan を使う。
 2026-10-07 の文書のみの計画更新は完了済みで、今回の実装承認とは区別する。
 リスク: 将来の完全な契約を 01A の必須実装と混同すると scope が再拡大する。
 各仕様に milestone の適用範囲を記載し、共通 interface / Run layout を維持して段階的に検証する。
+
+## Phase 01B implementation plan — 2026-10-12
+
+- Goal / scope: 01A の経路・schema major 1・既存 layout を維持して Local robustness を追加する。
+- Evidence: 開始 HEAD `24efc22`、branch main、clean。現在の checkout に旧環境・weights・runs はない。
+  既存8 tests の初回は環境不足で5 failures（2.516秒）。コード回帰とは区別する。
+- Order: source of truth 確認 → 固定環境を Git 管理外 `.local/envs/` に再作成 →
+  変更前01A regression → process group cancel / timeout・instance busy guard → validation / terminal
+  再 collect → worker timing / fingerprint → adversarial / lifecycle tests → 同じ MoGe CPU smoke → docs / exit → commit / push。
+- Process: POSIX の独立 session / process group、SIGTERM、bounded grace 後 SIGKILL。
+  wrapper exit だけで終了扱いにせず group の生存を確認。timeout は poll に依存せず backend timer で発火。
+  cancel は停止確認後 CANCELLED、timeout は FAILED / TIMEOUT。終了前に完了した job は完了を優先。
+- Validation: job / handle identity、必須 report 型・error・outputs・metadata、Run 内 path、
+  checksums / NPY / 入力・環境定義 digest。確定後破損は ArtifactIntegrityError、結果を書き換えない。
+  新 backend の保存済み terminal collect は読むだけ。active handle の監視・停止復旧は実装しない。
+- Measurements: perf_counter による load / adapter predict / depth serialization / unload、
+  CUDA 利用時のみ synchronize / allocator peak（bytes）。package name/version list と digest、
+  Python / platform / 定義 hash / torch / CUDA / device を記録。未測定値を0にしない、秘密の環境変数を保存しない。
+- Tests: 01A contract regression、実 Conda のcancel / timeout（SIGTERM無視の子を含む）と busy 再使用、
+  malformed / missing / corrupt report・path / checksum、terminal 再 collect / active拒否、
+  timing / fingerprint / CPU no allocator、CLI failure / interrupt / unsupported。実機は明示 CPU。
+- Risks: orphan / zombie、終了競合、timer と collect の race、依存 download / native API 不整合。
+  group を逸脱する daemon、OS quota、複数 backend 間の調停は保証しない。Linux POSIX で検証する。
+- Rollback / hygiene: 追加情報は optional、既存 JSON の読み戻し互換テストを追加。
+  base / system を変更せず environment / downloads / runs / secrets を commit しない。
+  failures を成功にせず、force push しない。Phase 02 以降の実装は開始しない。
+
+### Phase 01B completion evidence — 2026-10-12
+
+- 変更前01A 8 tests成功（9.501秒）、最終29 tests成功（53.102秒）。既存8 + 追加21。
+- 実Condaのcancel / timeout / orphan / graceful停止でwrapper waitとworker / child PID消失を確認。
+  pollingなしtimeout、busy解除 / 再使用、cancel競合、停止確認失敗の非terminal維持も検証。
+- 保存済みterminalの再collect（新backend / CLI、FAILED / CANCELLEDを含む）、
+  hash / mtime不変とpredict log 1回、01A形式互換、active recovery拒否を確認。
+- 環境再作成: 固定environment.yml、MoGe / utils3d revision、checkpoint SHA-256を利用。
+  Python 3.11.14 / torch 2.6.0+cu124 / torchvision 0.21.0+cu124 / runtime 12.4、明示CPU。
+- MoGe regression Run ID: f4a2052f-71da-4664-9c9f-281cca95fb41。COMPLETED / exit 0。
+  float32 [256,256]、metric z_depth (m)、65,536 valid / 0 invalid、必須12 files / JSON / logs検証。
+- 42 Python distributions / 24 Conda packagesとdefinition digest / list digest / fingerprintを保存。
+  load / predict / serialization / unload / metadata / worker timingを単位・scope付きで保存。
+  CPU allocator値は省略。実GPUは未検証。CUDA要求の負例はFAILEDでfallbackなし。
+- 完了証拠の詳細と測定値は [Phase 01](docs/phases/phase-01.md) に集約。
+  .local/validation/ / runs/はGit管理外。base / system変更なし。
+- 01A COMPLETE、01B COMPLETE、Phase 01 COMPLETE。Phase 02以降は未着手・未承認。
+  automatic retry / active recovery / queue / GPU lease / UI / tracking / Slurm / 他モデルは追加しない。
+- Exit達成により現在のmainへcommit / pushする。force pushなし、生成物・環境本体・secretを含めない。
 
 ## Phase 01A implementation plan — 2026-10-09
 

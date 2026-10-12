@@ -2,6 +2,7 @@
 
 Status: schema `1.0` の最小型と MoGe adapter / manifest を Phase 01A で実装。
 fake tests と MoGe の CPU 実推論・depth 保存を確認済み。GPU は未検証。
+01B の区間計測・fingerprint は共通 worker が担当し adapter signature は維持。
 optional geometry の保存・複数モデルは将来仕様。
 関連: [Architecture](architecture.md)、[Execution](execution-backend-spec.md)、
 [Environment](environment-strategy.md)、[Run Directory](run-directory-spec.md)。

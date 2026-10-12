@@ -1,8 +1,9 @@
 # Architecture
 
 Status: Phase 00 COMPLETE。Phase 01A の最小経路を実装し、fake tests を確認済み。
-MoGe の明示 CPU E2E と成果物検証により 01A COMPLETE。GPU は未検証。
-01B 以降は未着手・未承認。以下の全体図には将来設計も含む。
+MoGe の明示 CPU E2E と成果物検証、Local robustness / CPU regression により
+01A / 01B / Phase 01 COMPLETE。GPU は未検証。Phase 02 以降は未着手・未承認。
+以下の全体図には将来設計も含む。
 
 ## Repository investigation
 
@@ -123,6 +124,11 @@ BackendCatalog は利用可能な profile と準備状態の metadata を返し�
 `ExperimentRunner.submit(model_id, image, variant_id=None, device, dtype, parameters)`。
 submit は `JobHandle`、status は `JobStatusSnapshot`、collect は `JobResult` を返す。
 CLI が LocalBackend を構成し、Runner は ExecutionBackend の公開契約のみを使う。
+01B では submit に optional `walltime_seconds` を追加。cancel は CancelReceipt を返す。
+LocalBackend は instance の RLock / busy guard と job ごとの execution timer を持ち、
+WorkerProcess の独立 process group を停止確認して結果を確定する。複数 instance 間の調停はしない。
+新しい backend は保存済み terminal 結果だけを読み戻せる。active job recovery は拒否する。
+区間計測・環境観測は共通 worker / runtime module、検証は Storage に置く。
 RunRequest / RunHandle wrapper、catalog / discovery / tracking はまだ実装しない。
 
 ## Planned package topology

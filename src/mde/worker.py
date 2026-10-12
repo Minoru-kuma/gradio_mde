@@ -5,11 +5,13 @@ import os
 import platform
 import sys
 import traceback
+import time
 from pathlib import Path
 
 from .contracts import (JobSpec, ModelInfo, ModelLoadContext, PredictionRequest,
                         SCHEMA_VERSION, check_schema, utc_now)
 from .storage import artifact_ref, contained_path, read_json, sha256_file, write_json
+from .runtime import environment_fingerprint, timed, reset_allocator, observe_allocator
 
 
 def framework_runtime(device: str) -> dict:
@@ -26,13 +28,14 @@ def framework_runtime(device: str) -> dict:
         command = shutil.which("nvidia-smi")
         if command:
             observation = subprocess.run([command, "--query-gpu=driver_version", "--format=csv,noheader"],
-                                         capture_output=True, text=True, check=False)
+                                         capture_output=True, text=True, check=False, timeout=5)
             if observation.returncode == 0:
                 data["driver_version"] = observation.stdout.strip().splitlines()[0]
     return data
 
 
 def execute(job_path: Path, run: Path) -> int:
+    worker_started = time.perf_counter()
     import numpy as np
     from PIL import Image
 
@@ -60,9 +63,11 @@ def execute(job_path: Path, run: Path) -> int:
                                    spec.inference["device"], spec.inference["dtype"], spec.inference["seed"])
         module, name = info.data["adapter_entrypoint"].split(":")
         adapter = getattr(importlib.import_module(module), name)()
+        report["execution"]["environment_fingerprint"] = environment_fingerprint(spec.environment_ref)
         stage = "load"
         print(f"load: {info.model_id}", flush=True)
-        loaded = adapter.load(context)
+        with timed(report["metrics"], "load_seconds", "adapter.load including checkpoint IO and device transfer", context.device):
+            loaded = adapter.load(context)
         report["execution"].update(loaded.runtime)
         report["execution"]["model"] = loaded.identity
         report["warnings"].extend(loaded.warnings)
@@ -79,11 +84,14 @@ def execute(job_path: Path, run: Path) -> int:
             rgb = np.asarray(image).copy()
         stage = "predict"
         print(f"predict: {original_size}", flush=True)
-        batch = adapter.predict(PredictionRequest(input_spec["view_id"], rgb,
-                                  spec.inference["parameters"], tuple(spec.inference["requested_outputs"])))
+        allocator_measured = reset_allocator(context.device)
+        with timed(report["metrics"], "predict_seconds", "adapter.predict including preprocessing, inference, postprocessing and CPU output; CUDA synchronized", context.device):
+            batch = adapter.predict(PredictionRequest(input_spec["view_id"], rgb,
+                                      spec.inference["parameters"], tuple(spec.inference["requested_outputs"])))
         if len(batch.views) != 1 or batch.views[0].view_id != input_spec["view_id"]:
             raise ValueError("Prediction view identity mismatch")
         stage = "serialize"
+        serialization_started = time.perf_counter()
         output = batch.views[0]
         if output.depth is None:
             raise ValueError("Missing required depth")
@@ -124,6 +132,10 @@ def execute(job_path: Path, run: Path) -> int:
                               "extras": output.extras}]
         report["artifacts"] = [ref]
         report["execution"]["serialization_profile"] = "01A-depth-only"
+        report["metrics"]["serialization_seconds"] = {"value": time.perf_counter() - serialization_started,
+            "unit": "s", "scope": "depth validation, conversion, atomic NPY write and checksum; excludes metadata / result JSON"}
+        if allocator_measured:
+            observe_allocator(context.device, report["metrics"])
         report["outcome"] = "COMPLETED"
         print(f"saved: {ref['path']} shape={depth.shape}", flush=True)
     except Exception as error:
@@ -133,7 +145,8 @@ def execute(job_path: Path, run: Path) -> int:
     finally:
         if adapter is not None:
             try:
-                adapter.unload()
+                with timed(report["metrics"], "unload_seconds", "adapter.unload; CPU wall clock"):
+                    adapter.unload()
                 print("unload: complete", flush=True)
             except Exception as error:
                 report["warnings"].append(f"unload failed: {error}")
@@ -145,15 +158,18 @@ def execute(job_path: Path, run: Path) -> int:
     report["finished_at"] = utc_now()
     if report["outcome"] == "COMPLETED":
         try:
-            write_json(output_dir / "metadata.json", {"schema_version": SCHEMA_VERSION, "run_id": spec.run_id,
-                       "attempt_id": spec.attempt_id, "execution": report["execution"], "views": [metadata],
-                       "warnings": report["warnings"]})
-            report["artifacts"].append(artifact_ref(run, output_dir / "metadata.json", media_type="application/json"))
+            with timed(report["metrics"], "metadata_serialization_seconds", "metadata JSON write and checksum"):
+                write_json(output_dir / "metadata.json", {"schema_version": SCHEMA_VERSION, "run_id": spec.run_id,
+                           "attempt_id": spec.attempt_id, "execution": report["execution"], "views": [metadata],
+                           "warnings": report["warnings"]})
+                report["artifacts"].append(artifact_ref(run, output_dir / "metadata.json", media_type="application/json"))
         except Exception as error:
             traceback.print_exc()
             report["outcome"] = "FAILED"
             report["error"] = {"code": "WORKER_ERROR", "stage": "serialize", "message": str(error),
                                "retryability": False, "traceback_path": f"logs/{spec.attempt_id}/stderr.log"}
+    report["metrics"]["worker_seconds"] = {"value": time.perf_counter() - worker_started,
+        "unit": "s", "scope": "worker execute including imports, fingerprint, cleanup, metadata write; excludes result publication / Conda startup"}
     write_json(output_dir / "result.json", report)
     return 0 if report["outcome"] == "COMPLETED" else 1
 

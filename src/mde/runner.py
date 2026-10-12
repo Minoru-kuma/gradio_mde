@@ -16,7 +16,8 @@ class ExperimentRunner:
         self.project_root = Path(project_root)
 
     def submit(self, model_id: str, image: Path, *, variant_id: str | None = None,
-               device: str = "cuda:0", dtype: str = "float32", parameters: dict | None = None) -> JobHandle:
+               device: str = "cuda:0", dtype: str = "float32", parameters: dict | None = None,
+               walltime_seconds: int | None = None) -> JobHandle:
         info = self.registry.get_model(model_id)
         variant = info.variant(variant_id)
         if device not in info.data["supported_devices"] or dtype not in info.data["supported_dtypes"]:
@@ -30,6 +31,7 @@ class ExperimentRunner:
         request = {"model_ref": model_ref, "parameters": parameters,
                    "device": device, "dtype": dtype, "input_sha256": sha256_file(image),
                    "environment": environment, "backend_id": self.backend.backend_id}
+        request["walltime_seconds"] = walltime_seconds
         digest = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
         run_id = str(uuid.uuid4())
         run = self.store.prepare(run_id, image)
@@ -45,7 +47,7 @@ class ExperimentRunner:
                          "sha256": request["input_sha256"], "original_size": {"width": width, "height": height}}],
                        {"device": device, "dtype": dtype, "seed": 0, "parameters": parameters,
                         "requested_outputs": ["depth"], "resolution_policy": "native_input_grid"},
-                       asdict(ResourceSpec(gpu_count=int(device.startswith("cuda")))),
+                       asdict(ResourceSpec(gpu_count=int(device.startswith("cuda")), walltime_seconds=walltime_seconds)),
                        {"run_location": run_id}, f"{run_id}/{ATTEMPT_ID}", digest,
                        {"git_commit": "unknown", "source_digest": sources.hexdigest()})
         write_json(run / "job.json", spec.to_dict())

@@ -23,7 +23,7 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 
 ## 現在の開発状況
 
-**2026-10-11: Phase 00 COMPLETE、01A COMPLETE、01B NOT_STARTED。Phase 01 全体は IN_PROGRESS です。**
+**2026-10-12: Phase 00 COMPLETE、01A COMPLETE、01B COMPLETE、Phase 01 COMPLETE。Phase 02 は未着手・未承認です。**
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -34,7 +34,7 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 Phase 01 / Phase 03 の必要時に参考資料として確認します。
 
 source audit gate と文書の exit criteria を再評価し、Phase 00 を COMPLETE としました。
-現在は 01A のみ承認済みです。CLI / Runner / LocalBackend / Conda worker / ModelAdapter / RunStore の
+01A の成果として CLI / Runner / LocalBackend / Conda worker / ModelAdapter / RunStore の
 最小経路を実装し、独立環境 `mde-moge` と固定 checkpoint を準備しました。
 ユーザーの CPU 選択に従い、MoGe-2 ViT-S Normal × sample 1枚 × LocalBackend の実推論が成功しました。
 Run ID は `9c5b6556-30d3-43ae-827f-7bd8b0a47580`。raw depth は float32 `[256,256]` の
@@ -43,7 +43,11 @@ Run ID は `9c5b6556-30d3-43ae-827f-7bd8b0a47580`。raw depth は float32 `[256,
 NVIDIA GPU は見えず `cuda_available=false` であり、GPU 実行・driver 互換性は未検証です。
 依存導入後の fake / contract tests は8件成功（17.025秒）。depth の意味と実行経路の確認であり、精度評価は行っていません。
 checkpoint / wheels / runs は Git 管理外です。固定版と実測証拠は [Phase 01](docs/phases/phase-01.md) に記録しています。
-01B、Gradio、Slurm、MLflow、Benchmark は未着手です。
+01B では cancel / execution timeout、Conda process group の停止、instance busy guard、
+report / artifact 検証、区間計測、環境 fingerprint、保存済み terminal result の再 collect を追加しました。
+固定環境を再作成し MoGe CPU regression smoke が成功。Run ID は
+`f4a2052f-71da-4664-9c9f-281cca95fb41`。GPU / 精度評価は未検証です。
+Gradio、Slurm、MLflow、Benchmark、他モデルは未着手です。
 初回調査の根拠と clean-start 決定は [architecture](docs/architecture.md#repository-investigation) を参照してください。
 
 ## 対応予定モデル
@@ -99,10 +103,20 @@ CLI の既定 device は `cuda:0`。CUDA が使えない場合は FAILED とな�
 入力は現在 PNG 1 枚、出力は raw depth / metadata / result / stdout / stderr です。
 sample の出典・license は [tests/assets/README.md](tests/assets/README.md) に記録しています。
 
+timeout は `--timeout-seconds 180` 等で指定できます。SIGINT / SIGTERM は worker group を停止し、
+ユーザー cancel は CANCELLED（CLI exit 130）、timeout は FAILED / TIMEOUT（exit 1）です。
+成功は exit 0、事前設定・未対応機能・integrity error は exit 2。同じ LocalBackend instance の
+実行中の追加 submit は busy として拒否し、queue は作りません。保存済み結果は Conda 不要で再収集できます:
+
+```bash
+PYTHONPATH=src python -m mde.cli collect --run-id f4a2052f-71da-4664-9c9f-281cca95fb41
+```
+
 GPU 不要の contract tests（NumPy / Pillow を持つ独立モデル環境が必要）:
 
 ```bash
 PYTHONPATH=src python -m unittest discover -s tests -v
+# prefix 環境の場合は MDE_TEST_CONDA_PREFIX=/path/to/env を指定
 ```
 
 以下は将来の UI / tracking / benchmark も含む概念的な手順です。
@@ -123,7 +137,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | フェーズ | 内容 | 状態 |
 | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
-| [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | IN_PROGRESS。01A COMPLETE（CPU E2E）、01B NOT_STARTED / 未承認 |
+| [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | COMPLETE。01A / 01B COMPLETE（CPU E2E / Local robustness） |
 | [02](docs/phases/phase-02.md) | Gradio Single Model UI | 未着手 |
 | [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 未着手 |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |

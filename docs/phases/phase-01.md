@@ -1,10 +1,9 @@
 # Phase 01 — Single Model + Local Execution + Miniconda
 
-Status: **Phase 01 — IN_PROGRESS**（2026-10-11）。
-**01A — COMPLETE、01B — NOT_STARTED / NOT_AUTHORIZED**。
-ユーザーの自宅 Wi-Fi 接続後の再開・CPU 選択指示により、MoGe の CPU E2E が成功。
-raw depth / JSON reports / logs の保存・読み戻しと、依存導入後の8件の fake tests を確認した。
-Phase 01 全体は 01B が未着手のため IN_PROGRESS。01A 完了を次 milestone の承認としない。
+Status: **Phase 01 — COMPLETE**（2026-10-12）。
+**01A — COMPLETE、01B — COMPLETE**。Phase 02 は未着手・未承認。
+01A のMoGe CPU E2E経路を維持し、01BのLocal robustnessとCPU regression smokeを検証した。
+既存layout / protocol major 1を維持。完了を次phaseの実装承認としない。
 管理: [PLANS.md](../../PLANS.md)。
 
 ## Goal
@@ -48,7 +47,7 @@ MoGe-2 ViT-S Normal の source / checkpoint を固定した。latest を自動�
 制御側から worker を起動し、process poll と result validation で成功 / 失敗を判定する。
 `submit()` は handle を返し、呼出し側は単純な poll loop で待てばよい。
 一度に 1 job の手動実行を前提とし、queue / GPU lease / concurrency manager を作らない。
-共通 cancel signature は保持するが、01A の backend は `supports_cancel = false` を宣言し、
+01A 当時は共通 cancel signature を保持し、backend は `supports_cancel = false` を宣言し、
 呼ばれたら明示的な UnsupportedOperation とする。cancel / timeout の実装完了は 01B の条件。
 
 新規整備するモデル環境は 1 つ。Runner は既存の制御側 Python から起動できればよく、
@@ -100,19 +99,19 @@ GPU / driver は利用できず、ユーザー指示に基づいて CPU を明�
 
 ### 01B tasks — after 01A acceptance
 
-- [ ] cancel / timeout と process group の停止、子 worker の終了確認を実装。
-- [ ] same LocalBackend instance の同時 submit は busy として拒否する簡単な guard を整備。
+- [x] cancel / timeout と process group の停止、子 worker の終了確認を実装。
+- [x] same LocalBackend instance の同時 submit は busy として拒否する簡単な guard を整備。
   GPU 全体の lease・他 process との調停には拡張しない。
-- [ ] malformed job / unknown environment / corrupt result / checksum / path validation を補強。
-- [ ] load / prediction / serialization timing と optional allocator memory の計測を整備。
-- [ ] environment の実測 fingerprint、再作成手順、保存済み terminal result の再 collect を確認。
-- [ ] CLI error / cancel の説明、未対応 ResourceSpec / backend operations を明示。
-- [ ] unsupported → supported cancel の capability を更新し、01A の E2E regression を確認。
+- [x] malformed job / unknown environment / corrupt result / checksum / path validation を補強。
+- [x] load / prediction / serialization timing と optional allocator memory の計測を整備。
+- [x] environment の実測 fingerprint、再作成手順、保存済み terminal result の再 collect を確認。
+- [x] CLI error / cancel の説明、未対応 ResourceSpec / backend operations を明示。
+- [x] unsupported → supported cancel の capability を更新し、01A の E2E regression を確認。
 
 ## Tests
 
 01A は下記の contract / fake tests と実モデル CPU smoke を確認済み。それぞれの証拠を分けて記録する。
-01B tests は将来計画であり今回実行しない。
+01B tests とCPU regressionも2026-10-12に実行済み（下記acceptance evidence）。
 
 ### 01A tests
 
@@ -191,6 +190,40 @@ WorkerResult / JobResult / stdout / stderr を保存・読み戻しできる。
 depth の意味、使用 model / checkpoint / environment / device が記録され、制御側に model / torch の
 必須依存がない。環境定義と最小起動手順、未対応機能を記録する。
 **GPU lease、cancel 完成、retry、restart recovery、concurrency は 01A exit の条件ではない。**
+
+### 01B acceptance evidence — 2026-10-12
+
+2026-10-12のユーザー実装指示に基づき01Bのみ追加。Phase 02以降には進まない。
+
+| 項目 | 確認結果 |
+| --- | --- |
+| 01A regression（変更前） | 独立環境再作成後8件成功、9.501秒。環境不足時の初回5 failuresと区別 |
+| 最終tests | 29件成功、53.102秒。既存8件と追加21件。cancel未対応の旧期待値は01Bのcapabilityへ更新 |
+| cancel | SIGTERM / grace / SIGKILL、CANCELLED、再cancel冪等、完了優先の競合、停止確認失敗時はRUNNING維持 |
+| timeout | status pollingなしでtimerが発火、FAILED / TIMEOUT。SIGTERMを無視するworker・子も停止 |
+| process終了 | Conda wrapperをwait、worker / child PIDが/procから消失。graceful / 強制停止 / wrapper先行終了を検証 |
+| busy | 同じinstanceの別submitを拒否。同一specは同じhandle、変更specはconflict。終了後の次jobが成功 |
+| report / artifacts | malformed / missing / corrupt、型・schema・ID・error、depth / metadata / checksum / path / symlink / unit / shape。確定後破損はArtifactIntegrityErrorでterminal不変 |
+| terminal再collect | 新backend / 新CLIでも成功。worker未起動、predict log 1回、全filesのhash / mtime不変。FAILED / CANCELLEDも再読込。active recoveryは拒否 |
+| 互換性 | 01A形式のfingerprint / metrics未追加結果を読戻し。layout / schema_version 1.0 / depth-only維持 |
+| 環境再作成 | environment.ymlから.local/envs/mde-mogeへ作成。固定MoGe / utils3dを--no-deps導入、checkpoint SHA-256照合。base / system変更なし |
+| runtime | CPython 3.11.14、torch 2.6.0+cu124、torchvision 0.21.0+cu124、torch CUDA runtime 12.4、device=cpu、cuda_available=false、GPU / driver=null |
+| fingerprint | Python distribution 42件、Conda package 24件。Python / OS / arch / prefix、定義・package list・全体SHA-256。任意環境変数やcredentialを保存しない |
+| definition digest | b582cfa5e7c85d5d9d48b6dd08f64ce142f546f4831ddcecc8e1d95065224d98 |
+| Python package list digest | a4d8eea7de469c9a57fa37f71780e5220a62753a35a10544b23456741884a404 |
+| environment fingerprint digest | c38cf05fd74cd90d540e747b3c22befd56fc50d2b10549e4c3fe627408c4edf1 |
+| MoGe CPU Run ID | f4a2052f-71da-4664-9c9f-281cca95fb41、COMPLETED / exit 0。固定source / checkpointは01Aと同じ |
+| raw depth | float32 [256,256]、z_depth / metric / m、65,536 valid / 0 invalid、0.81104505–4.28780937 m。必須12 files / JSON / logs / NumPy読み戻し成功 |
+| basic timing | load 2.339091 s、predict 2.157162 s、depth serialization 0.001107 s、unload 0.077755 s、metadata 0.000749 s、worker execute 4.699339 s。各scopeはEnvironment仕様に記載 |
+| CUDA allocator | CPUではkeyなし（未計測）。CUDA synchronize / peak APIはmock検証。実GPUは未検証 |
+| CUDA no fallback | dfc5b6d3-80c5-42b8-a28e-ec7d7f413c11、cuda:0要求はFAILED / load / CUDA unavailable、outputs空。CPUに切替なし |
+| CLI | SIGINTでgroup停止 / exit 130、worker失敗exit 1と構造化理由、invalid timeout / 未対応は明示エラー。collectはConda不要 |
+
+logs / summaryは.local/validation/、実モデル成果物はruns/に保持しGit管理外。
+精度評価やbenchmark、GPU互換性の証拠ではない。推移依存の完全lockやupstream全extras / pip check
+の成功は保証しない。実測fingerprintと固定定義を区別する。git_commitは既存のunknownのまま、
+source_digestで実行sourceを識別。GPU lease / queue / retry / active recovery等は未実装。
+01B exitを充足し、01A / 01B / Phase 01をCOMPLETEとする。
 
 ### 01B exit
 

@@ -1,7 +1,8 @@
 # Environment strategy
 
 Status: Phase 01A で独立環境 `mde-moge`、定義、Resolver / Conda launcher を追加。
-Conda subprocess の fake tests と MoGe CPU 実推論は確認済み。GPU 互換性は未検証。
+Conda subprocess の fake tests と MoGe CPU 実推論は確認済み。01Bで環境再作成・
+process group 停止・計測・fingerprint・CPU regression を検証。GPU 互換性は未検証。
 作成手順と固定版は [MoGe README](../models/moge/README.md)、実測状態は [PLANS](../PLANS.md)。
 
 ## Why Miniconda / Conda
@@ -114,8 +115,8 @@ prefix 指定。shell の `source activate` 文字列を Runner に埋め込ま�
 
 WorkerLaunchSpec は executable / argv、cwd、許可した environment variables、log paths を持つ。
 01A は選定環境で worker を起動して process exit / report を確認する薄い launcher とする。
-timeout と process group の終了制御は 01B に追加し、cancel 時は wrapper だけでなく子 worker まで
-終了する。JSON Job / result、stdout / stderr の責務は共通 protocol に置く。
+01B では timeout と process group の終了制御を実装。cancel 時は wrapper だけでなく子 worker まで
+終了を確認する。JSON Job / result、stdout / stderr の責務は共通 protocol に置く。
 structured progress や多環境 provider の汎用化を 01A の前提にしない。
 
 model worker は Gradio や MLflow を import せず、JSON / numeric artifacts を返す。
@@ -148,3 +149,37 @@ Phase 01A: 初期モデルの pin、minimal worker packaging、launcher と 1 �
 Phase 01B: cancel / timeout、基本計測、詳細 fingerprint、環境再作成手順の検証。
 Phase 03: 3 環境の独立性、capability / runtime matrix。Phase 07–08: module、node driver、offline cache、
 共有 prefix と node-local prefix の選択。複数モデル / micromamba / cluster profile は未設定。
+
+## Phase 01B measurement and fingerprint
+
+共通 worker が execution.environment_fingerprint に Python version / implementation / executable /
+prefix、OS / release / machine / processor、環境定義 digest、Python distribution の name/version list、
+Conda package の name/version/build/subdir list とそれぞれの SHA-256 digest を保存する。
+list をソートし canonical JSON（sort_keys、separator comma/colon）で hash を計算する。
+fingerprint 全体（fingerprint_digest 自身を除く）も同じ方法で hash。credential / 任意環境変数 /
+package source URL を採取しない。prefix は生成されたローカル結果にのみ残す。
+execution の device / torch_version / torch_cuda_runtime / cuda_available / GPU名 / driver は
+実際に import 済み framework から観測する。device=cpu で GPU名 / driver が null は未検証を意味する。
+
+metrics は各 key に value / unit / scope を持つ。未計測は key を省略し0で埋めない。
+
+| Key | 単位 / scope |
+| --- | --- |
+| load_seconds | s、adapter.load のcheckpoint IO / device transferを含む |
+| predict_seconds | s、adapter.predict の前処理・推論・後処理・CPU出力を含む。CUDA時は前後 synchronize |
+| serialization_seconds | s、depth validation / conversion / NPY atomic write / checksum。metadata / result JSONを除く |
+| unload_seconds | s、adapter.unload のCPU wall clock。CUDA不調でもcleanupを試みる |
+| metadata_serialization_seconds | s、metadata JSON write / checksum |
+| worker_seconds | s、execute のimports / fingerprint / cleanup / metadata。result publication / Conda startupを除く |
+| cuda_peak_allocated_bytes / cuda_peak_reserved_bytes | bytes、predict開始前resetからdepth保存までのtorch allocator peak。loaded modelを含みcontext / 他processを除く |
+
+allocator はCUDAが実際に利用可能な要求deviceの場合のみ記録する。CPU smoke はallocator未計測、
+CUDA API境界はmockで検証し、実GPUの計測は未検証。
+計測は perf_counter、timeout はmonotonicを利用する。
+実装根拠: [Python subprocess](https://docs.python.org/3/library/subprocess.html)、
+[PyTorch CUDA memory API source](https://github.com/pytorch/pytorch/blob/v2.6.0/torch/cuda/memory.py)。
+
+2026-10-12 は既存環境がなかったため environment.yml から .local/envs/mde-moge を再作成し、
+固定 upstream --no-deps installとcheckpoint hash照合後にfake / MoGe CPU smokeが成功した。
+環境の手順は [MoGe README](../models/moge/README.md)。推移依存の完全lock、
+upstream全CLI / UIのrequirements充足、pip check成功は保証しない。

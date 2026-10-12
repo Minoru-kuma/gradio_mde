@@ -25,6 +25,31 @@ class FakeAdapter(ModelAdapter):
             raise RuntimeError("intentional predict failure")
         if action == "missing_result":
             raise SystemExit(0)
+        if action in ("block", "stubborn", "orphan", "gentle"):
+            import json
+            import os
+            import signal
+            import subprocess
+            import time
+            child_code = "import signal,time; "
+            if action != "gentle":
+                child_code += "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+            child_code += "print('ready',flush=True); time.sleep(120)"
+            child = subprocess.Popen([sys.executable, "-c", child_code],
+                stdout=subprocess.PIPE, text=True)
+            child.stdout.readline()
+            child.stdout.close()
+            print("fake child ready: " + json.dumps({"worker": os.getpid(), "child": child.pid}), flush=True)
+            if action == "orphan":
+                raise SystemExit(0)
+            if action == "stubborn":
+                signal.signal(signal.SIGTERM, signal.SIG_IGN)
+            if action == "gentle":
+                def terminate(*_):
+                    child.wait(timeout=2)
+                    raise SystemExit(143)
+                signal.signal(signal.SIGTERM, terminate)
+            time.sleep(120)
         depth = None if action == "missing_depth" else np.full(request.image.shape[:2], 2.5, dtype=np.float32)
         return PredictionBatch([MDEOutput(request.view_id, depth,
             {"depth_kind": "z_depth", "scale_type": "relative", "depth_unit": "arbitrary",

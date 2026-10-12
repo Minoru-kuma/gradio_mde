@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+import re
+import uuid
 from typing import Any
 
 SCHEMA_VERSION = "1.0"
@@ -15,7 +17,8 @@ def utc_now() -> str:
 
 
 def check_schema(value: dict) -> None:
-    if value.get("schema_version", "").split(".")[0] != "1":
+    if (not isinstance(value, dict) or not isinstance(value.get("schema_version"), str)
+            or not re.fullmatch(r"1\.[0-9]+", value["schema_version"])):
         raise ValueError("UnsupportedSchema: expected protocol major 1")
 
 
@@ -28,6 +31,10 @@ class ResultNotReady(RuntimeError):
 
 
 class UnknownJob(KeyError):
+    pass
+
+
+class BackendBusy(RuntimeError):
     pass
 
 
@@ -161,8 +168,42 @@ class JobSpec:
     def from_dict(cls, value: dict) -> "JobSpec":
         check_schema(value)
         job = cls(**{key: value[key] for key in cls.__dataclass_fields__ if key in value})
-        if job.attempt_id != ATTEMPT_ID or job.attempt_number != 1 or len(job.inputs) != 1:
-            raise UnsupportedOperation("01A supports one view and one initial attempt")
+        if (job.attempt_id != ATTEMPT_ID or type(job.attempt_number) is not int or job.attempt_number != 1
+                or not isinstance(job.inputs, list) or len(job.inputs) != 1):
+            raise UnsupportedOperation("Phase 01 supports one view and one initial attempt")
+        if str(uuid.UUID(job.run_id)) != job.run_id:
+            raise ValueError("Invalid Run ID")
+        for key in ("model_ref", "environment_ref", "inference", "resources", "storage", "provenance"):
+            if not isinstance(getattr(job, key), dict):
+                raise ValueError(f"JobSpec {key} must be an object")
+        if job.storage.get("run_location") != job.run_id:
+            raise ValueError("Run location mismatch")
+        for key in ("backend_id", "backend_profile", "idempotency_key"):
+            if not isinstance(getattr(job, key), str) or not getattr(job, key):
+                raise ValueError(f"Invalid {key}")
+        if not isinstance(job.request_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", job.request_digest):
+            raise ValueError("Invalid request digest")
+        if not isinstance(job.environment_ref.get("environment_id"), str):
+            raise ValueError("Missing environment ID")
+        if not isinstance(job.model_ref.get("manifest"), dict) or not isinstance(job.model_ref.get("variant"), dict):
+            raise ValueError("Malformed model reference")
+        check_schema(job.model_ref["manifest"])
+        source = job.inputs[0]
+        if not isinstance(source, dict) or source.get("view_id") != VIEW_ID:
+            raise ValueError("Invalid input view")
+        if not isinstance(source.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", source["sha256"]):
+            raise ValueError("Invalid input checksum")
+        if not isinstance(source.get("path"), str) or not isinstance(source.get("original_size"), dict):
+            raise ValueError("Malformed input reference")
+        for axis in ("width", "height"):
+            if type(source["original_size"].get(axis)) is not int or source["original_size"][axis] < 1:
+                raise ValueError("Invalid input dimensions")
+        if job.inference.get("device") not in ("cpu", "cuda:0") or job.inference.get("dtype") != "float32":
+            raise UnsupportedOperation("Phase 01 supports cpu / cuda:0 and float32")
+        if not isinstance(job.inference.get("parameters"), dict) or type(job.inference.get("seed")) is not int:
+            raise ValueError("Malformed inference parameters / seed")
+        if job.inference.get("requested_outputs") != ["depth"]:
+            raise UnsupportedOperation("Phase 01 serializes depth only")
         return job
 
 
@@ -192,6 +233,17 @@ class JobStatusSnapshot:
     finished_at: str | None = None
     cancel_requested: bool = False
     reason: str | None = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class CancelReceipt:
+    accepted: bool
+    requested_at: str
+    status: str
+    already_terminal: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)

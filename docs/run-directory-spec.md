@@ -160,7 +160,8 @@ stdout / stderr の partial log も保持する。terminal JobResult は確定�
 
 01A の NPY は little-endian float32 `[H,W]` / C order、invalid は NaN。
 control は NumPy を import せず NPY header / payload size / checksum を検証する。
-同一 backend instance の repeated collect は検証済みで、process 再起動後の collect は未実装。
+01B では同一 / 新 backend instance と新 CLI process の terminal 再 collect を検証済み。
+job-result.json が存在しない active handle は復旧しない。
 Git metadata が見えない実行では `git_commit=unknown` と `.py / .json / .yml` の source digest を残す。
 metadata は actual Python / Conda prefix / device と、adapter が観測した torch / runtime / GPU を持つ。
 machine-specific path はローカル生成結果に限り、repository に commit しない。
@@ -173,3 +174,18 @@ machine-specific path はローカル生成結果に限り、repository に comm
 | attempt 別 output / logs | retry で成果と失敗証拠を失わない | directory の階層が一段増える | execution instance / scheduler requeue |
 | WorkerResult と確定 JobResult を分ける | worker 未起動や scheduler failure も表現する | report が二段になる | reconciliation / audit tooling |
 | file manifest を最後に publish | 読み手が partial artifacts を成功扱いしない | file validation と publication grace が必要 | NFS / remote Store の専用 writer |
+
+## Phase 01B validation and compatibility
+
+layout と schema_version `1.0` は維持。新規情報は既存 execution / metrics 内の optional field とする。
+01A 形式の fingerprint / 計測のない保存結果の読み戻しを tests で確認する。
+JSON object 以外、duplicate key、NaN / Infinity / overflow scalar、未知 major を拒否する。
+必須 depth と metadata は output/attempt-0001 以下の参照・size / SHA-256 を照合し、
+NPY header / payload / dtype / shape、depth unit / scale / camera、metadata の ID / views / runtime
+および worker / terminal report の一致を検証する。absolute / parent traversal / Run外 symlink を拒否。
+input hash と immutable JobSpec snapshots も照合する。
+
+確定前の不正 result は FAILED、確定後の変更は ArtifactIntegrityError。cancel / timeout の
+途中 artifacts を成功出力にしない。診断結果と partial stdout / stderr を保持する。
+terminal 再 collect は読み取り専用で、artifact の checksum / mtime と predict log の回数を tests /
+MoGe regression で確認した。active job を directory から再 submit する機能はない。

@@ -1,7 +1,8 @@
 # Execution backend specification
 
 Status: Phase 01A の LocalBackend / 共通型を実装し、Conda worker の fake tests と MoGe CPU E2E を確認済み。
-cancel / timeout は未対応。Slurm / Mock backend と以下の高度な契約は将来設計。
+01B の cancel / timeout / busy guard / validation / terminal 再 collect を実装・検証済み。
+Phase 01 COMPLETE。Slurm / Mock backend と以下の高度な契約は将来設計。
 関連: [Architecture](architecture.md)、[Environment](environment-strategy.md)、
 [Run Directory](run-directory-spec.md)、[Slurm](slurm-integration.md)。
 
@@ -22,7 +23,7 @@ backend を変えた比較実行は provenance を分けるため新しい Run I
 
 ## ExecutionBackend interface
 
-submit / status / collect の signature は最小実装と共通。cancel の CancelReceipt は将来仕様。
+submit / status / collect の signature は最小実装と共通。Local の CancelReceipt は01Bで実装済み。
 以下は全体の共通契約。01A の最小実装と 01B / 06 の追加範囲を
 [Phase 01](phases/phase-01.md) と本書の LocalBackend 節で区別する。
 
@@ -43,9 +44,11 @@ collect(handle: JobHandle) -> JobResult
 非 terminal の collect は `ResultNotReady`、不明 handle は `UnknownJob`、schema 不一致は
 `UnsupportedSchema` 等の明示エラーにする。poll timeout は job 実行 timeout と区別する。
 FAILED / CANCELLED でも診断情報を collect できる。collect はモデルを再実行しない。
-01A は interface の signature を保ちつつ `supports_cancel=false` を公開し、cancel 呼び出しは
-`UnsupportedOperation` とする。未対応操作を成功扱いしない。execution timeout 対応も 01B に
-追加し、01A で walltime を指定された場合は unsupported resource として submit 前に拒否する。
+01A 時点は `supports_cancel=false` / walltime 未対応だった。01B では
+`supports_cancel=true`、Local cancel は bounded な同期停止と確認を行い CancelReceipt を返す。
+receipt は accepted / requested_at / status / already_terminal。terminal に対する再 cancel は
+accepted=false / already_terminal=true で元の状態を維持する。停止確認失敗は例外となり、
+RUNNING / busy guard を維持する。別 process の active handle 復旧・停止は未対応。
 
 ## Common types
 
@@ -114,7 +117,7 @@ Snapshot は `status`、`last_known_status`、`backend_state`、`observed_at`、
 観測不能時は補助状態 `UNKNOWN` と last_known を返す。UNKNOWN は実行状態の逆戻りではない。
 query 失敗と worker 失敗、job 不在と未登録 handle を区別する。
 01A の Local snapshot は status / backend_state / observed_at / sequence / timestamps /
-cancel_requested / reason の subset。UNKNOWN / CANCELLED の enum は保持するが状態遷移は未実装。
+cancel_requested / reason の subset。01B は CANCELLED 遷移を追加。UNKNOWN 観測は未実装。
 
 ```mermaid
 stateDiagram-v2
@@ -144,7 +147,8 @@ warnings、error を持つ。成功時は少なくとも 1 view の depth が必
 worker の `output/<attempt_id>/result.json` は WorkerResult report であり、execution 全体の
 確定結果と区別する。Backend は worker report と process / scheduler 情報を照合して JobResult を作り、
 `attempts/<attempt_id>/job-result.json` に保存する。worker が起動しなかった失敗でも backend が
-outputs 空の診断結果を生成できる。FAILED の途中 artifact は partial と示し成功出力と混ぜない。
+outputs 空の診断結果を生成できる。FAILED の途中 artifact は partial と示し成功出力と混ぜない。01B は成功参照を空にし、
+途中fileとpartial logsをRun内に残す。partial artifact参照の一覧化は未実装。
 
 error は code、stage（preflight / load / predict / serialize / backend / collect）、message、
 retryability、exit code / signal、traceback artifact ref。native exception class をプロセス越しに渡さない。
@@ -152,7 +156,7 @@ metrics は units と measurement scope を伴い、未計測を 0 として補�
 
 ## LocalBackend
 
-### Phase 01A — Minimum Local E2E
+### Phase 01A — Minimum Local E2E（当時の範囲）
 
 1. 単一 Job を検証・受理・記録し、worker を起動して JobHandle を返す。
    QUEUED は起動までの状態として使えるが、待ち行列や GPU lease を作らない。
@@ -171,11 +175,32 @@ cpu_count は要求記録のみで thread quota を強制せず、host / GPU mem
 
 ### Phase 01B — Local robustness
 
-cancel / timeout は process group に終了を要求し、必要に応じて grace period 後に強制終了する。
-Conda wrapper と子 worker の終了を確認してから terminal とする。同一 Backend instance の
-実行中の追加 submit は busy として拒否し、単純な二重起動を防ぐ。queue や分散 lease は導入しない。
-欠落 / 破損 artifacts、繰り返し collect、異常終了を検証し、基本 timing / allocator memory と
-環境の再現手順を整える。保存済み terminal result の再読込と active job の復旧は区別する。
+01B は実装・検証済み。POSIX の `start_new_session=True` で Conda wrapper と子 worker を
+独立 group に起動する。SIGTERM → grace（既定1秒）→ 必要なら SIGKILL、wrapper の wait と
+group の停止確認後に terminal とする。Linux は /proc で group の実行中 process を確認し、
+zombie は実行終了済みとして親 / init の回収に委ねる。tests は worker / 子 PID の消失も確認する。
+自ら group を離脱する daemon は対象外。Windows は起動拒否、Linux 以外の POSIX は未実機検証。
+
+`ResourceSpec.walltime_seconds` は正整数。Conda startup を含む launch 後の経過時間を
+monotonic clock と job ごとの timer で制限し、polling がなくても停止する。queue はない。
+timeout は FAILED / TIMEOUT、ユーザー cancel は CANCELLED。process が既に終了した場合は
+先に report を検証し、その結果を優先する。timer / status / cancel / collect は instance lock で直列化。
+
+実行中の異なる submit は BackendBusy。既に受理した同一 spec は同じ handle、異なる spec で
+同じ key は identity conflict。終了後は次 job を受理する。instance / host 間の GPU 調停はしない。
+unknown resources、GPU type、host / GPU memory quota は UnsupportedOperation、GPU count は0–1。
+cpu_count は正整数の要求記録のみで quota enforcement はない。
+
+Job snapshots / input hash、環境定義 hash、WorkerResult の型・ID・timestamp・error・metric、
+必須 depth / metadata の参照・checksum・size・NPY・単位・camera・JSON整合を検証する。
+不正な終了前 result は FAILED / INVALID_RESULT（非ゼロ exit は WORKER_FAILED）。
+確定後の欠落 / 破損は ArtifactIntegrityError、terminal state は書き換えない。
+
+`LocalBackend(run_root, manager=None).collect(saved_handle)` は保存済み terminal 結果を検証して読む。
+WorkerManager / Conda は不要で、worker を起動せず file を移動・更新しない。
+保存済み handle と job/result identity を照合する。terminal report がなければ active recovery として
+UnsupportedOperation、不明 handle は UnknownJob。同一 instance / 新 instance とも再 collect を検証済み。
+基本 timing / allocator / fingerprint は [Environment](environment-strategy.md) に定義する。
 
 高度な retry / submission reconciliation / application restart recovery / concurrency 制御は
 Phase 06 以降。GPU lease はその必要性と scope を改めて判断する。

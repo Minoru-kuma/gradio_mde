@@ -1,4 +1,4 @@
-# MoGe-2 plugin — Phase 01A
+# MoGe-2 plugin — Phase 01
 
 1画像の raw depth 保存に絞った adapter。Gradio / Tracking / scheduler / Store を import しない。
 共通 worker が画像を読み、ModelAdapter が load / predict / unload と MDEOutput を担当する。
@@ -80,7 +80,7 @@ camera-space points の z 成分に metric_scale を適用する。
 01A では depth のみ保存する。mask は validity 判定に使い、invalid Inf は worker が NaN に保存する。
 metric scale は推定値であり、この smoke に GT / 精度評価はない。
 
-## 検証状態
+## 01A 検証状態（2026-10-11時点）
 
 2026-10-11、ユーザーの CPU 選択に基づいて上記 CLI を `--device cpu` で実行し、E2E が成功。
 Run ID: `9c5b6556-30d3-43ae-827f-7bd8b0a47580`。float32 `[256,256]` の metric z-depth（m）、
@@ -107,3 +107,37 @@ conda run --no-capture-output -n mde-moge python -m pip install --timeout 120 \
 `.local/packages` の取得済み NVIDIA wheel 5個は PyPI の SHA-256 と照合済み。
 必要な残り package を download して導入し、native API import と実測 runtime を確認した。
 CPU を選択する際は CLI の `--device cpu` を指定する。CUDA 要求時の自動 fallback は行わない。
+
+## Phase 01B regression / environment recreation
+
+2026-10-12、旧環境・weightsのないcheckoutから固定版環境を再作成して検証した。
+base / systemに導入せず、生成物をGit管理外に置く例:
+
+```bash
+CONDA_PKGS_DIRS=$PWD/.local/conda-pkgs conda env create \
+  --prefix .local/envs/mde-moge -f models/moge/environment.yml
+PIP_CACHE_DIR=$PWD/.local/pip-cache conda run --no-capture-output \
+  --prefix .local/envs/mde-moge python -m pip install --no-deps \
+  'git+https://github.com/microsoft/MoGe.git@07444410f1e33f402353b99d6ccd26bd31e469e8' \
+  'git+https://github.com/EasternJournalist/utils3d.git@3fab839f0be9931dac7c8488eb0e1600c236e183'
+conda run --no-capture-output --prefix .local/envs/mde-moge \
+  python -m models.moge.prepare_checkpoint \
+  --output .local/weights/moge-2-vits-normal.pt --cache-dir .local/huggingface
+PYTHONPATH=src MDE_TEST_CONDA_PREFIX=$PWD/.local/envs/mde-moge \
+  python -m unittest discover -s tests -v
+PYTHONPATH=src python -m mde.cli run --model moge --input tests/assets/sample.png \
+  --device cpu --conda-prefix .local/envs/mde-moge \
+  --checkpoint .local/weights/moge-2-vits-normal.pt --timeout-seconds 180
+```
+
+29 tests成功（53.102秒）。CPU smoke Run ID:
+`f4a2052f-71da-4664-9c9f-281cca95fb41`、COMPLETED / exit 0。
+float32 [256,256]のmetric z-depth、65,536 valid / 0 invalid、必須12 filesを読み戻した。
+新backend / CLIのterminal再collectは再推論せずhash / mtimeも不変。
+
+load / predict / depth serialization / unload / metadata / worker timingと、42 Python distributions /
+24 Conda packagesを含むfingerprintを保存。runtime / package digest / 計測scopeは
+[Phase 01](../../docs/phases/phase-01.md) と [Environment](../../docs/environment-strategy.md) に記録。
+CUDA unavailable環境でcuda:0要求はloadでFAILED、CPU fallbackなしを確認した。
+GPU成功 / allocator実機計測 / 精度評価 / upstream全extras充足は未検証。
+01A / 01B / Phase 01 COMPLETE、Phase 02は未着手・未承認。
