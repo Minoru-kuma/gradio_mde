@@ -183,3 +183,20 @@ CUDA API境界はmockで検証し、実GPUの計測は未検証。
 固定 upstream --no-deps installとcheckpoint hash照合後にfake / MoGe CPU smokeが成功した。
 環境の手順は [MoGe README](../models/moge/README.md)。推移依存の完全lock、
 upstream全CLI / UIのrequirements充足、pip check成功は保証しない。
+
+## Phase 02 application / offline demo plan — 設計のみ
+
+[02B](phases/phase-02/phase-02b.md) と [02C](phases/phase-02/phase-02c.md) はNOT_STARTED。
+Gradio / numeric artifact reader / 3D rendererはapplication environmentへ導入する計画。
+現在のstdlib control境界を維持し、viewer用数値依存をmodel adapter / backendに混入させない。
+model environmentはworker / torch / selected model、applicationにはmodel package / torchを要求しない。
+
+実装承認後にGradioとviewer libraryの固定版・依存 / frontend assets・OS / browser条件を調査してpinし、
+再作成定義 / lockと起動手順を記録する。今回の作業では版選定・依存導入・環境変更をしない。
+モデルrevision / checkpoint / cache / model environmentとapplication / frontend assetsを事前準備し、
+ネットワーク遮断下でローカル起動・推論・保存Run表示・3D操作を検証する計画。
+CDN / remote JSを必須にせずローカル配信を確認する。submit時の自動install / downloadは行わない。
+
+CPUは明示選択、CUDA不可の自動fallbackなし。既存CPU推論成功と未来のUI / GPU / 学会デモは区別。
+保存terminal Run表示はmodel環境・weightsなしで可能にし、取得したruntime / GPU memoryのみ表示、
+未計測はunavailable。GPU実機検証は別証拠として記録する。

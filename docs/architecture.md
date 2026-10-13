@@ -215,3 +215,18 @@ BenchmarkCoordinator（Phase 05）は image × model × config を複数の通�
 GPU 実行の互換性・性能、UI package pin、GT dataset / evaluation protocol、MLflow version / URI、
 研究室設定は未確定。各仕様・phase に判断時点を割り当て、値を仮定してコード化しない。
 外部の過去コードの所在・利用可否は、参考資料が必要になった 01 / 03 で確認する。
+
+## Phase 02 application / geometry / management boundaries — 設計のみ
+
+Phase 02 / 02A–02DはNOT_STARTED。親仕様は [Phase 02](phases/phase-02.md)。
+02Aはadapterの意味変換、workerのgeometry serialization、RunStoreのvalidationを拡張する。
+02BはInference / Resultsの2タブで既存Runnerを操作、全sessionに1つのLocalBackendを共有する。
+sessionごとのinput / handle / selectionは独立。instance busy guardを維持して同時jobは拒否しqueueしない。
+Gradio callbackにadapter / torch / Conda / subprocess制御を置かない。
+
+02Cは共通artifact reader / geometry generation / rendererを利用して4表示モードを提供する。
+02Dは [Run Management Service](run-management-spec.md) 経由で履歴・metadata・export・archive・deleteを扱う。
+derived storageの最小生成 / reuseは02C、管理操作は02D。管理serviceは推論経路を呼ばない。
+raw / 確定JobResultは不変、user sidecarとderived manifestを別保存する計画。
+UIを閉じることは暗黙cancel / deleteではなく、terminal保存Runを再起動後に読む。
+active job recovery・multi-process調停・公開多ユーザーはPhase 02に導入しない。

@@ -23,7 +23,8 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 
 ## 現在の開発状況
 
-**2026-10-12: Phase 00 COMPLETE、01A COMPLETE、01B COMPLETE、Phase 01 COMPLETE。Phase 02 は未着手・未承認です。**
+**2026-10-13: Phase 00 / 01A / 01B / Phase 01 COMPLETE。Phase 02 / 02A〜02D の実装は NOT_STARTED。**
+Phase 02 の文書整備・検証・commit / main push のみ承認されており、実装は未承認です。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -138,7 +139,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
 | [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | COMPLETE。01A / 01B COMPLETE（CPU E2E / Local robustness） |
-| [02](docs/phases/phase-02.md) | Gradio Single Model UI | 未着手 |
+| [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | NOT_STARTED（文書のみ承認） |
 | [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 未着手 |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |
 | [05](docs/phases/phase-05.md) | Benchmark Mode | 未着手 |
@@ -151,6 +152,29 @@ Phase の完了によって次 phase を自動開始しません。管理方法�
 実行し、共通 MDEOutput の raw depth、metadata / result / logs を Run Directory に保存する段階です。
 cancel / timeout 等は 01B、GPU lease の必要性判断・高度な復旧 / concurrency は後段へ分けます。
 
+## Phase 02 の計画 — 実装 NOT_STARTED
+
+[Phase 02](docs/phases/phase-02.md) は、1モデルのLocal推論と保存成果物を扱う
+**Inference / Results の2タブ**を計画します。内部milestoneの順序は次の通りです。
+
+| Milestone | 役割 | 前提 |
+| --- | --- | --- |
+| [02A](docs/phases/phase-02/phase-02a.md) | 必須depthとoptional points / normals / intrinsicsの正式保存・検証 | Phase 01 |
+| [02B](docs/phases/phase-02/phase-02b.md) | GradioからRunnerを操作、入力・状態・cancel・busy・session分離 | 02A |
+| [02C](docs/phases/phase-02/phase-02c.md) | ResultsのDepth / RawDepth / Point Cloud / Mesh、派生mesh永続化 | 02A・02B |
+| [02D](docs/phases/phase-02/phase-02d.md) | Run履歴・管理情報・export・再生成・archive / restore・明示削除 | 02C |
+
+Geometry artifactsは共通worker / RunStore、3D表示は共通viewer、管理操作は
+[Run Management Service](docs/run-management-spec.md) に分離します。
+モデル由来raw成果物と確定JobResultは不変、派生meshは遅延生成して別manifestに保存します。
+表示切替・保存Runの再表示に再推論は行いません。optional出力は全モデルに強制しません。
+
+ノートPC上のローカル起動を優先し、weights・モデル環境・application環境・frontend assetsを
+事前準備すればオフライン利用できる構成を目指します。推論完了後はResultsへ結果を渡し、
+保存Runは再起動後もRun IDから開ける計画です。CPUは明示選択、CUDAからの自動fallbackはありません。
+既存CPU推論成功と、未検証のGradio / 3D / GPU / 学会デモは区別します。
+高度な検索・共有ユーザー管理・認証・お気に入り・高度な3D編集は範囲外です。
+
 ## ドキュメント一覧
 
 - [AGENTS.md](AGENTS.md): Codex の作業ルール
@@ -162,4 +186,5 @@ cancel / timeout 等は 01B、GPU lease の必要性判断・高度な復旧 / c
 - [Slurm integration](docs/slurm-integration.md): 将来の接続方式と研究室確認事項
 - [MLflow design](docs/mlflow-design.md): Params / Metrics / Artifacts / Tags
 - [Run Directory spec](docs/run-directory-spec.md): file protocol、Run ID、attempt、保存形式
+- [Run Management spec](docs/run-management-spec.md): Phase 02C / 02D の派生保存・管理service計画
 - [Phase 00–08](docs/phases/): 各段階の tasks / tests / exit criteria

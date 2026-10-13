@@ -1,7 +1,8 @@
 # Phase 01 — Single Model + Local Execution + Miniconda
 
 Status: **Phase 01 — COMPLETE**（2026-10-12）。
-**01A — COMPLETE、01B — COMPLETE**。Phase 02 は未着手・未承認。
+**01A — COMPLETE、01B — COMPLETE**。Phase 02 の実装は NOT_STARTED / 未承認。
+2026-10-13 の Phase 02 文書整備のみ承認。管理は [PLANS](../../PLANS.md) を参照。
 01A のMoGe CPU E2E経路を維持し、01BのLocal robustnessとCPU regression smokeを検証した。
 既存layout / protocol major 1を維持。完了を次phaseの実装承認としない。
 管理: [PLANS.md](../../PLANS.md)。

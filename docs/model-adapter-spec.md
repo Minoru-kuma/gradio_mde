@@ -200,3 +200,21 @@ depth 単位・pose の向き・必須項目の変更は破壊的変更とし、
 | scale / depth kind / frame を明示 | metric と relative、z と range の比較誤りを避ける | adapter の検証量が増える | camera / evaluation protocol の追加 |
 | capability は variant と条件付き | モデル family の機能を過剰申告しない | UI に条件表示が必要 | optional output / derived visualization |
 | extras は namespaced typed refs | native output を失わず共通 API を保つ | 汎用 UI は未知 extras を自動可視化しない | plugin-specific artifact renderer を独立追加 |
+
+## Phase 02A geometry contract extension — 設計のみ
+
+[02A](phases/phase-02/phase-02a.md) はNOT_STARTED。既存MDEOutputのoptional fieldsの
+serializationを計画する。現行MoGe adapterはdepth / maskのみ返し、native_output_keysの記録は
+optional geometryのexportではない。全モデルにpoints / normals / intrinsicsを強制しない。
+明示要求の未対応はsubmit前に拒否、runtime欠落はfailure。要求していないoptional欠如は正常。
+
+標準depth / points / normals / pixel Kは上記Geometric conventionsを維持。
+モデル固有のnative表現→標準化はadapterの責務とし、native frame / unit / scale /
+pixel conventionと変換を記録する。native artifactを保存する場合はnamespaced typed refsとして
+標準artifactと区別する。意味不明のnative配列を共通points / normalsとして扱わない。
+viewerは保存frame / unit / scaleを維持し、表示都合でrawをnormalizeしない。
+
+共通workerはserialization、RunStoreはshape / dtype / valid mask / path / digestと意味metadata検証。
+normal orientation・K grid・RGB対応は02A fixtureで確認。rawはpublish後不変。
+旧depth-only / mask未保存Runは読込可能、別mask不在は従来finite-positive depth判定を利用。
+具体wire refs / 新serialization profileは02A実装前に決定し、旧schema 1.0互換testsを追加する。

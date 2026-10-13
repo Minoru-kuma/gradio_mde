@@ -1,73 +1,98 @@
-# Phase 02 — Gradio Single Model UI
+# Phase 02 — Geometry Artifacts / Gradio / 3D Results / Run Management
 
-Status: 未着手・未承認。
-管理: [PLANS.md](../../PLANS.md)。
+Status: **NOT_STARTED**（実装）。02A〜02Dも **NOT_STARTED / 実装未承認**。
+2026-10-13の承認は文書整備・検証・commit / main pushのみ。以下は設計・将来の受入条件。
+管理: [PLANS](../../PLANS.md)。Phase 01 / 01A / 01BはCOMPLETE。
 
 ## Goal
 
-Phase 01 の single inference を Gradio から操作し、状態・depth・計測・保存結果を確認できるようにする。
+単一モデルの幾何成果物を正式に保存・検証し、GradioのInference / Resultsから
+Local推論、2D / 3D閲覧、保存Runの安全な管理を行えるようにする。
+ノートPCで学会デモできるローカル・オフライン構成を目指す。
 
 ## Background
 
-推論経路が成立してから UI を載せる。過去の複雑化を避け、UI callback は Runner の公開 service を
-利用する。モデルの native API、Conda、subprocess、Slurm command を UI に持ち込まない。
+Phase 01のCLI → ExperimentRunner → LocalBackend → 独立Conda worker → ModelAdapterを維持する。
+現在はPNG 1枚 / attempt-0001 / depth-onlyの保存経路、schema 1.0。
+MDEOutputにoptional geometry fieldsはあるが、workerの保存・RunStore検証は未対応。
+Gradio、3D viewer、派生保存、Run管理serviceは存在しない。
+実モデルCPU成功は [Phase 01](phase-01.md) の証拠であり、GPU / UI / 学会デモ成功ではない。
 
 ## Scope
 
-1 モデルの選択、image upload、inference request、async status / cancel、depth visualization、
-runtime / GPU memory の表示、raw artifact download。backend selector は catalog から表示するが、
-この段階の運用対象は Local のみ。optional points / normals は存在する標準 artifact に限り共通表示。
+- 02A: depth必須、points / normals / intrinsics optional、metadata / maskと標準保存・検証。
+- 02B: **Inference / Results** の2タブ。model / variant、画像検証、device / backend / parameters、
+  submit、Run ID、非同期status / progress、cancel / timeout / failure、session分離、Local busy。
+- 02C: Resultsの **Depth | RawDepth | Point Cloud | Mesh**、保存Run読込、共通derived mesh保存。
+- 02D: 履歴・直接読込・詳細・表示名/メモ・export・再生成・archive / restore・明示削除。
+
+BackendはLocalのみ。UIはRunner / Registry metadataと共通serviceを利用し、
+モデル推論・PyTorch・Conda・subprocessの直接制御をcallbackに書かない。
+Gradioは独立application environment、version / dependenciesは実装時にpinする。
+全sessionで同じLocalBackendを共有し、一度に1job、busyは拒否、実行jobのqueueを作らない。
+session stateの画像・handle・表示Runは個別に保持する。公開多ユーザー運用は想定しない。
 
 ## Non-goals
 
-複数モデルの統合、MLflow UI、Benchmark mode、Slurm option 入力、model-specific viewer、
-モデル推論の reimplementation。未準備 backend を選べるものとして表示しない。
+Phase 03: 複数モデル統合。04: MLflow。05: Benchmark / 比較評価。
+06以降: 高度なqueue / retry / active recovery。07–08: SlurmBackend。
+お気に入り / ふぁぼ（時期未定）、認証・本格的多ユーザー公開、高度な検索、共有ユーザー管理、
+アクセス制御、高度な3D編集・解析、自動削除 / retentionは対象外。先回り実装しない。
 
 ## Dependencies
 
-Phase 01 の Local E2E / collect と [Architecture](../architecture.md) の公開 boundary。
-Gradio version と共通 artifact viewer の採用はこの phase で pin し、モデルの環境から分離する。
+| 内部 milestone | 前提 | 成果の利用先 |
+| --- | --- | --- |
+| [02A — Geometry Artifacts](phase-02/phase-02a.md) | Phase 01 COMPLETE、実装承認 | 02B / 02Cの共通成果物 |
+| [02B — Gradio Inference](phase-02/phase-02b.md) | 02A exit、実装承認 | 02C / 02Dの2タブ・session境界 |
+| [02C — 3D Results Viewer](phase-02/phase-02c.md) | 02A・02B exit、実装承認 | 02Dの派生保存・管理対象 |
+| [02D — Run Management](phase-02/phase-02d.md) | 02C exit、実装承認 | Phase 02全体の管理経路 |
+
+**01 → 02A → 02B → 02C → 02D**。独立したPhaseの新設ではない。
+02BではResultsに共通結果とRun IDを渡す枠を作り、完全な3D表示は02Cに置く。
+02Cで最小derived生成/読込/再利用を作り、再生成・削除のユーザー管理操作は02Dに置く。
+関連: [Architecture](../architecture.md)、[Adapter](../model-adapter-spec.md)、
+[Execution](../execution-backend-spec.md)、[Run Directory](../run-directory-spec.md)、
+[Environment](../environment-strategy.md)、[Run Management](../run-management-spec.md)。
 
 ## Implementation tasks
 
-- [ ] minimal app を application environment に置き、Registry metadata から controls を生成。
-- [ ] model / variant、input、requested resources を Runner request に変換。
-- [ ] JobHandle / Run ID を session state として扱い、複数 session を混線させない。
-- [ ] blocking prediction callback を作らず、poll / progress / cancel を公開 service 経由で扱う。
-- [ ] depth の raw 値と表示 normalization を分離し、単位 / scale / invalid mask を表示。
-- [ ] capability と actual artifacts に基づき optional panels を表示 / 非表示。
-- [ ] missing metrics を unavailable と表示し、selected attempt の download を提供。
-- [ ] UI が閉じた後の結果を Run ID から読めるようにし、CLI 経路を維持。
+- [ ] 02A: 共通serializationとartifact検証、native / standard provenance、旧Run互換。
+- [ ] 02B: Runner操作・非同期poll・session分離・busy表示、application依存pin。
+- [ ] 02C: 4表示モード・色/描画切替・視点管理、derived meshの遅延生成・永続保存。
+- [ ] 02D: callbackと分離した管理service、安全な明示操作と履歴。
+- [ ] ローカル起動・事前準備・offline・明示CPU・保存結果デモの再現手順。
 
 ## Tests
 
-- fake Runner の queued / running / failed / cancelled / completed を UI で区別できる。
-- 画像なし / 壊れた画像 / unknown parameter の入力が実行前に検証される。
-- unknown metric と optional output absence が UI error にならない。
-- concurrent sessions で他 session の image / handle / result を使わない。
-- cancel 後に完了通知が来る競合、画面再接続、download path の Run 内検証。
-- 実モデル 1 枚の UI smoke と同じ request の CLI 結果が同じ共通契約になること。
+各milestoneのfake / contract / browser / 実機テストを分けて記録する。
+旧depth-only Run、optional欠如、破損path / digest、session混線、cancel完了race、
+大きなgeometry、アプリ再起動後の閲覧、raw不変、管理操作の競合を検証する。
+offlineはネットワーク遮断下でfrontend操作と準備済みモデル推論を確認する。
+GPU検証は機材がある場合の別証拠とし、未計測runtime / GPU memoryはunavailable。
 
 ## Exit criteria
 
-UI から 1 モデルを LocalBackend 経由で実行・cancel・表示・download できる。
-UI / Runner に model name 分岐・torch import・Conda / scheduler 起動がない。
-CLI と保存結果の互換性、複数 session、failure 表示が確認される。起動手順と docs を更新する。
+02A〜02Dの全exitを満たし、旧CLI・保存Run互換を確認する。
+UIから1モデルをLocalで実行し、完了後すぐResultsで確認・downloadできる。
+保存Runを再推論せず再起動後も開き、利用可能geometryの3D回転・zoom・panと管理操作ができる。
+optional欠如時は理由を表示し、存在しないgeometry / metricsを捏造しない。
+raw / JobResultのdigest不変、derived条件の追跡、archive非削除と実行中削除拒否を確認する。
+pin済み環境とoffline起動手順・検証結果を記録し、GPU / 学会実演の未検証項目を明示する。
+今回の文書完成ではこれらを達成済みにしない。
 
 ## Known risks
 
-Gradio event queue の挙動、長い処理での UI blocking、session 混線、大きな point cloud の描画容量、
-表示 normalization を raw depth と誤認するリスク。
+K / pixel grid / native frameの変換誤り、rawと表示normalizationの混同、geometry容量とbrowser制約、
+Gradio event dispatchの待ち行列、shared backendとsession分離、派生cacheのpartial publication、
+削除と生成のrace、CDN / 外部通信依存。対策と受入検証は各milestone・管理仕様に分ける。
 
-## Decisions deferred to later phases
+## Decisions / Deferred decisions
 
-03: multi-model capability matrix とパラメータ UI 拡張。04: tracking 状態表示。
-05: benchmark 操作。06: mock backend selection。07–08: actual Slurm selection。
-viewer の高度な解析機能と認証 / 多ユーザー公開は別 scope。
-
-## Decisions
-
-| Decision | Reason | Trade-off | Future extension |
-| --- | --- | --- | --- |
-| UI は公開 Runner service を操作 | UI と inference implementation を分離 | 非同期状態の表示が必要 | backend / model の追加 |
-| generic capability-driven panels | モデル追加時の callback 分岐を避ける | 未知 extras の専用表示は後回し | 独立 artifact renderer |
+raw推論成果物と確定JobResultは不変。表示による再推論・scale正規化はしない。
+標準化で必要な変換はadapter境界でnative conventionとともに記録し、viewerはその保存frame / unit /
+scaleを維持する。表示cameraの初期位置のみ自動調整し、可能な範囲でPoint Cloud / Mesh間の視点を保持。
+Derived Meshは初回要求時に生成、Runに関連付け永続保存、algorithm / parameters / input digestで再利用。
+自動削除なし、明示再生成は新履歴を追加しJobResultを変更しない。
+Gradio / viewerの版、3D形式、容量上限、mesh discontinuity閾値、schema minor / profile名は
+各milestoneの実装承認後に調査・pin・fixture検証して確定する。

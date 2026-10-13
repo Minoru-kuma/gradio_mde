@@ -2,22 +2,68 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 01B — COMPLETE、docs / Git 最終整理**（2026-10-12）。
-- Authorization: Local robustness、環境再作成・依存導入、01A regression、明示 CPU MoGe smoke、
-  docs 更新。01B exit 達成時の commit / 現在 branch への push。Phase 02 以降は未承認。
-- Phase 00: **COMPLETE**。ユーザーの正式な clean-start 決定により source audit gate は充足。
-- Phase 01: **COMPLETE**。01A: **COMPLETE**。01B: **COMPLETE**。
-- Phase 02–08: **NOT_STARTED / NOT_AUTHORIZED**。
-- Source policy: repository 内に再利用必須の既存 production implementation は存在しない。
-  過去のモデルコードは Phase 01 / 03 の必要時に参考資料として確認する。
-- 今回禁止: GPU lease / queue / active recovery / retry controller、Gradio、Slurm、
-  MLflow、Benchmark、他モデル、warm worker / distributed inference。
+- Current work: **Phase 02 ドキュメント再構成**（2026-10-13）。
+- Authorization: 仕様・計画文書の整備、既存実装の読取調査、文書検証、commit / `main` への通常 push。
+- Phase 00: **COMPLETE**。clean-start 決定により source audit gate は充足。
+- Phase 01 / 01A / 01B: **COMPLETE**。既存 CPU E2E / Local robustness の証拠を維持。
+- Phase 02 / 02A / 02B / 02C / 02D: **NOT_STARTED**。文書整備のみ承認、実装は **NOT_AUTHORIZED**。
+- Phase 03–08: **NOT_STARTED / NOT_AUTHORIZED**。
+- Source of truth: 最新 `origin/main`。開始時 HEAD / origin/main は
+  `0ed1e00869750c14945d1bb942d7783fb07c8f56`、branch `main`、working tree clean。
+- Source policy: clean-start。再利用必須の既存production implementationはなく、過去のモデルコードは
+  Phase 01 / 03で必要時に参考として確認する。現在の実装状態はlatest mainを基準とする。
+- 今回禁止: Python / production code 変更、依存導入・環境変更、Gradio 実装、02A–02D 実装開始、
+  他モデル、MLflow、Benchmark、Slurm、高度な queue / recovery。
+
+## Phase 02 documentation plan — 2026-10-13
+
+- Goal: 02A を安全に開始できる共通契約と範囲を GitHub 上に確定する。実装承認は別途必要。
+- Scope: README / AGENTS / PLANS、Phase 02 親文書と4内部 milestone、関連技術仕様の必要部分。
+  Phase 01 の実装済み仕様・完了証拠を保持し、新規 storage / service 契約は設計のみと明記する。
+- Order: latest main / clean確認 → 実装・仕様照合 → 親仕様 / 02A–02D / 技術仕様 →
+  状態・相対リンク・範囲・差分検証 → remote更新確認 → docs commit → `main`へ通常push。
+  remote の更新・競合・範囲外変更があれば上書きせず停止する。
+- Implementation order (未承認): **01 → 02A → 02B → 02C → 02D**。
+  02C は02Aの geometry保存と02BのResults枠、02Dは02Cの派生保存契約に依存。
+  02Cでderived storageの最小生成・再利用・読込、02Dで管理操作を追加する。
+- Verification: milestone依存・検証可能なexit、旧depth-only/schema 1.0互換、状態表示、
+  実装/設計/未検証の区別、Markdown相対リンク・fence、docsのみの変更、`git diff --check`。
+  今回は実装テスト・モデル推論・GPU / 学会デモを実行しない。
+- Risks: native / standard frame混同、K変換とRGB対応、optional欠如、巨大geometry容量、
+  Gradio event queue / session混線、derived cacheの衝突、削除race / path逸脱、offline frontend依存。
+  契約とfake/adversarial/browser/実機検証を各milestoneに割り当てる。
+- Exit (今回の文書作業): 上記検証成功、承認範囲のdocsをcommit / mainへpush、clean確認。
+  Phase 02と02A–02Dの実装状態はNOT_STARTEDを維持し、実装を自動開始しない。
+
+### Documentation validation evidence — 2026-10-13
+
+- README / AGENTS / PLANS / Phase 01冒頭 / Phase 02親・4milestoneの状態整合を確認。
+  Phase 01 COMPLETEを維持し、Phase 02 / 02A–02Dの実装はNOT_STARTED / 未承認。
+- 24 Markdown文書の157相対リンク（heading anchorsを含む）とfenced blocksを検証し成功。
+- 02A→02B→02C→02Dの依存、fixture / browser / 実機ごとの検証可能なexit、
+  schema 1.0 / depth-only互換とraw / JobResult不変の計画を照合。
+- `git diff --check`成功。変更対象は15 Markdown文書のみ、production code / 依存定義の変更なし。
+- 新規契約は設計のみと明記。実装tests / 推論 / UI / GPU / 学会デモ検証は今回実施していない。
+  commit / pushの結果はGit履歴で確認し、remote更新があれば停止する。
+
+## Phase 02 internal milestones (implementation NOT_STARTED)
+
+| Milestone | Dependencies | 検証する主要 exit |
+| --- | --- | --- |
+| [02A — Geometry Artifacts](docs/phases/phase-02/phase-02a.md) | 01 COMPLETE | depth必須・optional保存/検証、旧Run読込、raw不変 |
+| [02B — Gradio Inference](docs/phases/phase-02/phase-02b.md) | 02A | Local推論/状態/cancel/timeout、session分離・busy、CLI互換 |
+| [02C — 3D Results Viewer](docs/phases/phase-02/phase-02c.md) | 02A・02B | 4表示モード、offline操作、派生meshの遅延永続保存・再利用・再起動読込 |
+| [02D — Run Management](docs/phases/phase-02/phase-02d.md) | 02C | 共通service経由の一覧/編集/export/再生成/archive/restore/確認付き削除 |
+
+02A–02DはPhase 02の内部milestoneであり独立Phaseではない。全exit達成でPhase 02 COMPLETE。
+文書の計画作成と実装の開始・完了は別で、現時点のexitはすべて将来の受入条件。
 
 ## Phase management
 
 状態は `NOT_STARTED → PLANNED → IN_PROGRESS → REVIEW_READY → COMPLETE` を基本とし、
 外部条件の不足は `BLOCKED` として理由を残す。`PLANNED` は計画文書の準備状態であり、
 production code の実装承認・開始を意味しない。実験 JobStatus とは別の管理状態である。
+今回のPhase 02では文書が準備済みでも実装状態を `NOT_STARTED` に保ち、文書作業の状態を別記する。
 
 各 phase 開始前に、最新のユーザー指示がその phase の実作業を承認していることを確認する。
 必要な通常作業のたびに承認を取り直す必要はないが、未指示の phase に進んではならない。
@@ -30,7 +76,7 @@ Tests、Exit criteria、Known risks、Decisions deferred to later phases を維�
 | --- | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | clean-start の正式確認 | 調査記録・共通契約・段階計画の整合 | COMPLETE |
 | [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | COMPLETE、01A / 01B exit 達成 |
-| [02](docs/phases/phase-02.md) | 01 | 1 モデルの Gradio、状態表示と保存結果 | 未着手 |
+| [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | NOT_STARTED（文書のみ承認） |
 | [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 未着手 |
 | [04](docs/phases/phase-04.md) | 03 | Runner から MLflow、失敗時にも結果保存 | 未着手 |
 | [05](docs/phases/phase-05.md) | 03・04 | 同じ single inference に基づく比較評価 | 未着手 |
@@ -54,7 +100,7 @@ Phase 06 は abstraction の初導入ではなく、backend の可搬性を検�
 Phase 01 全体の COMPLETE は 01A / 01B 双方の exit を満たした時点とし、01A 単独の完了を区別する。
 01A 完了は 01B または Phase 02 の実装を自動承認しない。
 
-現在の作業手順と rollback は下記 01B implementation plan を使う。
+以下の 01B implementation plan は完了済み作業の履歴であり、現在の承認範囲は冒頭を参照する。
 2026-10-07 の文書のみの計画更新は完了済みで、今回の実装承認とは区別する。
 リスク: 将来の完全な契約を 01A の必須実装と混同すると scope が再拡大する。
 各仕様に milestone の適用範囲を記載し、共通 interface / Run layout を維持して段階的に検証する。

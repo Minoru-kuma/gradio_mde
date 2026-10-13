@@ -253,3 +253,19 @@ cancel / timeout は 01B、応答喪失・再起動をまたぐ照合や高度�
 | backend 状態と worker report の両方を確認 | exit 0 / scheduler COMPLETED だけでは成果物を保証できない | publication grace と validation が必要 | integrity / remote Store |
 | UNKNOWN は観測の補助状態 | 通信障害で実行結果を誤判定しない | UI に未確定表示が必要 | reconciliation / controller recovery |
 | retry を別 attempt とする | 失敗の証拠と測定 provenance を保持 | Run Directory が増える | bounded transient retry / scheduler requeue |
+
+## Phase 02 Local UI integration — 設計のみ
+
+[02B](phases/phase-02/phase-02b.md) はNOT_STARTED。運用backendはLocalのみ。
+UIは既存Runner submit / status / collect / cancelを使い、timeoutはresources経由。
+全sessionで単一Runner / LocalBackend instanceを共有し、busy submitを明示拒否する。
+LocalBackendのinstance guardはglobal GPU lease / multi-process調停ではない。
+Gradio event dispatchがinference jobをqueueに溜めない設定を実装時に検証する。
+
+現行JobStatusSnapshotは数値progressを持たない。statusとindeterminate進捗を表示し、
+未提供%を捏造しない。数値progress拡張を採るなら共通optional契約として別途仕様更新する。
+CUDA要求のCPU fallbackなし、cancel完了race / timeoutの現行terminal semanticsを維持。
+02A requested optional outputsは計画であり、現行JobSpecは[depth]のみ受理する。
+確定JobResultはimmutable、derived geometry・管理sidecarの追加で書き換えない。
+保存terminal Run読込は再推論 / active recoveryではない。active削除を拒否する管理責務は
+[Run Management Service](run-management-spec.md) に分離する。

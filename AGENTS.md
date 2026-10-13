@@ -5,14 +5,16 @@
 [phase 文書](docs/phases/) と変更対象の仕様を読む。
 
 1. 作業は phase 単位で行う。ユーザーが指示していない phase に進まない。
-   2026-10-12 の指示により現在の承認範囲は Phase 01B の Local robustness、
-   環境再作成・依存導入、01A regression、実モデル CPU smoke、docs 更新。
-   exit を満たした作業単位の commit / 現在 branch への push も承認済み。
-   Phase 02 以降、Gradio、Slurm、MLflow、Benchmark、他モデルは範囲外。
-   2026-10-11 の自宅 Wi-Fi 接続後の指示により、依存 download と実モデル smoke を再開する。
-   GPU のないノート PC では明示した CPU 推論を利用する。CUDA 要求時の自動 CPU fallback は行わない。
+   2026-10-13 の指示により現在の承認範囲は Phase 02 のドキュメント整備・検証と、
+   検証成功後の commit / main への通常 push のみ。最新 origin/main を正本として確認する。
+   Python コード変更、依存導入・環境変更、Gradio 実装、02A〜02D の実装開始は未承認。
+   02A〜02D は Phase 02 の内部 milestone。未承認の milestone に進まない。
+   remote 更新・競合・範囲外変更があれば上書きせず停止し報告する。force push は行わない。
    01A / 01B / Phase 01 は CPU E2E・Local robustness と成果物検証により COMPLETE。
-   現在は docs / Git 最終整理までとし、Phase 02 に進まない。
+   Phase 02 / 02A〜02D の実装状態は NOT_STARTED。文書計画は実装承認・開始・完了を意味しない。
+   GPU のないノート PC では明示した CPU 推論を利用する。CUDA 要求時の自動 CPU fallback は行わない。
+   Phase 03 以降、他モデル、Slurm、MLflow、Benchmark は今回の範囲外。
+   本タスク完了後に Phase 02A の実装を自動開始しない。
 2. 大規模変更前に PLANS.md の目的・範囲・手順・検証・リスクを更新する。
    plan の更新や前 phase の完了は、次 phase を開始する許可を意味しない。
 3. model-specific logic は `models/<model_name>/` に閉じ込める。
