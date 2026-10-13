@@ -5,16 +5,18 @@
 [phase 文書](docs/phases/) と変更対象の仕様を読む。
 
 1. 作業は phase 単位で行う。ユーザーが指示していない phase に進まない。
-   2026-10-13 の指示により現在の承認範囲は Phase 02 のドキュメント整備・検証と、
-   検証成功後の commit / main への通常 push のみ。最新 origin/main を正本として確認する。
-   Python コード変更、依存導入・環境変更、Gradio 実装、02A〜02D の実装開始は未承認。
-   02A〜02D は Phase 02 の内部 milestone。未承認の milestone に進まない。
-   remote 更新・競合・範囲外変更があれば上書きせず停止し報告する。force push は行わない。
-   01A / 01B / Phase 01 は CPU E2E・Local robustness と成果物検証により COMPLETE。
-   Phase 02 / 02A〜02D の実装状態は NOT_STARTED。文書計画は実装承認・開始・完了を意味しない。
-   GPU のないノート PC では明示した CPU 推論を利用する。CUDA 要求時の自動 CPU fallback は行わない。
-   Phase 03 以降、他モデル、Slurm、MLflow、Benchmark は今回の範囲外。
-   本タスク完了後に Phase 02A の実装を自動開始しない。
+   最新の指示により現在の承認範囲は Phase 02A — Geometry Artifacts の実装・検証・
+   関連docs更新と、Exit達成後のcommit / mainへの通常push。開始時にlatest origin/mainを確認する。
+   pin済みMoGe-2 ViT-S Normalの実CPU推論でnative Pointsの保存・再読込・Depthとの整合検証を
+   必須Exitとする。達成できなければCOMPLETEにせず原因を報告する。
+   02A〜02DはPhase 02の内部milestone。02B以降、Gradio、他モデル、MLflow、Benchmark、Slurm、
+   高度なqueue / recoveryには進まない。実装・実機検証に必要な独立モデル環境のみ利用する。
+   remote更新・競合・範囲外変更があれば上書きせず停止し報告。force pushは禁止。
+   01A / 01B / Phase 01はCOMPLETE。02Aは実CPU native Pointsを含むExit達成でCOMPLETE、Phase 02はIN_PROGRESS。
+   02B〜02DはNOT_STARTED / 未承認。現在は02A docs / Git整理まで。
+   CPUを明示選択し、CUDA要求時の自動fallbackを行わない。
+   仮K・便宜的逆投影をmodel由来Pointsにしない。既存depth-only Run / CLI互換とraw不変を維持。
+   02A完了は02Bの開始許可ではない。
 2. 大規模変更前に PLANS.md の目的・範囲・手順・検証・リスクを更新する。
    plan の更新や前 phase の完了は、次 phase を開始する許可を意味しない。
 3. model-specific logic は `models/<model_name>/` に閉じ込める。

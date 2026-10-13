@@ -5,7 +5,7 @@ import json
 import uuid
 from pathlib import Path
 
-from .contracts import ATTEMPT_ID, VIEW_ID, ExecutionBackend, JobHandle, JobSpec, ResourceSpec
+from .contracts import ATTEMPT_ID, VIEW_ID, ExecutionBackend, JobHandle, JobSpec, ResourceSpec, normalize_outputs
 from .registry import ModelRegistry, validate_parameters
 from .storage import RunStore, inspect_png, run_path, sha256_file, write_json
 
@@ -17,11 +17,17 @@ class ExperimentRunner:
 
     def submit(self, model_id: str, image: Path, *, variant_id: str | None = None,
                device: str = "cuda:0", dtype: str = "float32", parameters: dict | None = None,
-               walltime_seconds: int | None = None) -> JobHandle:
+               walltime_seconds: int | None = None,
+               requested_outputs: tuple[str, ...] = ("depth",)) -> JobHandle:
         info = self.registry.get_model(model_id)
         variant = info.variant(variant_id)
         if device not in info.data["supported_devices"] or dtype not in info.data["supported_dtypes"]:
             raise ValueError("Unsupported device or dtype")
+        outputs = normalize_outputs(requested_outputs)
+        capabilities = variant.get("capabilities", info.data["capabilities"])
+        for key in outputs:
+            if capabilities.get(key, {}).get("status") not in ("supported", "conditional"):
+                raise ValueError(f"Unsupported requested output: {key}")
         parameters = validate_parameters(info.data.get("parameter_schema", {}), parameters or {})
         width, height = inspect_png(image)
         environment = dict(info.data["environment_refs"][0])
@@ -32,6 +38,8 @@ class ExperimentRunner:
                    "device": device, "dtype": dtype, "input_sha256": sha256_file(image),
                    "environment": environment, "backend_id": self.backend.backend_id}
         request["walltime_seconds"] = walltime_seconds
+        if outputs != ["depth"]:
+            request["requested_outputs"] = outputs
         digest = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
         run_id = str(uuid.uuid4())
         run = self.store.prepare(run_id, image)
@@ -46,7 +54,7 @@ class ExperimentRunner:
                        [{"view_id": VIEW_ID, "path": f"input/views/{VIEW_ID}/image.png",
                          "sha256": request["input_sha256"], "original_size": {"width": width, "height": height}}],
                        {"device": device, "dtype": dtype, "seed": 0, "parameters": parameters,
-                        "requested_outputs": ["depth"], "resolution_policy": "native_input_grid"},
+                        "requested_outputs": outputs, "resolution_policy": "native_input_grid"},
                        asdict(ResourceSpec(gpu_count=int(device.startswith("cuda")), walltime_seconds=walltime_seconds)),
                        {"run_location": run_id}, f"{run_id}/{ATTEMPT_ID}", digest,
                        {"git_commit": "unknown", "source_digest": sources.hexdigest()})

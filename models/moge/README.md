@@ -1,6 +1,6 @@
-# MoGe-2 plugin — Phase 01
+# MoGe-2 plugin — Phase 01 / 02A
 
-1画像の raw depth 保存に絞った adapter。Gradio / Tracking / scheduler / Store を import しない。
+1画像のraw depthと明示要求されたnative geometryを返すadapter。Gradio / Tracking / scheduler / Store を import しない。
 共通 worker が画像を読み、ModelAdapter が load / predict / unload と MDEOutput を担当する。
 raw depth / metadata / report の保存は worker 側で行う。
 
@@ -141,3 +141,28 @@ load / predict / depth serialization / unload / metadata / worker timingと、42
 CUDA unavailable環境でcuda:0要求はloadでFAILED、CPU fallbackなしを確認した。
 GPU成功 / allocator実機計測 / 精度評価 / upstream全extras充足は未検証。
 01A / 01B / Phase 01 COMPLETE、Phase 02は未着手・未承認。
+
+## Phase 02A native geometry
+
+CLIの既定は従来depth-only。`--outputs depth points normals intrinsics mask`で実出力を要求する。
+Points要求時のinferはforce_projection=False / fov_x=None。native予測点にupstreamのz shiftと
+metric scaleを適用したcamera-space Pointsをそのまま返す。仮Kによるadapter逆投影は行わない。
+PointsとDepthは同じmetres、points.z=depth。有効領域の値はidentityコピー、invalidのみNaNへ標準化。
+Normalsはnative normal headのunit vectorで符号反転・depth由来生成なし。
+Kはnative normalized UVからoutput pixel整数中心へA @ K変換し、Aとnative Kをmetadataに記録。
+fx_pixel=W*fx、fy_pixel=H*fy、cx_pixel=W*cx-0.5、cy_pixel=H*cy-0.5。
+scale headによる推定metresであり、GT accuracyを保証しない。
+
+実CPU geometry Run: `0c33df74-f72d-4348-a9a1-c2968d5f9e7b`、COMPLETED。
+Points float32 [256,256,3] / m、65,536 valid、points.z-depth最大誤差0 m。
+Normals最大unit-length誤差1.1920928955078125e-7、Kのcx / cyは127.5。
+Depth-only新Run: `5d0351b3-1a6b-460f-80eb-c19f528e5656`、COMPLETED、geometry Runとdepth digest一致。
+新CLI processによるgeometry / 旧01A Run再collectで全filesのhash / mtime不変、predictは1回。
+既存独立mde-mogeと固定weightsを再利用し、依存・環境変更なし。GPU / 精度は未検証。
+検証の詳細は [Phase 02A](../../docs/phases/phase-02/phase-02a.md)。02B以降は未着手・未承認。
+
+最終production sourceでの追加CPU smoke Run: `a2c9ca5a-4eb7-4697-b880-8041e7749bae`、COMPLETED / exit 0。
+Runのsource_digestが最終src / models/mogeの対象source filesと一致することを確認した。
+Points [256,256,3] / m、65,536 valid、points.z-depth誤差0 m、Normals / Intrinsics / masksも再検証。
+新CLIによる2回collectで全file hash / mtime不変、predictは1回。
+初回geometryと既定depth-onlyのdepth SHA-256も一致。GPU / GT精度は未検証。

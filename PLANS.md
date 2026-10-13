@@ -2,20 +2,61 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 02 ドキュメント再構成**（2026-10-13）。
-- Authorization: 仕様・計画文書の整備、既存実装の読取調査、文書検証、commit / `main` への通常 push。
-- Phase 00: **COMPLETE**。clean-start 決定により source audit gate は充足。
-- Phase 01 / 01A / 01B: **COMPLETE**。既存 CPU E2E / Local robustness の証拠を維持。
-- Phase 02 / 02A / 02B / 02C / 02D: **NOT_STARTED**。文書整備のみ承認、実装は **NOT_AUTHORIZED**。
-- Phase 03–08: **NOT_STARTED / NOT_AUTHORIZED**。
-- Source of truth: 最新 `origin/main`。開始時 HEAD / origin/main は
-  `0ed1e00869750c14945d1bb942d7783fb07c8f56`、branch `main`、working tree clean。
-- Source policy: clean-start。再利用必須の既存production implementationはなく、過去のモデルコードは
-  Phase 01 / 03で必要時に参考として確認する。現在の実装状態はlatest mainを基準とする。
-- 今回禁止: Python / production code 変更、依存導入・環境変更、Gradio 実装、02A–02D 実装開始、
-  他モデル、MLflow、Benchmark、Slurm、高度な queue / recovery。
+- Current work: **Phase 02A — COMPLETE、docs / Git整理**。
+- Authorization: 02A実装・検証・関連docs更新、必須Exit達成後のcommit / mainへの通常push。
+- Phase 00 / 01 / 01A / 01B: **COMPLETE**。
+- Phase 02: **IN_PROGRESS**。02A: **COMPLETE**（実CPU native Pointsを含むExit達成）。
+  02B〜02D / 03–08はNOT_STARTED / 未承認。
+- Start evidence: latest origin/main / HEAD `7ed21e36e428d07b11d4048b2e9c771e4f6fc6cc`、main、clean。
+- Source policy: latest mainの実装・契約を基準とする。旧depth-only成果物を破壊しない。
+- 禁止: 02B以降、Gradio、viewer / mesh、Run管理service、他モデル、Tracking / Benchmark / Slurm。
 
-## Phase 02 documentation plan — 2026-10-13
+## Phase 02A implementation plan
+
+- Goal / Scope: depth必須 + optional points / normals / intrinsics / maskを正式Run artifactsへ保存・検証。
+  実MoGe CPU native Pointsの保存・再読込・frame / metric尺度・depth整合を必須Exitに追加。
+- Order: source確認・承認更新 → 既存独立環境 / pin / weights検証・29tests baseline →
+  native API / K / normal convention調査 → requested outputsとprofile契約確定 → adapter・worker・
+  RunStore実装 → fake / adversarial / 01A・01B regression → 実CPU smokeと旧Run再読込 →
+  docs / Exit / hygiene → remote更新確認 → commit / main push。02Bへ進まない。
+- Contract: schema major 1 / 既存depth-only defaultを維持。explicit optional requestを事前capability検証し、
+  runtime欠落は失敗。新geometry profileはoptional refs・共通effective validity / native provenanceを持つ。
+  controlはstdlibでNPY検証、numeric依存はworker。raw / 確定JobResultを上書きしない。
+- Tests: 各optional有無・組合せ、NPY dtype / shape / mask / semantic不正、missing / corrupt /
+  traversal / symlink / digest、旧profile / CLI・cancel / timeout / busy回帰、再collect不変。
+  native points / K / normal mappingは数値fixturesとpin source、実CPUは正式worker経由で検証。
+- Environment: 既存named mde-mogeとcheckpointが見える。pin / runtimeを照合して利用し、
+  base / systemを変更しない。環境・weights・runs・logsはGit管理外。GPUは未検証。
+- Risks: native normalized K pixel center、normal方向、points/depth尺度、optional capability過剰申告、
+  payload検証のmemory負荷、旧結果互換。source / fixture / 実測で確認し不明値を捏造しない。
+- Exit: 02A checklistとnative実Points条件の全達成のみCOMPLETE・commit / push。
+  未達なら原因・残条件を記録。remote更新・競合・範囲外変更は停止、force pushなし。
+
+### Phase 02A completion evidence
+
+- Baseline: 29 tests成功（107.062秒）。最終40 tests成功（238.662秒）、既存29 + 新geometry11。
+  初回全体はtimeout=4秒の既存testがreadiness前に終了し1 failure（248.709秒）。
+  条件を変更せず単独再実行（4.247秒）と最終全体で成功。数値roundtrip最終補足1 testも成功。
+- 実CPU geometry Run: 0c33df74-f72d-4348-a9a1-c2968d5f9e7b、COMPLETED。
+  native points（force_projection=False）float32 [256,256,3] / metric m、65,536 valid / 0 invalid、
+  points.z-depth最大誤差0 m。Normals / Intrinsics / effective mask / model maskも実出力で保存・検証。
+- 既定depth-only CPU Run: 5d0351b3-1a6b-460f-80eb-c19f528e5656、COMPLETED、depth digest一致。
+  geometry / 旧01A Runを新CLIで各2回collect、全file hash / mtime不変・predict追加なし。
+- 既存独立mde-moge / fixed weights再利用。依存導入・環境定義変更なし、GPU / accuracyは未検証。
+- Python AST / JSON、25 Markdown / 165相対リンク・anchor / fence、control import境界、
+  `git diff --check`を検証。変更は02A code / tests / related docsのみ。generated artifactsはGit管理外。
+- 02A COMPLETE、Phase 02 IN_PROGRESS、02B–02D NOT_STARTED / 未承認。次milestoneを自動開始しない。
+  [02A evidence](docs/phases/phase-02/phase-02a.md#acceptance-evidence--実cpu--compatibility)に詳細を記録。
+  remote更新確認後に本作業単位をcommit / mainへ通常pushする。
+
+
+最終production sourceでの追加CPU smoke Run: `a2c9ca5a-4eb7-4697-b880-8041e7749bae`、COMPLETED / exit 0。
+Runのsource_digestが最終src / models/mogeの対象source filesと一致することを確認した。
+Points [256,256,3] / m、65,536 valid、points.z-depth誤差0 m、Normals / Intrinsics / masksも再検証。
+新CLIによる2回collectで全file hash / mtime不変、predictは1回。
+初回geometryと既定depth-onlyのdepth SHA-256も一致。GPU / GT精度は未検証。
+
+## Phase 02 documentation plan — 2026-10-13 (完了済み履歴)
 
 - Goal: 02A を安全に開始できる共通契約と範囲を GitHub 上に確定する。実装承認は別途必要。
 - Scope: README / AGENTS / PLANS、Phase 02 親文書と4内部 milestone、関連技術仕様の必要部分。
@@ -46,24 +87,24 @@
 - 新規契約は設計のみと明記。実装tests / 推論 / UI / GPU / 学会デモ検証は今回実施していない。
   commit / pushの結果はGit履歴で確認し、remote更新があれば停止する。
 
-## Phase 02 internal milestones (implementation NOT_STARTED)
+## Phase 02 internal milestones
 
 | Milestone | Dependencies | 検証する主要 exit |
 | --- | --- | --- |
-| [02A — Geometry Artifacts](docs/phases/phase-02/phase-02a.md) | 01 COMPLETE | depth必須・optional保存/検証、旧Run読込、raw不変 |
+| [02A — Geometry Artifacts](docs/phases/phase-02/phase-02a.md) | 01 COMPLETE | depth必須・optional保存/検証、旧Run読込、raw不変、実CPU native Points（COMPLETE） |
 | [02B — Gradio Inference](docs/phases/phase-02/phase-02b.md) | 02A | Local推論/状態/cancel/timeout、session分離・busy、CLI互換 |
 | [02C — 3D Results Viewer](docs/phases/phase-02/phase-02c.md) | 02A・02B | 4表示モード、offline操作、派生meshの遅延永続保存・再利用・再起動読込 |
 | [02D — Run Management](docs/phases/phase-02/phase-02d.md) | 02C | 共通service経由の一覧/編集/export/再生成/archive/restore/確認付き削除 |
 
 02A–02DはPhase 02の内部milestoneであり独立Phaseではない。全exit達成でPhase 02 COMPLETE。
-文書の計画作成と実装の開始・完了は別で、現時点のexitはすべて将来の受入条件。
+文書作成と実装の開始・完了は別。02Aは実装Exit達成、02B以降は将来の受入条件。
 
 ## Phase management
 
 状態は `NOT_STARTED → PLANNED → IN_PROGRESS → REVIEW_READY → COMPLETE` を基本とし、
 外部条件の不足は `BLOCKED` として理由を残す。`PLANNED` は計画文書の準備状態であり、
 production code の実装承認・開始を意味しない。実験 JobStatus とは別の管理状態である。
-今回のPhase 02では文書が準備済みでも実装状態を `NOT_STARTED` に保ち、文書作業の状態を別記する。
+文書準備だけでは実装を開始しない。現在は02AのExit達成でCOMPLETE、02B以降は未承認。
 
 各 phase 開始前に、最新のユーザー指示がその phase の実作業を承認していることを確認する。
 必要な通常作業のたびに承認を取り直す必要はないが、未指示の phase に進んではならない。
@@ -76,7 +117,7 @@ Tests、Exit criteria、Known risks、Decisions deferred to later phases を維�
 | --- | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | clean-start の正式確認 | 調査記録・共通契約・段階計画の整合 | COMPLETE |
 | [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | COMPLETE、01A / 01B exit 達成 |
-| [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | NOT_STARTED（文書のみ承認） |
+| [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | IN_PROGRESS（02A COMPLETE、02B以降未承認） |
 | [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 未着手 |
 | [04](docs/phases/phase-04.md) | 03 | Runner から MLflow、失敗時にも結果保存 | 未着手 |
 | [05](docs/phases/phase-05.md) | 03・04 | 同じ single inference に基づく比較評価 | 未着手 |

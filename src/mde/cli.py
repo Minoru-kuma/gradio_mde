@@ -26,6 +26,8 @@ def main(argv=None) -> int:
     run.add_argument("--backend", choices=["local"], default="local")
     run.add_argument("--device", choices=["cuda:0", "cpu"], default="cuda:0")
     run.add_argument("--dtype", choices=["float32"], default="float32")
+    run.add_argument("--outputs", nargs="+", choices=["depth", "points", "normals", "intrinsics", "mask"],
+                     default=["depth"], help="Required output names; depth must be included")
     run.add_argument("--params", default="{}", help="Manifest parameters as a JSON object")
     run.add_argument("--run-root", type=Path)
     run.add_argument("--project-root", type=Path, default=Path(__file__).resolve().parents[2])
@@ -70,7 +72,8 @@ def main(argv=None) -> int:
         if not isinstance(parameters, dict):
             raise ValueError("--params must be a JSON object")
         handle = runner.submit(args.model, args.input, variant_id=args.variant, device=args.device,
-                               dtype=args.dtype, parameters=parameters, walltime_seconds=args.timeout_seconds)
+                               dtype=args.dtype, parameters=parameters, walltime_seconds=args.timeout_seconds,
+                               requested_outputs=tuple(args.outputs))
         print(json.dumps({"run_id": handle.run_id, "status": "SUBMITTED", "run_root": str(store.root)}), flush=True)
         while not runner.status(handle).status.terminal:
             if interrupted.is_set():

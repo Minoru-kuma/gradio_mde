@@ -1,7 +1,7 @@
 # Phase 02 — Geometry Artifacts / Gradio / 3D Results / Run Management
 
-Status: **NOT_STARTED**（実装）。02A〜02Dも **NOT_STARTED / 実装未承認**。
-2026-10-13の承認は文書整備・検証・commit / main pushのみ。以下は設計・将来の受入条件。
+Status: **IN_PROGRESS**。02Aは実CPU native Pointsを含むExit達成でCOMPLETE。docs整理・commit / main pushまで承認。
+02B〜02Dは **NOT_STARTED / 実装未承認**。02Aの実装証拠は内部文書、02B以降は将来の受入条件。
 管理: [PLANS](../../PLANS.md)。Phase 01 / 01A / 01BはCOMPLETE。
 
 ## Goal
@@ -13,14 +13,14 @@ Local推論、2D / 3D閲覧、保存Runの安全な管理を行えるように�
 ## Background
 
 Phase 01のCLI → ExperimentRunner → LocalBackend → 独立Conda worker → ModelAdapterを維持する。
-現在はPNG 1枚 / attempt-0001 / depth-onlyの保存経路、schema 1.0。
-MDEOutputにoptional geometry fieldsはあるが、workerの保存・RunStore検証は未対応。
+Phase 01はPNG 1枚 / attempt-0001 / depth-onlyの保存経路、schema 1.0。
+02Aで明示要求のoptional geometry保存・RunStore検証を追加し、既定depth-onlyを維持する。
 Gradio、3D viewer、派生保存、Run管理serviceは存在しない。
 実モデルCPU成功は [Phase 01](phase-01.md) の証拠であり、GPU / UI / 学会デモ成功ではない。
 
 ## Scope
 
-- 02A: depth必須、points / normals / intrinsics optional、metadata / maskと標準保存・検証。
+- 02A: depth必須、points / normals / intrinsics optional、metadata / maskと標準保存・検証、実CPU native Points。
 - 02B: **Inference / Results** の2タブ。model / variant、画像検証、device / backend / parameters、
   submit、Run ID、非同期status / progress、cancel / timeout / failure、session分離、Local busy。
 - 02C: Resultsの **Depth | RawDepth | Point Cloud | Mesh**、保存Run読込、共通derived mesh保存。
@@ -57,7 +57,7 @@ Phase 03: 複数モデル統合。04: MLflow。05: Benchmark / 比較評価。
 
 ## Implementation tasks
 
-- [ ] 02A: 共通serializationとartifact検証、native / standard provenance、旧Run互換。
+- [x] 02A: 共通serializationとartifact検証、native / standard provenance、旧Run互換。
 - [ ] 02B: Runner操作・非同期poll・session分離・busy表示、application依存pin。
 - [ ] 02C: 4表示モード・色/描画切替・視点管理、derived meshの遅延生成・永続保存。
 - [ ] 02D: callbackと分離した管理service、安全な明示操作と履歴。

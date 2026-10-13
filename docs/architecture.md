@@ -218,7 +218,8 @@ GPU 実行の互換性・性能、UI package pin、GT dataset / evaluation proto
 
 ## Phase 02 application / geometry / management boundaries — 設計のみ
 
-Phase 02 / 02A–02DはNOT_STARTED。親仕様は [Phase 02](phases/phase-02.md)。
+Phase 02はIN_PROGRESS、02A COMPLETE、02B–02DはNOT_STARTED / 未承認。
+以下の02A記述は実装前の計画であり、確定契約は末尾を参照。親仕様は [Phase 02](phases/phase-02.md)。
 02Aはadapterの意味変換、workerのgeometry serialization、RunStoreのvalidationを拡張する。
 02BはInference / Resultsの2タブで既存Runnerを操作、全sessionに1つのLocalBackendを共有する。
 sessionごとのinput / handle / selectionは独立。instance busy guardを維持して同時jobは拒否しqueueしない。
@@ -230,3 +231,11 @@ derived storageの最小生成 / reuseは02C、管理操作は02D。管理servic
 raw / 確定JobResultは不変、user sidecarとderived manifestを別保存する計画。
 UIを閉じることは暗黙cancel / deleteではなく、terminal保存Runを再起動後に読む。
 active job recovery・multi-process調停・公開多ユーザーはPhase 02に導入しない。
+
+## Phase 02A implemented geometry boundary
+
+02Aのoptional output要求をRunner / JobSpecに追加し、workerがserialization、RunStoreが
+geometry検証を担当する。`mde.geometry`はstdlibのみ、NPYのheader・bounded payload読込で
+Points / Depth・normal length・K・maskを検証する。numeric依存はworker、MoGe変換はmodels/mogeに閉じる。
+ModelAdapterにStorage / LocalBackend依存を追加せず、coreのモデル名分岐も追加しない。
+既定CLI / depth-only保存形式を維持。02B–02DのUI / viewer / management境界は設計のみ。

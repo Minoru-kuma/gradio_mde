@@ -2,7 +2,7 @@
 
 Status: Phase 01A の1 Run / 1 attempt / 1 view の最小 layout を実装し、fake 出力の保存・読戻しを確認。
 MoGe CPU の実推論成果物も保存・読み戻し確認済み。証拠は [Phase 01](phases/phase-01.md)。
-optional geometry / tracking / evaluation / retry は将来設計。
+02A optional geometryは末尾の実装契約を参照。tracking / evaluation / retryは将来設計。
 関連: [Job contracts](execution-backend-spec.md)、[MDEOutput](model-adapter-spec.md)、
 [MLflow](mlflow-design.md)、[Slurm](slurm-integration.md)。
 
@@ -192,7 +192,8 @@ MoGe regression で確認した。active job を directory から再 submit す�
 
 ## Phase 02 additive artifacts and management — 設計のみ
 
-Phase 02 / 02A–02DはNOT_STARTED。上記layoutのoptional geometryは現行exportではない。
+Phase 02はIN_PROGRESS、02A COMPLETE、02B–02DはNOT_STARTED / 未承認。
+以下の02A記述は実装前の計画であり、確定契約は末尾を参照。上記layoutのoptional geometryは現行exportではない。
 [02A](phases/phase-02/phase-02a.md) でdepth必須、points / normals / intrinsics / maskのoptional
 保存・参照検証を追加する計画。既存depth.npy / metadata / reportの場所と意味を維持する。
 旧schema 1.0 / 01A-depth-onlyを読込し、optional absenceは許容。
@@ -208,3 +209,42 @@ Run / attempt / viewを検証し、別Run path / symlinkを許容しない。
 Run / derivedの削除は対象付き明示確認、active / terminal未確定は拒否、自動削除なし。
 上記将来retention policyはPhase 02には導入しない。条件変更の再推論は新Run、
 derived明示再生成は新generationと履歴。active restart recoveryは依然Phase 06以降。
+
+## Implemented Phase 02A wire format and validation
+
+先行節の02A設計を以下の追加契約として実装。02C / 02Dのderived / user metadataは設計のみ。
+既存schema_version `1.0` / layout / depth意味は維持し、optional output refsを追加する。
+新profile `execution.serialization_profile=02A-geometry-v1` を旧 `01A-depth-only` と区別する。
+旧profile（profile field欠如も含む）は従来depth-onlyとして読込可能。旧Runへgeometryを後付けしない。
+旧readerにgeometry検証能力があるとはしない。geometry Runの正式検証には02A readerを使う。
+
+| output ref / file (output/attempt-0001/views/view-0001以下) | 型 / 単位 | 保存条件 |
+| --- | --- | --- |
+| depth / depth.npy | little-endian float32 [H,W]、m / arbitrary / unknown | 必須、従来不変 |
+| points / points.npy | little-endian float32 [H,W,3]、depthと同単位・尺度 | 明示要求、実model出力 |
+| normals / normals.npy | little-endian float32 [H,W,3]、unitless | 明示要求、実model出力 |
+| intrinsics / intrinsics.npy | little-endian float32 [3,3]、pixel | 明示要求、実model出力を標準化 |
+| mask / mask.npy | bool [H,W]、unitless | geometry profileで常にeffective validityを保存 |
+| model_mask / model_mask.npy | bool [H,W]、unitless | geometry profileでnative maskがある場合 |
+
+refsはpath / media_type=application/x-npy / shape / dtype / unit / size_bytes / SHA-256。
+`outputs[0]`と`artifacts`双方に同一refを持ち、metadata.jsonのviewsとreport metadataも一致させる。
+maskのexplicit要求はnative maskの提供を要求するが、serialized mask refはeffective validity。
+model_maskが元のモデル判定、maskがfinite-positive depth AND model_mask。
+geometryのmetadataには各refのorigin / native convention / conversion等を保存する。
+共通effective maskだけorigin=validation、その他はorigin=model。rawモデルgeometryと将来derivedを混同しない。
+
+requested_outputsをJobSpecと照合し、geometry profileの欠落・別profile・未対応名を拒否。
+C-order / header・payload・dtype・shape・unit・frame・scale・digest・contained pathをstdlibで検証する。
+float payloadは4096 records単位で読み、controlにNumPy / PyTorchを導入しない。
+有効Pointsはfiniteで、z-depthならpoints.z、ray_distanceならpoints normがdepthと
+rtol=1e-4 / atol=1e-5（同単位）以内で一致することを確認。
+有効Normalsはfinite・unit length（abs tolerance=1e-3）。Kはfinite、正focal、
+canonical pinhole bottom row [0,0,1] / K[1,0]=0（abs tolerance=1e-6）とgrid / pixel center metadataを確認。
+無効depth / vectorはNaN、mask payloadは0 / 1、valid / invalid統計も照合。
+model_mask / effective maskを混同しない。geometry不正は確定前FAILED、確定後ArtifactIntegrityError。
+
+numeric filesは一時NPYへ書きrenameし、geometry値検証後にmetadata / worker reportを
+従来のatomic publicationで確定する。
+既存raw fileがあれば保存を拒否し、published WorkerResult / JobResultがあるRunのworker再実行も拒否する。
+失敗途中のraw / logsは診断として保持し成功出力へ公開しない。再collectは読み取り専用。

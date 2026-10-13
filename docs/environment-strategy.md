@@ -200,3 +200,12 @@ CDN / remote JSを必須にせずローカル配信を確認する。submit時�
 CPUは明示選択、CUDA不可の自動fallbackなし。既存CPU推論成功と未来のUI / GPU / 学会デモは区別。
 保存terminal Run表示はmodel環境・weightsなしで可能にし、取得したruntime / GPU memoryのみ表示、
 未計測はunavailable。GPU実機検証は別証拠として記録する。
+
+## Phase 02A validation environment
+
+既存独立named mde-mogeを再利用し、Python 3.11.14 / torch 2.6.0+cu124 / pinned MoGe・utils3d /
+checkpoint SHA-256を照合してCPUで検証した。依存追加・環境変更は行っていない。
+geometry用のNumPyはworker環境の既存依存、controlのgeometry readerはstdlibのみ。
+02A serialization_secondsは要求されたnumeric artifactsの変換・NPY保存・geometry値検証・checksumを
+含むscopeを各metricに明記する。01A形式の保存metricのscopeを変更せず読み戻す。
+CPUなのでCUDA allocator値は省略、GPU / driver互換は未検証。

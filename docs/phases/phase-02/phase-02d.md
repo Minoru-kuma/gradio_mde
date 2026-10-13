@@ -2,7 +2,7 @@
 
 Status: **NOT_STARTED / 実装未承認**。Phase 02の内部milestone。以下は設計のみ。
 親: [Phase 02](../phase-02.md)、管理: [PLANS](../../../PLANS.md)。
-今回の承認は文書整備・検証・commit / main pushのみ。実装開始・依存導入は行わない。
+現在の実装承認は02Aのみ。このmilestoneは未承認のため開始しない。
 
 ## Goal / Background
 

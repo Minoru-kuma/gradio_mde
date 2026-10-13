@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 from .contracts import (JobSpec, ModelInfo, ModelLoadContext, PredictionRequest,
-                        SCHEMA_VERSION, check_schema, utc_now)
+                        SCHEMA_VERSION, GEOMETRY_PROFILE, normalize_outputs, check_schema, utc_now)
 from .storage import artifact_ref, contained_path, read_json, sha256_file, write_json
 from .runtime import environment_fingerprint, timed, reset_allocator, observe_allocator
 
@@ -44,6 +44,8 @@ def execute(job_path: Path, run: Path) -> int:
     if run.name != spec.run_id:
         raise ValueError("Run ID/path mismatch")
     output_dir = run / "output" / spec.attempt_id
+    if (output_dir / "result.json").exists() or (run / "attempts" / spec.attempt_id / "job-result.json").exists():
+        raise ValueError("Published inference results are immutable; create a new Run")
     report = {"schema_version": SCHEMA_VERSION, "run_id": spec.run_id, "attempt_id": spec.attempt_id,
               "outcome": "FAILED", "outputs": [], "artifacts": [], "metrics": {}, "warnings": [],
               "started_at": utc_now(), "execution": {"python_version": platform.python_version(),
@@ -95,12 +97,16 @@ def execute(job_path: Path, run: Path) -> int:
         output = batch.views[0]
         if output.depth is None:
             raise ValueError("Missing required depth")
+        if np.asarray(output.depth).dtype.hasobject:
+            raise ValueError("Object depth arrays are forbidden")
         depth = np.asarray(output.depth, dtype=np.dtype("<f4"), order="C")
         if depth.ndim != 2 or min(depth.shape) < 1:
             raise ValueError("Depth must have shape [H,W]")
         valid = np.isfinite(depth) & (depth > 0)
         if output.mask is not None:
-            mask = np.asarray(output.mask, dtype=bool)
+            mask = np.asarray(output.mask)
+            if mask.dtype != np.dtype(bool):
+                raise ValueError("Model mask must be bool")
             if mask.shape != depth.shape:
                 raise ValueError("Mask/depth shape mismatch")
             valid &= mask
@@ -122,18 +128,64 @@ def execute(job_path: Path, run: Path) -> int:
             raise ValueError("Unknown depth kind")
         if metadata["scale_type"] == "metric" and metadata["depth_unit"] != "m":
             raise ValueError("Metric depth must be in metres")
-        depth_path = output_dir / "views" / output.view_id / "depth.npy"
-        with depth_path.with_suffix(".npy.tmp").open("wb") as stream:
-            np.save(stream, depth, allow_pickle=False)
-        os.replace(depth_path.with_suffix(".npy.tmp"), depth_path)
-        ref = artifact_ref(run, depth_path, media_type="application/x-npy", shape=list(depth.shape),
-                           dtype="float32", unit=metadata["depth_unit"])
-        report["outputs"] = [{"view_id": output.view_id, "depth": ref, "metadata": metadata,
-                              "extras": output.extras}]
+        def save_array(name, array, unit):
+            array = np.ascontiguousarray(array)
+            path = contained_path(run, f"output/{spec.attempt_id}/views/{output.view_id}/{name}.npy")
+            if path.exists():
+                raise ValueError("Raw artifacts are immutable")
+            temporary = path.with_suffix(".npy.tmp")
+            with temporary.open("xb") as stream:
+                np.save(stream, array, allow_pickle=False)
+            os.replace(temporary, path)
+            return artifact_ref(run, path, media_type="application/x-npy", shape=list(array.shape),
+                                dtype="bool" if array.dtype == np.dtype(bool) else "float32", unit=unit)
+
+        ref = save_array("depth", depth, metadata["depth_unit"])
+        serialized = {"view_id": output.view_id, "depth": ref, "metadata": metadata, "extras": output.extras}
+        report["outputs"] = [serialized]
         report["artifacts"] = [ref]
-        report["execution"]["serialization_profile"] = "01A-depth-only"
+        requested = normalize_outputs(spec.inference["requested_outputs"])
+        profile = "01A-depth-only"
+        if requested != ["depth"]:
+            profile = GEOMETRY_PROFILE
+            meanings = output.metadata.get("geometry", {})
+            metadata["requested_outputs"] = requested
+            metadata["geometry"] = {"mask": {"origin": "validation",
+                "conversion": "finite-positive depth AND model mask; invalid depth and vectors stored as NaN"}}
+            serialized["mask"] = save_array("mask", valid, "unitless")
+            report["artifacts"].append(serialized["mask"])
+            if output.mask is not None:
+                serialized["model_mask"] = save_array("model_mask", np.asarray(output.mask), "unitless")
+                metadata["geometry"]["model_mask"] = meanings.get("model_mask", {})
+                report["artifacts"].append(serialized["model_mask"])
+            if "mask" in requested and output.mask is None:
+                raise ValueError("Missing requested model mask")
+            for key in ("points", "normals", "intrinsics"):
+                if key not in requested:
+                    continue
+                value = getattr(output, key)
+                if value is None:
+                    raise ValueError(f"Missing requested {key}")
+                raw = np.asarray(value)
+                if raw.dtype.hasobject:
+                    raise ValueError(f"Object {key} arrays are forbidden")
+                array = np.asarray(value, dtype=np.dtype("<f4"), order="C")
+                expected = (3, 3) if key == "intrinsics" else (*depth.shape, 3)
+                if array.shape != expected:
+                    raise ValueError(f"{key} shape mismatch")
+                if key != "intrinsics":
+                    array = np.where(valid[..., None], array, np.nan).astype("<f4")
+                unit = metadata["depth_unit"] if key == "points" else "pixel" if key == "intrinsics" else "unitless"
+                serialized[key] = save_array(key, array, unit)
+                metadata["geometry"][key] = meanings.get(key, {})
+                report["artifacts"].append(serialized[key])
+        else:
+            metadata.pop("geometry", None)
+        report["execution"]["serialization_profile"] = profile
+        from .geometry import validate_geometry
+        validate_geometry(run, report)
         report["metrics"]["serialization_seconds"] = {"value": time.perf_counter() - serialization_started,
-            "unit": "s", "scope": "depth validation, conversion, atomic NPY write and checksum; excludes metadata / result JSON"}
+            "unit": "s", "scope": "numeric artifact validation, conversion, atomic NPY write and checksum; excludes metadata / result JSON"}
         if allocator_measured:
             observe_allocator(context.device, report["metrics"])
         report["outcome"] = "COMPLETED"

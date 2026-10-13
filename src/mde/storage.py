@@ -153,6 +153,8 @@ def validate_outputs(run: Path, report: dict) -> None:
         raise ArtifactIntegrityError("Invalid camera frame")
     if metadata.get("output_size") != {"height": info["shape"][0], "width": info["shape"][1]}:
         raise ArtifactIntegrityError("Output dimensions mismatch")
+    from .geometry import validate_geometry
+    validate_geometry(run, report)
     document = read_json(contained_path(run, expected_metadata))
     check_schema(document)
     if document.get("run_id") != report["run_id"] or document.get("attempt_id") != report["attempt_id"]:

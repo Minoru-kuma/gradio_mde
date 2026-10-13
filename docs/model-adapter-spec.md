@@ -3,7 +3,7 @@
 Status: schema `1.0` の最小型と MoGe adapter / manifest を Phase 01A で実装。
 fake tests と MoGe の CPU 実推論・depth 保存を確認済み。GPU は未検証。
 01B の区間計測・fingerprint は共通 worker が担当し adapter signature は維持。
-optional geometry の保存・複数モデルは将来仕様。
+02A geometry保存・検証は末尾の実装契約を参照。複数モデルは将来仕様。
 関連: [Architecture](architecture.md)、[Execution](execution-backend-spec.md)、
 [Environment](environment-strategy.md)、[Run Directory](run-directory-spec.md)。
 
@@ -122,7 +122,8 @@ metadata は深度の解釈に必要な共通項目であり、モデルの追�
 出力の dense maps は同じ `[H, W]` を使用する。配列を CPU に移し共通 dtype に変換した後で
 serialization する。推論 dtype と保存 dtype は別々に記録する。
 01A の worker は depth のみ保存し、optional mask は finite-positive 判定に併用する。
-optional fields / extras の型は保持するが geometry 配列の exporter は未実装。
+01A時点ではoptional fields / extrasの型のみ保持しgeometry exporterは未実装だった。
+02Aの現在のexport / 検証契約は末尾を参照。
 MoGe の採用版・checkpoint / native output は [plugin README](../models/moge/README.md) を参照する。
 
 ### Geometric conventions
@@ -201,9 +202,9 @@ depth 単位・pose の向き・必須項目の変更は破壊的変更とし、
 | capability は variant と条件付き | モデル family の機能を過剰申告しない | UI に条件表示が必要 | optional output / derived visualization |
 | extras は namespaced typed refs | native output を失わず共通 API を保つ | 汎用 UI は未知 extras を自動可視化しない | plugin-specific artifact renderer を独立追加 |
 
-## Phase 02A geometry contract extension — 設計のみ
+## Phase 02A geometry contract extension — 実装前の計画記録
 
-[02A](phases/phase-02/phase-02a.md) はNOT_STARTED。既存MDEOutputのoptional fieldsの
+以下は02A実装前の計画記録。確定した実装契約は次節を参照。既存MDEOutputのoptional fieldsの
 serializationを計画する。現行MoGe adapterはdepth / maskのみ返し、native_output_keysの記録は
 optional geometryのexportではない。全モデルにpoints / normals / intrinsicsを強制しない。
 明示要求の未対応はsubmit前に拒否、runtime欠落はfailure。要求していないoptional欠如は正常。
@@ -218,3 +219,27 @@ viewerは保存frame / unit / scaleを維持し、表示都合でrawをnormalize
 normal orientation・K grid・RGB対応は02A fixtureで確認。rawはpublish後不変。
 旧depth-only / mask未保存Runは読込可能、別mask不在は従来finite-positive depth判定を利用。
 具体wire refs / 新serialization profileは02A実装前に決定し、旧schema 1.0互換testsを追加する。
+
+## Implemented Phase 02A geometry profile
+
+02Aは上記将来契約のうちdepth / points / normals / intrinsics / maskを実装する。
+以下が02Aの現在の契約で、先行する「設計のみ」「depth-onlyのみ」はPhase 01時点の範囲を示す。
+`requested_outputs`はdepth必須、points / normals / intrinsics / maskをoptionalで明示要求する。
+既定は[depth]。未対応要求はRunnerで拒否、conditionalはadapter実出力で確認し欠落をfailureにする。
+未要求optionalは保存しない。全モデルへのgeometry強制はしない。
+
+adapterはnative→standardの意味変換とgeometry metadataを返し、storageを呼ばない。
+`metadata.geometry.<name>`にorigin=model、native_convention、conversionを記録する。
+pointsはcamera_frame / scale_type、normalsはcamera_frame / orientation、intrinsicsはcamera_model=pinhole /
+output grid [H,W] / pixel_center=integerを追加する。model_maskはnative maskの意味を記録する。
+保存dtypeはfloat32、native値の無効領域だけ共通workerでNaN化し、変換方法をeffective maskのmetadataに残す。
+
+pin済みMoGeのPoints要求では`infer(force_projection=False, fov_x=None)`を使用。
+モデルのaffine pointsにupstreamのcamera-space z shift・metric scaleを適用した実出力を保存し、
+adapterでDepthからPointsを逆投影しない。Depthのみの従来実行ではforce_projection=Trueを維持する。
+normalはnative `normal`キーをnormalsへ対応付け、学習したcamera-space方向をflip / 派生計算しない。
+normalized Kは`[[W,0,-0.5],[0,H,-0.5],[0,0,1]] @ native_K`で整数画素中心のpixel Kへ変換し、
+native K数値と式をmetadataに保持する。RGB対応はidentityとして記録する。
+確認根拠: [固定MoGe infer](https://github.com/microsoft/MoGe/blob/07444410f1e33f402353b99d6ccd26bd31e469e8/moge/model/v2.py)、
+[固定utils3d denormalize_intrinsics](https://github.com/EasternJournalist/utils3d/blob/3fab839f0be9931dac7c8488eb0e1600c236e183/utils3d/torch/transforms.py)。
+実測・Exit証拠は [02A](phases/phase-02/phase-02a.md) に記録する。

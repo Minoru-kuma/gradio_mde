@@ -265,7 +265,17 @@ Gradio event dispatchがinference jobをqueueに溜めない設定を実装時�
 現行JobStatusSnapshotは数値progressを持たない。statusとindeterminate進捗を表示し、
 未提供%を捏造しない。数値progress拡張を採るなら共通optional契約として別途仕様更新する。
 CUDA要求のCPU fallbackなし、cancel完了race / timeoutの現行terminal semanticsを維持。
-02A requested optional outputsは計画であり、現行JobSpecは[depth]のみ受理する。
+UI計画作成時のJobSpecは[depth]のみだった。02Aの実装では末尾のrequest extensionを追加する。
 確定JobResultはimmutable、derived geometry・管理sidecarの追加で書き換えない。
 保存terminal Run読込は再推論 / active recoveryではない。active削除を拒否する管理責務は
 [Run Management Service](run-management-spec.md) に分離する。
+
+## Phase 02A implemented request extension
+
+02AではRunner.submitにoptional `requested_outputs=("depth",)`、CLIに`--outputs depth points ...`を追加。
+depth必須、points / normals / intrinsics / maskから一意の集合を選び、共通順序でJobSpecへ保存する。
+explicit optional要求はvariant capability supported / conditionalのみ受理し、runtime不足はworker failure。
+requested outputsは条件digestにも含む（既定depth-onlyのdigest入力は従来の形を維持）。
+JobSpecの旧[depth]制限を拡張し、single-view / single-attempt / cpu・cuda:0 / float32の制限は維持。
+新profile・geometry保存後のcollectは同じBackend境界で行い、cancel / timeout / busyを変更しない。
+terminal JobResultはimmutable。02B以降のUI / progress / session設計は依然未実装。

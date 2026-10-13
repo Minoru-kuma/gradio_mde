@@ -12,6 +12,18 @@ ATTEMPT_ID = "attempt-0001"
 VIEW_ID = "view-0001"
 
 
+OUTPUT_NAMES = ("depth", "points", "normals", "intrinsics", "mask")
+GEOMETRY_PROFILE = "02A-geometry-v1"
+
+
+def normalize_outputs(value) -> list[str]:
+    if (not isinstance(value, (list, tuple)) or not value
+            or any(not isinstance(key, str) or key not in OUTPUT_NAMES for key in value)
+            or len(set(value)) != len(value) or "depth" not in value):
+        raise ValueError("Outputs must contain depth and unique supported geometry names")
+    return [key for key in OUTPUT_NAMES if key in value]
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -202,8 +214,7 @@ class JobSpec:
             raise UnsupportedOperation("Phase 01 supports cpu / cuda:0 and float32")
         if not isinstance(job.inference.get("parameters"), dict) or type(job.inference.get("seed")) is not int:
             raise ValueError("Malformed inference parameters / seed")
-        if job.inference.get("requested_outputs") != ["depth"]:
-            raise UnsupportedOperation("Phase 01 serializes depth only")
+        normalize_outputs(job.inference.get("requested_outputs"))
         return job
 
 

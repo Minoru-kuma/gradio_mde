@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "model_id": "geometry",
+  "display_name": "Geometry fixture",
+  "adapter_entrypoint": "tests.fixtures.geometry:GeometryAdapter",
+  "upstream_revision": "test-fixture",
+  "default_variant": "fake-depth",
+  "variants": [
+    {
+      "variant_id": "fake-depth",
+      "checkpoint": null
+    }
+  ],
+  "capabilities": {
+    "depth": {
+      "status": "conditional"
+    },
+    "points": {
+      "status": "conditional"
+    },
+    "normals": {
+      "status": "conditional"
+    },
+    "intrinsics": {
+      "status": "conditional"
+    },
+    "mask": {
+      "status": "conditional"
+    }
+  },
+  "environment_refs": [
+    {
+      "environment_id": "mde-moge",
+      "definition_ref": "models/moge/environment.yml"
+    }
+  ],
+  "supported_devices": [
+    "cpu"
+  ],
+  "supported_dtypes": [
+    "float32"
+  ],
+  "parameter_schema": {
+    "properties": {
+      "action": {
+        "type": "string",
+        "default": "success"
+      }
+    }
+  }
+}

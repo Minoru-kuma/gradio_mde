@@ -23,8 +23,8 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 
 ## 現在の開発状況
 
-**2026-10-13: Phase 00 / 01A / 01B / Phase 01 COMPLETE。Phase 02 / 02A〜02D の実装は NOT_STARTED。**
-Phase 02 の文書整備・検証・commit / main push のみ承認されており、実装は未承認です。
+**2026-10-13: Phase 00 / 01A / 01B / Phase 01 COMPLETE。Phase 02 は IN_PROGRESS、02A COMPLETE、02B〜02D は NOT_STARTED。**
+Phase 02A の実装・検証・関連docs更新とExit達成後のcommit / main pushが承認されています。02B以降は未承認です。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -139,7 +139,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
 | [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | COMPLETE。01A / 01B COMPLETE（CPU E2E / Local robustness） |
-| [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | NOT_STARTED（文書のみ承認） |
+| [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | IN_PROGRESS（02A COMPLETE、02B以降未承認） |
 | [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 未着手 |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |
 | [05](docs/phases/phase-05.md) | Benchmark Mode | 未着手 |
@@ -152,14 +152,14 @@ Phase の完了によって次 phase を自動開始しません。管理方法�
 実行し、共通 MDEOutput の raw depth、metadata / result / logs を Run Directory に保存する段階です。
 cancel / timeout 等は 01B、GPU lease の必要性判断・高度な復旧 / concurrency は後段へ分けます。
 
-## Phase 02 の計画 — 実装 NOT_STARTED
+## Phase 02 — 02A実装、02B以降は計画のみ
 
 [Phase 02](docs/phases/phase-02.md) は、1モデルのLocal推論と保存成果物を扱う
 **Inference / Results の2タブ**を計画します。内部milestoneの順序は次の通りです。
 
 | Milestone | 役割 | 前提 |
 | --- | --- | --- |
-| [02A](docs/phases/phase-02/phase-02a.md) | 必須depthとoptional points / normals / intrinsicsの正式保存・検証 | Phase 01 |
+| [02A](docs/phases/phase-02/phase-02a.md) | 必須depthとoptional points / normals / intrinsicsの正式保存・検証（COMPLETE） | Phase 01 |
 | [02B](docs/phases/phase-02/phase-02b.md) | GradioからRunnerを操作、入力・状態・cancel・busy・session分離 | 02A |
 | [02C](docs/phases/phase-02/phase-02c.md) | ResultsのDepth / RawDepth / Point Cloud / Mesh、派生mesh永続化 | 02A・02B |
 | [02D](docs/phases/phase-02/phase-02d.md) | Run履歴・管理情報・export・再生成・archive / restore・明示削除 | 02C |
@@ -174,6 +174,25 @@ Geometry artifactsは共通worker / RunStore、3D表示は共通viewer、管理�
 保存Runは再起動後もRun IDから開ける計画です。CPUは明示選択、CUDAからの自動fallbackはありません。
 既存CPU推論成功と、未検証のGradio / 3D / GPU / 学会デモは区別します。
 高度な検索・共有ユーザー管理・認証・お気に入り・高度な3D編集は範囲外です。
+
+## Phase 02A Geometry Artifacts
+
+従来CLIは既定depth-onlyのままです。optional geometryを明示要求できます。
+
+```bash
+PYTHONPATH=src python -m mde.cli run --model moge --input tests/assets/sample.png \
+  --device cpu --checkpoint .local/weights/moge-2-vits-normal.pt \
+  --outputs depth points normals intrinsics mask --timeout-seconds 300
+```
+
+ModelAdapterのnative出力をworkerが標準NPYへ保存し、RunStoreがsize / digest / shape / dtype /
+frame / unit / validityとPoints-Depthの整合性を検証します。PointsはMoGeのnative推定点を使い、
+`force_projection=False`で便宜的逆投影を避けます。Normals / Intrinsicsはnative提供時のみ対応。
+maskはeffective validity、model_maskは元モデル判定として別保存します。
+旧schema 1.0 / depth-only RunのcollectとCLI互換を維持し、raw / 確定JobResultを上書きしません。
+実CPU native Pointsの保存・再読込・Depth整合と40 tests成功で02A COMPLETE。
+実CPU結果・テスト・制限は [02A](docs/phases/phase-02/phase-02a.md) に記録します。
+Gradio / 3D / derived mesh / Run管理は02B以降の計画であり、まだ利用できません。
 
 ## ドキュメント一覧
 
