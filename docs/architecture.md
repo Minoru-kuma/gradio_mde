@@ -2,7 +2,7 @@
 
 Status: Phase 00 COMPLETE。Phase 01A の最小経路を実装し、fake tests を確認済み。
 MoGe の明示 CPU E2E と成果物検証、Local robustness / CPU regression により
-01A / 01B / Phase 01 COMPLETE。GPU は未検証。Phase 02 以降は未着手・未承認。
+01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02C以降は未承認。
 以下の全体図には将来設計も含む。
 
 ## Repository investigation
@@ -216,9 +216,9 @@ GPU 実行の互換性・性能、UI package pin、GT dataset / evaluation proto
 研究室設定は未確定。各仕様・phase に判断時点を割り当て、値を仮定してコード化しない。
 外部の過去コードの所在・利用可否は、参考資料が必要になった 01 / 03 で確認する。
 
-## Phase 02 application / geometry / management boundaries — 設計のみ
+## Phase 02 application / geometry / management boundaries
 
-Phase 02はIN_PROGRESS、02A COMPLETE、02B–02DはNOT_STARTED / 未承認。
+Phase 02はIN_PROGRESS、02A / 02B COMPLETE、02C–02DはNOT_STARTED / 未承認。
 以下の02A記述は実装前の計画であり、確定契約は末尾を参照。親仕様は [Phase 02](phases/phase-02.md)。
 02Aはadapterの意味変換、workerのgeometry serialization、RunStoreのvalidationを拡張する。
 02BはInference / Resultsの2タブで既存Runnerを操作、全sessionに1つのLocalBackendを共有する。
@@ -238,4 +238,17 @@ active job recovery・multi-process調停・公開多ユーザーはPhase 02に�
 geometry検証を担当する。`mde.geometry`はstdlibのみ、NPYのheader・bounded payload読込で
 Points / Depth・normal length・K・maskを検証する。numeric依存はworker、MoGe変換はmodels/mogeに閉じる。
 ModelAdapterにStorage / LocalBackend依存を追加せず、coreのモデル名分岐も追加しない。
-既定CLI / depth-only保存形式を維持。02B–02DのUI / viewer / management境界は設計のみ。
+既定CLI / depth-only保存形式を維持。02BのUI操作境界は下記を参照。02C–02Dのviewer / management境界は設計のみ。
+
+
+## Phase 02B implemented application boundary
+
+独立application環境（Python 3.13.13 / Gradio 6.30.0）に `mde.ui` とUI非依存の
+`mde.ui_controller` を追加。composition rootが既存Runner / Backendを一度構成する。
+callbackはmodel / torch / Conda / subprocessを制御しない。background observerのみRunnerを操作し、
+Gradioはsession snapshotをpollする。全eventはqueue=False、同時推論はnonblocking admissionで拒否。
+server-side State tokenとgenerationでhandle / cancel / result selectionを分離し、表示writerは単一Timer。
+Resultsは共通JobResult詳細と既存terminal collectのRun ID読込のみ。管理service / 3Dは未実装。
+PNG制限、pin / offline条件、callback / lifecycleの詳細は [Gradio Inference](gradio-inference.md)。
+保存schemaは変更せず、Runner.collectのsummary publicationを同instance内で直列化して
+同内容の再collectをread-onlyにした。raw / 確定JobResultを変更しない。

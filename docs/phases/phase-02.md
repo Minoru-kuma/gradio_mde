@@ -1,7 +1,8 @@
 # Phase 02 — Geometry Artifacts / Gradio / 3D Results / Run Management
 
-Status: **IN_PROGRESS**。02Aは実CPU native Pointsを含むExit達成でCOMPLETE。docs整理・commit / main pushまで承認。
-02B〜02Dは **NOT_STARTED / 実装未承認**。02Aの実装証拠は内部文書、02B以降は将来の受入条件。
+Status: **IN_PROGRESS**。02Aは実CPU native Pointsを含むExit達成でCOMPLETE。
+02Bは **COMPLETE / 全Exit達成、commit / main通常push承認済み**。
+02C〜02Dは **NOT_STARTED / 未承認**。02A / 02Bの証拠は内部文書を参照。
 管理: [PLANS](../../PLANS.md)。Phase 01 / 01A / 01BはCOMPLETE。
 
 ## Goal
@@ -15,7 +16,7 @@ Local推論、2D / 3D閲覧、保存Runの安全な管理を行えるように�
 Phase 01のCLI → ExperimentRunner → LocalBackend → 独立Conda worker → ModelAdapterを維持する。
 Phase 01はPNG 1枚 / attempt-0001 / depth-onlyの保存経路、schema 1.0。
 02Aで明示要求のoptional geometry保存・RunStore検証を追加し、既定depth-onlyを維持する。
-Gradio、3D viewer、派生保存、Run管理serviceは存在しない。
+02BでGradioの操作・共通結果詳細を実装。3D viewer、派生保存、Run管理serviceは存在しない。
 実モデルCPU成功は [Phase 01](phase-01.md) の証拠であり、GPU / UI / 学会デモ成功ではない。
 
 ## Scope
@@ -28,7 +29,8 @@ Gradio、3D viewer、派生保存、Run管理serviceは存在しない。
 
 BackendはLocalのみ。UIはRunner / Registry metadataと共通serviceを利用し、
 モデル推論・PyTorch・Conda・subprocessの直接制御をcallbackに書かない。
-Gradioは独立application environment、version / dependenciesは実装時にpinする。
+Gradioは独立application environment。02BでGradio 6.30.0と依存をpinした。
+起動・session / dispatch / offline契約は [Gradio Inference](../gradio-inference.md)。
 全sessionで同じLocalBackendを共有し、一度に1job、busyは拒否、実行jobのqueueを作らない。
 session stateの画像・handle・表示Runは個別に保持する。公開多ユーザー運用は想定しない。
 
@@ -58,7 +60,7 @@ Phase 03: 複数モデル統合。04: MLflow。05: Benchmark / 比較評価。
 ## Implementation tasks
 
 - [x] 02A: 共通serializationとartifact検証、native / standard provenance、旧Run互換。
-- [ ] 02B: Runner操作・非同期poll・session分離・busy表示、application依存pin。
+- [x] 02B: Runner操作・非同期poll・session分離・busy表示、application依存pin。
 - [ ] 02C: 4表示モード・色/描画切替・視点管理、derived meshの遅延生成・永続保存。
 - [ ] 02D: callbackと分離した管理service、安全な明示操作と履歴。
 - [ ] ローカル起動・事前準備・offline・明示CPU・保存結果デモの再現手順。

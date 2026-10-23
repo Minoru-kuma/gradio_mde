@@ -184,22 +184,17 @@ CUDA API境界はmockで検証し、実GPUの計測は未検証。
 環境の手順は [MoGe README](../models/moge/README.md)。推移依存の完全lock、
 upstream全CLI / UIのrequirements充足、pip check成功は保証しない。
 
-## Phase 02 application / offline demo plan — 設計のみ
+## Phase 02 application / offline conditions
 
-[02B](phases/phase-02/phase-02b.md) と [02C](phases/phase-02/phase-02c.md) はNOT_STARTED。
-Gradio / numeric artifact reader / 3D rendererはapplication environmentへ導入する計画。
-現在のstdlib control境界を維持し、viewer用数値依存をmodel adapter / backendに混入させない。
-model environmentはworker / torch / selected model、applicationにはmodel package / torchを要求しない。
-
-実装承認後にGradioとviewer libraryの固定版・依存 / frontend assets・OS / browser条件を調査してpinし、
-再作成定義 / lockと起動手順を記録する。今回の作業では版選定・依存導入・環境変更をしない。
-モデルrevision / checkpoint / cache / model environmentとapplication / frontend assetsを事前準備し、
-ネットワーク遮断下でローカル起動・推論・保存Run表示・3D操作を検証する計画。
-CDN / remote JSを必須にせずローカル配信を確認する。submit時の自動install / downloadは行わない。
-
-CPUは明示選択、CUDA不可の自動fallbackなし。既存CPU推論成功と未来のUI / GPU / 学会デモは区別。
-保存terminal Run表示はmodel環境・weightsなしで可能にし、取得したruntime / GPU memoryのみ表示、
-未計測はunavailable。GPU実機検証は別証拠として記録する。
+02Bは独立application venv（Python 3.13.13 / Gradio 6.30.0）を利用する。
+[ui.lock](../requirements/ui.lock)に推移依存まで固定し、model environmentへGradioを要求しない。
+applicationにtorch / model packageは不要。wheelsはGit管理外wheelhouseに準備し、
+別venvへの `--no-index` 再作成とpip checkを検証する。
+frontendはGradio wheelのassetsをlocalhost配信し、analytics / share / 外部font / SSRを無効化する。
+既存独立model環境 / source / fixed checkpointを事前準備し、CPUを明示選択する。
+Python socketsとbrowser外向きHTTPを遮断したUI smokeの条件・限界と再作成手順は
+[Gradio Inference](gradio-inference.md)、実測は [02B](phases/phase-02/phase-02b.md) を参照。
+02Cのnumeric viewer / 3D rendererは未承認・未実装。GPU / 学会実演は未検証。
 
 ## Phase 02A validation environment
 

@@ -5,18 +5,17 @@
 [phase 文書](docs/phases/) と変更対象の仕様を読む。
 
 1. 作業は phase 単位で行う。ユーザーが指示していない phase に進まない。
-   最新の指示により現在の承認範囲は Phase 02A — Geometry Artifacts の実装・検証・
-   関連docs更新と、Exit達成後のcommit / mainへの通常push。開始時にlatest origin/mainを確認する。
-   pin済みMoGe-2 ViT-S Normalの実CPU推論でnative Pointsの保存・再読込・Depthとの整合検証を
-   必須Exitとする。達成できなければCOMPLETEにせず原因を報告する。
-   02A〜02DはPhase 02の内部milestone。02B以降、Gradio、他モデル、MLflow、Benchmark、Slurm、
-   高度なqueue / recoveryには進まない。実装・実機検証に必要な独立モデル環境のみ利用する。
-   remote更新・競合・範囲外変更があれば上書きせず停止し報告。force pushは禁止。
-   01A / 01B / Phase 01はCOMPLETE。02Aは実CPU native Pointsを含むExit達成でCOMPLETE、Phase 02はIN_PROGRESS。
-   02B〜02DはNOT_STARTED / 未承認。現在は02A docs / Git整理まで。
+   最新の指示（2026-10-23）により現在の承認範囲は Phase 02B — Gradio Inference の
+   実装・検証・関連docs更新と、02B Exit達成後のcommit / mainへの通常push。
+   開始時にlatest origin/mainを確認する。remote更新・競合・範囲外変更は上書きせず停止・報告。
+   force pushは禁止。Phase 01 / 01A / 01B / 02AはCOMPLETE、Phase 02はIN_PROGRESS。
+   02Bは全Exit達成でCOMPLETE、現在はdocs / Git整理。02C〜02D / 他モデル / MLflow / Benchmark / Slurm /
+   高度なqueue・active recoveryは未承認。02B完了は02Cの開始許可ではない。
+   Gradioは独立application環境で既存Runner / Backendを利用し、全sessionで1つの
+   LocalBackendを共有。Inference / Resultsの2タブ、Resultsは02Bの共通詳細のみ。
+   fake / contract / browser / 実CPU MoGe UI smokeの全Exit達成時のみCOMPLETEとする。
    CPUを明示選択し、CUDA要求時の自動fallbackを行わない。
    仮K・便宜的逆投影をmodel由来Pointsにしない。既存depth-only Run / CLI互換とraw不変を維持。
-   02A完了は02Bの開始許可ではない。
 2. 大規模変更前に PLANS.md の目的・範囲・手順・検証・リスクを更新する。
    plan の更新や前 phase の完了は、次 phase を開始する許可を意味しない。
 3. model-specific logic は `models/<model_name>/` に閉じ込める。

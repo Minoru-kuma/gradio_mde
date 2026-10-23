@@ -2,16 +2,66 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 02A — COMPLETE、docs / Git整理**。
-- Authorization: 02A実装・検証・関連docs更新、必須Exit達成後のcommit / mainへの通常push。
-- Phase 00 / 01 / 01A / 01B: **COMPLETE**。
-- Phase 02: **IN_PROGRESS**。02A: **COMPLETE**（実CPU native Pointsを含むExit達成）。
-  02B〜02D / 03–08はNOT_STARTED / 未承認。
-- Start evidence: latest origin/main / HEAD `7ed21e36e428d07b11d4048b2e9c771e4f6fc6cc`、main、clean。
-- Source policy: latest mainの実装・契約を基準とする。旧depth-only成果物を破壊しない。
-- 禁止: 02B以降、Gradio、viewer / mesh、Run管理service、他モデル、Tracking / Benchmark / Slurm。
+- Current work: **Phase 02B — COMPLETE、docs / Git整理**。
+- Authorization（2026-10-23）: 02B実装・検証・関連docs更新、全Exit達成後のcommit / main通常push。
+- Phase 00 / 01 / 01A / 01B / 02A / 02B: **COMPLETE**。Phase 02: **IN_PROGRESS**。
+- 02C〜02D / 03–08: NOT_STARTED / 未承認。
+- Start evidence: git fetch origin成功、main clean、HEAD = origin/main `a2ccc73`、左右差分0。
+- Source policy: latest mainの実装・契約を再利用。旧depth-only / geometry成果物・CLI・raw不変。
+- 禁止: 02C以降、3D viewer / mesh、Run管理service、他モデル、Tracking / Benchmark / Slurm。
 
-## Phase 02A implementation plan
+## Phase 02B implementation plan — 2026-10-23
+
+- Goal / scope: 独立application環境のGradioから既存Runner / Backendを短いcallbackで操作。
+  Inference / Resultsの2タブ、manifestに基づく設定、PNG検証、明示device / timeout、
+  共有LocalBackend busy拒否、session別input / handle / result / callback世代、status / cancel。
+  Resultsは検証済み共通詳細・Run ID受渡しとterminal Run ID読込。4モードviewer・管理操作は追加しない。
+- Order: source / 承認更新 → Gradio公式仕様・pin / 独立環境 → 既存40tests baseline →
+  UI非依存controllerとsession / 非同期操作 → Gradio構成 → fake / contract / browser →
+  固定MoGe明示CPU UI smoke・旧CLI / Run互換 → docs / Exit判定 → remote再確認 → commit / 通常push。
+- Contracts: UIはRegistry metadata / Runnerのみ。composition rootが単一Backendを構成。
+  submit / poll / cancelを推論待機させず、Gradio eventはqueue=Falseで同時browserから即busyを検証。
+  cancel / collectはbackendの停止・検証を背景処理へ渡し、UIは状態をpollする。
+  世代を検証して古いcallback結果・cancel対象の混線を防止。進捗%・未測定値を捏造しない。
+- Tests: 入力空 / 破損 / 過大、未知variant / parameter / device、各status / timeout / missing metrics、
+  2browser sessionsの入力・handle・Results分離、busy即拒否・自動待機なし、cancel / 完了race、
+  terminal後の次job、古い通知、adapter / torch / subprocess境界、既存全tests・CLI互換。
+- Environment: applicationはrepo内Git管理外venv、Gradioと推移依存lock・再作成手順を保存。
+  既存独立mde-moge / pin weightsを再利用。frontend同梱assets、analytics / share / 外部fontを無効化し、
+  準備済み依存・weightsでのoffline browser / 推論を検証。worker依存は変更しない。
+- Risks / rollback: Gradio dispatch / callback順序、thread間backend lock、upload寿命 / 制限、
+  multi-process調停は保証しない。単一process / loopback運用。変更は追加中心、schema / CLI維持。
+  戻す場合は02B追加UI・application依存のみrevertしraw / 確定結果を保持。
+- Decision / Reason / Trade-off / Future extension: 1共有Backend + session別状態 / busy guardを維持 /
+  同時推論は拒否 / queue・認証・active recoveryは後続承認。数値progressはunavailableで契約拡張しない。
+- Start record: sourceとlatest main確認・承認更新済み。開始時点では実装・検証は未実行。
+
+### Phase 02B completion evidence
+
+- 全Exit達成で02B COMPLETE、Phase 02 IN_PROGRESS、02C–02D NOT_STARTED / 未承認。
+  2タブ / 1共有Backend / session分離 / 即時busy拒否 / 非同期status・cancel / terminal Resultsを実装。
+- 変更前40 tests成功（140.204秒）。最終全体55件は53成功・opt-in browser2件skip（149.853秒）。
+  最後に強化したRunner事前検証・load順序逆転の2件も成功（0.051秒）。
+  実browserは別実行でfake 1件成功（23.097秒）、実CPU UI 1件成功（25.977秒）。
+- fake / contract / browserで各status、PNG異常・未知設定、2session入力・handle・結果分離、
+  同時submit=1受理1busy、拒否jobの後日自動実行なし、session別cancel、完了race・古い世代、
+  disconnect非cancel、old load非上書き、terminal次job、integrity / path / active recovery拒否を確認。
+- Gradio 6.30.0 / Python 3.13.13を独立venvに固定。ui.lockから別venvへoffline再導入・pip check成功。
+  frontend外部要求0、queue join0、page errors0。worker依存は不変、applicationにtorch / MoGeなし。
+- 最終実CPU UI Run `799d2355-c57b-4552-92c4-644a7f25e775` COMPLETED。
+  float32 [256,256] / metric m / z_depth / 01A-depth-only、既存CLI CPU depth digest一致。
+  最終production source digest一致。CUDA不可失敗・実CPU cancel / timeoutのUI表示も確認。
+- Python application / Conda / worker非loopback socketとbrowser外部HTTPを遮断して成功。
+  新application / WorkerManagerなしで保存Runを再表示し全file hash / mtime不変。
+  旧01A・02A・新CPU / failure / cancel / timeoutの6Runを新CLIで各2回collectし全file不変。
+- 詳細・Run IDs / measured metrics / warning / offline条件は [02B evidence](docs/phases/phase-02/phase-02b.md)。
+  起動・callback契約は [Gradio Inference](docs/gradio-inference.md)。GPU / 3D / 学会実演は未検証。
+- 最終検証: 27 Markdown / 184 local links・anchors・fences、26 Python AST、JSON / TOML、
+  control dependencies空、git diff --check成功。remote再取得後もorigin/main = 開始HEAD、左右差分0。
+- Git publication: Exit達成済み差分をcommit / mainへ通常pushする。SHAと到達先は完了報告・Git履歴を参照。
+  remote更新・競合・範囲外変更なら停止。force pushしない。02C開始は未承認。
+
+## Phase 02A implementation plan（完了済み履歴）
 
 - Goal / Scope: depth必須 + optional points / normals / intrinsics / maskを正式Run artifactsへ保存・検証。
   実MoGe CPU native Pointsの保存・再読込・frame / metric尺度・depth整合を必須Exitに追加。
@@ -97,14 +147,14 @@ Points [256,256,3] / m、65,536 valid、points.z-depth誤差0 m、Normals / Intr
 | [02D — Run Management](docs/phases/phase-02/phase-02d.md) | 02C | 共通service経由の一覧/編集/export/再生成/archive/restore/確認付き削除 |
 
 02A–02DはPhase 02の内部milestoneであり独立Phaseではない。全exit達成でPhase 02 COMPLETE。
-文書作成と実装の開始・完了は別。02Aは実装Exit達成、02B以降は将来の受入条件。
+文書作成と実装の開始・完了は別。02AはCOMPLETE。02Bは今回承認済み、02C以降は将来の受入条件。
 
 ## Phase management
 
 状態は `NOT_STARTED → PLANNED → IN_PROGRESS → REVIEW_READY → COMPLETE` を基本とし、
 外部条件の不足は `BLOCKED` として理由を残す。`PLANNED` は計画文書の準備状態であり、
 production code の実装承認・開始を意味しない。実験 JobStatus とは別の管理状態である。
-文書準備だけでは実装を開始しない。現在は02AのExit達成でCOMPLETE、02B以降は未承認。
+文書準備だけでは実装を開始しない。現在は02Bの明示承認に従って作業し、02C以降は未承認。
 
 各 phase 開始前に、最新のユーザー指示がその phase の実作業を承認していることを確認する。
 必要な通常作業のたびに承認を取り直す必要はないが、未指示の phase に進んではならない。
@@ -117,7 +167,7 @@ Tests、Exit criteria、Known risks、Decisions deferred to later phases を維�
 | --- | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | clean-start の正式確認 | 調査記録・共通契約・段階計画の整合 | COMPLETE |
 | [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | COMPLETE、01A / 01B exit 達成 |
-| [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | IN_PROGRESS（02A COMPLETE、02B以降未承認） |
+| [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | IN_PROGRESS（02A / 02B COMPLETE、02C以降未承認） |
 | [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 未着手 |
 | [04](docs/phases/phase-04.md) | 03 | Runner から MLflow、失敗時にも結果保存 | 未着手 |
 | [05](docs/phases/phase-05.md) | 03・04 | 同じ single inference に基づく比較評価 | 未着手 |

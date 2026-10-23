@@ -2,18 +2,20 @@
 from dataclasses import asdict
 import hashlib
 import json
+import threading
 import uuid
 from pathlib import Path
 
 from .contracts import ATTEMPT_ID, VIEW_ID, ExecutionBackend, JobHandle, JobSpec, ResourceSpec, normalize_outputs
 from .registry import ModelRegistry, validate_parameters
-from .storage import RunStore, inspect_png, run_path, sha256_file, write_json
+from .storage import RunStore, inspect_png, read_json, run_path, sha256_file, write_json
 
 
 class ExperimentRunner:
     def __init__(self, registry: ModelRegistry, backend: ExecutionBackend, store: RunStore, project_root: Path):
         self.registry, self.backend, self.store = registry, backend, store
         self.project_root = Path(project_root)
+        self._collect_lock = threading.Lock()
 
     def submit(self, model_id: str, image: Path, *, variant_id: str | None = None,
                device: str = "cuda:0", dtype: str = "float32", parameters: dict | None = None,
@@ -67,9 +69,14 @@ class ExperimentRunner:
 
     def collect(self, handle: JobHandle):
         result = self.backend.collect(handle)
-        write_json(run_path(self.store.root, handle.run_id) / "run.json",
-                   {"schema_version": result.schema_version, "run_id": handle.run_id,
-                    "selected_attempt_id": handle.attempt_id, "status": result.status})
+        summary = {"schema_version": result.schema_version, "run_id": handle.run_id,
+                   "selected_attempt_id": handle.attempt_id, "status": result.status}
+        # Multiple application sessions may read one terminal Run concurrently.
+        # Serialize summary publication; repeated collect is read-only.
+        with self._collect_lock:
+            path = run_path(self.store.root, handle.run_id) / "run.json"
+            if not path.exists() or read_json(path) != summary:
+                write_json(path, summary)
         return result
 
     def cancel(self, handle: JobHandle, reason: str | None = None):

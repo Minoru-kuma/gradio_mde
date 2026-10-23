@@ -192,7 +192,7 @@ MoGe regression で確認した。active job を directory から再 submit す�
 
 ## Phase 02 additive artifacts and management — 設計のみ
 
-Phase 02はIN_PROGRESS、02A COMPLETE、02B–02DはNOT_STARTED / 未承認。
+Phase 02はIN_PROGRESS、02A / 02B COMPLETE、02C–02DはNOT_STARTED / 未承認。
 以下の02A記述は実装前の計画であり、確定契約は末尾を参照。上記layoutのoptional geometryは現行exportではない。
 [02A](phases/phase-02/phase-02a.md) でdepth必須、points / normals / intrinsics / maskのoptional
 保存・参照検証を追加する計画。既存depth.npy / metadata / reportの場所と意味を維持する。
@@ -248,3 +248,16 @@ numeric filesは一時NPYへ書きrenameし、geometry値検証後にmetadata / 
 従来のatomic publicationで確定する。
 既存raw fileがあれば保存を拒否し、published WorkerResult / JobResultがあるRunのworker再実行も拒否する。
 失敗途中のraw / logsは診断として保持し成功出力へ公開しない。再collectは読み取り専用。
+
+
+## Phase 02B application reads and compatibility
+
+UIのPNGは10 MiB / 4,194,304 pixels / edge 4096を上限とし、共通inspect_pngとapplication
+Pillow完全decodeで事前検証する。resize / re-encodeせず元bytesをRunnerに渡しinput digestを維持。
+JobSpec / WorkerResult / JobResult / geometry profile / CLI defaultを変更しない。
+terminal表示は既存collectのID / path / digest / geometry validation成功後のみpublishする。
+UI serviceはRun IDから保存handleをcontained pathで読んで既存collectへ渡し、active recoveryを拒否。
+Runner.collectのrun.json publicationはinstance lockを取り、同内容ならwriteを省略する。
+複数sessionの同時collectでtemporary fileを競合させず、再表示によるraw / result更新も行わない。
+02Bはrefs / metadataの詳細表示まで。download / viewerは02C、管理serviceは02D。
+詳細は [Gradio Inference](gradio-inference.md)。
