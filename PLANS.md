@@ -2,15 +2,59 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 02B — COMPLETE、docs / Git整理**。
-- Authorization（2026-10-23）: 02B実装・検証・関連docs更新、全Exit達成後のcommit / main通常push。
-- Phase 00 / 01 / 01A / 01B / 02A / 02B: **COMPLETE**。Phase 02: **IN_PROGRESS**。
-- 02C〜02D / 03–08: NOT_STARTED / 未承認。
-- Start evidence: git fetch origin成功、main clean、HEAD = origin/main `a2ccc73`、左右差分0。
-- Source policy: latest mainの実装・契約を再利用。旧depth-only / geometry成果物・CLI・raw不変。
-- 禁止: 02C以降、3D viewer / mesh、Run管理service、他モデル、Tracking / Benchmark / Slurm。
+- Current work: **Phase 02C — COMPLETE、docs / Git整理**（2026-10-27 明示承認）。
+- Authorization: 02C実装・検証・関連docs更新、全Exit達成後のcommit / main通常push。
+- Phase 00 / 01 / 01A / 01B / 02A / 02B COMPLETE、Phase 02 IN_PROGRESS。
+- 02D / 03–08、他モデル、Tracking / Benchmark / Slurm / active recoveryは未承認。
+- Start evidence: fetch成功、main clean、HEAD = origin/main `9954b777eef66475015c27da06263679a0b438ed`。
+- remote更新・競合・範囲外変更なら停止・報告。force push禁止。
 
-## Phase 02B implementation plan — 2026-10-23
+## Phase 02C implementation plan — 2026-10-27
+
+- Goal / scope: ResultsのDepth / RawDepth / Point Cloud / Mesh、保存Run再表示、
+  RGB / Depth / Normal色、texture / Geometry / Wireframe、meshの初回遅延生成・永続reuse。
+  空Run IDの入力案内と非同期load完了表示も改善。02D管理操作は実装しない。
+- Order: latest main / source確認 → 承認・plan更新 → 既存suite baseline →
+  固定版renderer比較と小fixture技術検証 → 共通numeric reader / derived service / renderer →
+  fake・contract・browser・実CPU native Points・offline検証 → docs / Exit監査 → remote再確認 → commit / push。
+- Contracts: UI環境のNumPy / Pillowのみで表示配列を作る。モデル分岐・torch importなし。
+  保存frame / unit / scaleを維持、Kは明示pinhole / integer grid / depth_kind適合時のみ使用。
+  RGBは記録したgrid対応がある場合のみ。raw / WorkerResult / JobResult / CLIを変更しない。
+- Derived: canonical algorithm版・展開parameters・run / attempt / view・全使用入力digestと意味metadataをkey化。
+  Run内別manifest、同条件lock、generation一時directoryからatomic rename。破損cacheを拒否。
+  同条件reuse・条件差別key・interrupted publication・同時要求・再起動読込をfixture検証。
+- Validation: baseline / 全既存回帰、数値fixture（invalid / all-invalid / constant / holes / discontinuity /
+  degeneracy / camera / RGB）、browserの4モード・色・mesh・回転 / zoom / pan / camera保持、
+  native Points等を明示要求するCPU MoGe UI Run、egress遮断下の推論・保存Run / frontend / 3D操作。
+  predict回数とraw / 確定結果hash不変を確認し、GPU・OS・browser・容量限界を明記する。
+- Risks / rollback: browser WebGL・memory、texture対応・K convention、cache破損 / race。
+  追加viewer / derivedだけrevert可能、rawは保持。単一application process、multi-process調停は範囲外。
+- Decisions: renderer名 / 版・mesh閾値・容量上限は技術検証で確定して仕様へ記録。
+- Completed / remaining: 02C全Exit達成。下記completion evidenceを参照。02Dは未承認。
+
+### Phase 02C completion evidence
+
+- 全Exit達成で02C COMPLETE、Phase 02 IN_PROGRESS、02D以降未承認。
+- 全65 tests: 61成功・opt-in browser4 skip（290.527秒）。別実行の02C fake browser1成功（87.308秒）、
+  native Points CPU browser1成功（51.529秒）、02B fake browser回帰1成功（29.257秒）。
+  02B旧depth-only CPU UI testは今回は未再実行、旧Run CLI再読込と新native CPUで確認した。
+- Three.js r180 / 0.180.0（MIT）同梱、RGB / Depth / native Normal色、RGB texture / Geometry /
+  Wireframe、camera保持/reset、Depth統計・raw download・optional理由付き無効化を検証。
+- 初回meshのみ遅延生成、manifest schema 1.0 / digest条件reuse / atomic directory publish。
+  6同時要求・条件差・中断partial・破損digest / manifest・symlink拒否・再起動reuseを確認。
+- 最終CPU Run `cf867c2d-6591-4962-9e77-504cef5013c3`、65,536 native Points / m、124,848 faces。
+  raw / WorkerResult / JobResult hash・mtime不変、predict1回、final Python source digest一致。
+- Python / worker非loopback socketとbrowser外部HTTP遮断下で推論・frontend / 3D / 再起動読込が成功。
+  external / console / page error 0。512×512で262,143点 / 522,240 facesを操作、超過は案内付き拒否。
+- 旧01A / 02A / 02B / 最終CPUの4RunをCLIで各2回collect、全file hash / mtime不変。
+- 詳細・Run IDs / 制限 / warning / 未検証項目は [02C evidence](docs/phases/phase-02/phase-02c.md)。
+  API / schema / renderer比較は [Results Viewer](docs/results-viewer.md)。GPU / 他OS/browser /
+  上限超geometry / multi-process / 精度 / 学会実演は未検証、02D管理操作は未実装。
+- 最終静的検証: 28 Markdown / 199 local links・anchors・fences、29 Python AST、JSON / TOML /
+  JS syntax、pip check、git diff --check成功。再fetch後もorigin/mainは開始HEAD `9954b77` と一致。
+  commit / mainへ通常pushする。SHAはGit履歴・完了報告に記録し、force pushは禁止。
+
+## Phase 02B implementation plan — 2026-10-23（完了済み履歴）
 
 - Goal / scope: 独立application環境のGradioから既存Runner / Backendを短いcallbackで操作。
   Inference / Resultsの2タブ、manifestに基づく設定、PNG検証、明示device / timeout、
@@ -36,7 +80,7 @@
   同時推論は拒否 / queue・認証・active recoveryは後続承認。数値progressはunavailableで契約拡張しない。
 - Start record: sourceとlatest main確認・承認更新済み。開始時点では実装・検証は未実行。
 
-### Phase 02B completion evidence
+### Phase 02B completion evidence（2026-10-23時点の履歴）
 
 - 全Exit達成で02B COMPLETE、Phase 02 IN_PROGRESS、02C–02D NOT_STARTED / 未承認。
   2タブ / 1共有Backend / session分離 / 即時busy拒否 / 非同期status・cancel / terminal Resultsを実装。
@@ -147,14 +191,14 @@ Points [256,256,3] / m、65,536 valid、points.z-depth誤差0 m、Normals / Intr
 | [02D — Run Management](docs/phases/phase-02/phase-02d.md) | 02C | 共通service経由の一覧/編集/export/再生成/archive/restore/確認付き削除 |
 
 02A–02DはPhase 02の内部milestoneであり独立Phaseではない。全exit達成でPhase 02 COMPLETE。
-文書作成と実装の開始・完了は別。02AはCOMPLETE。02Bは今回承認済み、02C以降は将来の受入条件。
+文書作成と実装の開始・完了は別。02AはCOMPLETE。02BはCOMPLETE、02Cは2026-10-27承認済み、02Dは将来の受入条件。
 
 ## Phase management
 
 状態は `NOT_STARTED → PLANNED → IN_PROGRESS → REVIEW_READY → COMPLETE` を基本とし、
 外部条件の不足は `BLOCKED` として理由を残す。`PLANNED` は計画文書の準備状態であり、
 production code の実装承認・開始を意味しない。実験 JobStatus とは別の管理状態である。
-文書準備だけでは実装を開始しない。現在は02Bの明示承認に従って作業し、02C以降は未承認。
+文書準備だけでは実装を開始しない。現在は02Cの明示承認に従って作業し、02D以降は未承認。
 
 各 phase 開始前に、最新のユーザー指示がその phase の実作業を承認していることを確認する。
 必要な通常作業のたびに承認を取り直す必要はないが、未指示の phase に進んではならない。
@@ -167,7 +211,7 @@ Tests、Exit criteria、Known risks、Decisions deferred to later phases を維�
 | --- | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | clean-start の正式確認 | 調査記録・共通契約・段階計画の整合 | COMPLETE |
 | [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | COMPLETE、01A / 01B exit 達成 |
-| [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | IN_PROGRESS（02A / 02B COMPLETE、02C以降未承認） |
+| [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | IN_PROGRESS（02A / 02B COMPLETE、02C COMPLETE、02D以降未承認） |
 | [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 未着手 |
 | [04](docs/phases/phase-04.md) | 03 | Runner から MLflow、失敗時にも結果保存 | 未着手 |
 | [05](docs/phases/phase-05.md) | 03・04 | 同じ single inference に基づく比較評価 | 未着手 |

@@ -192,7 +192,7 @@ MoGe regression で確認した。active job を directory から再 submit す�
 
 ## Phase 02 additive artifacts and management — 設計のみ
 
-Phase 02はIN_PROGRESS、02A / 02B COMPLETE、02C–02DはNOT_STARTED / 未承認。
+Phase 02はIN_PROGRESS、02A / 02B COMPLETE、02CはCOMPLETE / 全Exit達成、02DはNOT_STARTED / 未承認。
 以下の02A記述は実装前の計画であり、確定契約は末尾を参照。上記layoutのoptional geometryは現行exportではない。
 [02A](phases/phase-02/phase-02a.md) でdepth必須、points / normals / intrinsics / maskのoptional
 保存・参照検証を追加する計画。既存depth.npy / metadata / reportの場所と意味を維持する。
@@ -212,7 +212,7 @@ derived明示再生成は新generationと履歴。active restart recoveryは依�
 
 ## Implemented Phase 02A wire format and validation
 
-先行節の02A設計を以下の追加契約として実装。02C / 02Dのderived / user metadataは設計のみ。
+先行節の02A設計を以下の追加契約として実装。02C derivedは [Results Viewer](results-viewer.md)の追加契約を実装、02D user metadataは設計のみ。
 既存schema_version `1.0` / layout / depth意味は維持し、optional output refsを追加する。
 新profile `execution.serialization_profile=02A-geometry-v1` を旧 `01A-depth-only` と区別する。
 旧profile（profile field欠如も含む）は従来depth-onlyとして読込可能。旧Runへgeometryを後付けしない。
@@ -259,5 +259,5 @@ terminal表示は既存collectのID / path / digest / geometry validation成功�
 UI serviceはRun IDから保存handleをcontained pathで読んで既存collectへ渡し、active recoveryを拒否。
 Runner.collectのrun.json publicationはinstance lockを取り、同内容ならwriteを省略する。
 複数sessionの同時collectでtemporary fileを競合させず、再表示によるraw / result更新も行わない。
-02Bはrefs / metadataの詳細表示まで。download / viewerは02C、管理serviceは02D。
+02Bはrefs / metadataの詳細表示まで。02Cでdownload / viewer / derivedを追加、管理serviceは02D。
 詳細は [Gradio Inference](gradio-inference.md)。

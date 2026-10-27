@@ -1,0 +1,15 @@
+<section aria-label="Results viewer">
+  <div class="viewer-controls">
+    <label>Display mode <select data-mode><option>Depth</option><option>RawDepth</option><option>Point Cloud</option><option>Mesh</option></select></label>
+    <label>Point color <select data-color disabled><option>RGB color</option><option>Depth color</option><option>Normal color</option></select></label>
+    <label>Mesh display <select data-mesh disabled><option>RGB textured</option><option>Geometry</option><option>Wireframe</option></select></label>
+    <button data-reset type="button" disabled>Reset camera</button>
+  </div>
+  <p data-message role="status">Select a completed Run to view its saved artifacts.</p>
+  <p data-help>3D: left drag rotates, wheel zooms, right drag pans. Camera is preserved between Point Cloud and Mesh for this Run; Reset camera restores the bounds view.</p>
+  <div data-stage style="height:420px; width:100%; position:relative; background:#18202c; display:none"></div>
+  <img data-depth alt="Depth colormap; invalid pixels transparent" style="max-height:420px; max-width:100%; display:none" />
+  <a data-download style="display:none">Download original raw depth (.npy)</a>
+  <pre data-stats style="white-space:pre-wrap"></pre>
+  <details><summary>Geometry provenance and display conditions</summary><pre data-provenance style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>
+</section>

@@ -2,7 +2,7 @@
 
 Status: **COMPLETE / 全Exit達成（2026-10-23）**。Phase 02の内部milestone。
 親: [Phase 02](../phase-02.md)、管理: [PLANS](../../../PLANS.md)。
-02B実装・検証・関連docs更新と、全Exit達成後のcommit / main通常pushを承認。02C以降は未承認。
+02Bは完了。現在の承認は02C実装・検証・docs更新とExit後commit / main通常push（2026-10-27）。02D以降は未承認。
 
 ## Goal / Background
 
@@ -133,7 +133,8 @@ structured progressが必要なら共通契約をoptional拡張し、ログか�
 - Gradio構成時にupstream由来のunclosed event loop ResourceWarningが出る。
   tests / browser操作は成功し、警告を抑制していない。GPU / 他OS / 他browser / 公開運用は未検証。
 - ローカル証拠はGit管理外 `.local/validation/02b-*`、weights / venv / wheelhouse / runsもGit管理外。
-  02C / 02D・他モデル・Tracking・Benchmark・Slurm・高度なqueue / recoveryは未実装・未承認。
+  02B完了時点では02C / 02D・他モデル・Tracking・Benchmark・Slurm・高度なqueue / recoveryは未実装・未承認。
+  現在の02C承認・完了状況は [02C](phase-02c.md) を参照。
 
 
 ## Final exit assessment
@@ -143,5 +144,5 @@ structured progressが必要なら共通契約をoptional拡張し、ログか�
 control dependencies空、`git diff --check`を確認。旧01A / 02A・最終CPU・失敗 / cancel / timeoutの
 6Runを新CLIで各2回collectし全file hash / mtime不変。CPU Runの最終source digest一致も確認した。
 保存Run再表示に再推論・model環境を要求しない。02B内の未達Exitはない。
-Phase 02はIN_PROGRESS、02C〜02DはNOT_STARTED / 未承認。3D / download / 管理操作へ進まない。
+02B完了時点では02C〜02Dは未承認だった。現在は02Cを明示承認済み、管理操作を含む02D以降は未承認。
 remote更新なしを再確認し、承認済み02B差分のみcommit / mainへ通常pushする。

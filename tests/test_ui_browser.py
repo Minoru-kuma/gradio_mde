@@ -46,7 +46,7 @@ class BrowserHarness:
         self.playwright = sync_playwright().start()
         self.browser = self.playwright.chromium.launch(
             executable_path=os.environ.get("MDE_CHROME_EXE") or shutil.which("google-chrome"),
-            headless=True, args=["--no-sandbox"], timeout=15000)
+            headless=True, args=["--no-sandbox", "--enable-unsafe-swiftshader"], timeout=15000)
         self.url = f"http://127.0.0.1:{port}"
         self.external, self.requests, self.errors = [], [], []
         self.contexts = []

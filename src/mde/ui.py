@@ -18,6 +18,17 @@ from .ui_controller import InferenceController, MAX_UPLOAD_BYTES
 
 def build_app(controller):
     import gradio as gr
+    from .results import ResultsService
+
+    assets = Path(__file__).with_name("viewer_assets")
+    gr.set_static_paths(paths=[assets / "vendor"])
+    results_service = ResultsService(controller.runner.store, controller.runner.collect)
+
+    def render_view(request):
+        try:
+            return results_service.view(request["run_id"], request["mode"])
+        except Exception as error:
+            return {"error": str(error)}
 
     info = controller.info.data
     event = dict(queue=False, concurrency_limit=None, trigger_mode="once",
@@ -68,7 +79,7 @@ def build_app(controller):
                 from .contracts import OUTPUT_NAMES
                 outputs = gr.CheckboxGroup([key for key in OUTPUT_NAMES if
                     capabilities.get(key, {}).get("status") in ("supported", "conditional")],
-                    value=["depth"], label="Requested artifacts (depth required)")
+                    value=["depth"], label="Requested artifacts (depth required)", elem_id="requested-artifacts")
                 with gr.Accordion("Declared capabilities and parameter schema", open=False):
                     gr.JSON({"variants": [{"variant_id": v["variant_id"], "capabilities":
                         v.get("capabilities", info["capabilities"])} for v in info["variants"]],
@@ -82,11 +93,16 @@ def build_app(controller):
                 gr.Markdown("Progress: unavailable (indeterminate while running). CUDA failures do not fall back to CPU.")
             with gr.Tab("Results", id="results"):
                 gr.Markdown("Validated result details. Missing measurements are unavailable.\n"
-                            "Depth / 3D viewers and Run management belong to later milestones.")
+                            "Views use saved artifacts; Mesh is derived and saved on first request.")
                 saved_id = gr.Textbox(label="Saved terminal Run ID", elem_id="saved-run-id")
                 open_saved = gr.Button("Open saved Run", elem_id="open-saved-run")
                 open_notice = gr.Textbox(label="Load action", interactive=False, elem_id="load-notice")
                 result_id = gr.Textbox(label="Selected Run ID", interactive=False, elem_id="selected-run-id")
+                viewer = gr.HTML(value="", html_template=(assets / "viewer.html").read_text(),
+                    js_on_load=(assets / "viewer.js").read_text().replace("__ASSET_URL__",
+                        "/gradio_api/file=" + (assets / "vendor").as_posix()),
+                    server_functions=[render_view], elem_id="results-viewer",
+                    css_template=".viewer-controls {display:flex;gap:16px;flex-wrap:wrap} select, button {padding:6px;border:1px solid #888;border-radius:4px} pre {font-size:13px} [data-message] {white-space:pre-line}")
                 result = gr.JSON(label="Validated JobResult", elem_id="validated-result")
         timer = gr.Timer(0.5)
 
@@ -97,10 +113,10 @@ def build_app(controller):
 
         def poll(session, previous):
             if session is None:
-                return [gr.skip()] * 6
+                return [gr.skip()] * 8
             view = controller.snapshot(session)
             if view == previous:
-                return [gr.skip()] * 6
+                return [gr.skip()] * 8
             value = view["result"]
             display = view["status"]
             if view.get("cancel_requested"):
@@ -113,17 +129,24 @@ def build_app(controller):
             new_result = value is not None and (previous is None or previous.get("result") is None
                                                or previous["generation"] != view["generation"])
             return (view["run_id"], display, view["run_id"] if value else "", value,
-                    gr.Tabs(selected="results") if new_result else gr.skip(), view)
+                    gr.Tabs(selected="results") if new_result else gr.skip(), view,
+                    view["run_id"] if new_result else ("" if previous and previous.get("result") and not value else gr.skip()),
+                    view.get("load_notice", ""))
+
+        def open_run(session, selected):
+            try:
+                controller.open_run(session, selected)
+            except Exception as error:
+                controller.load_error(session, error)
 
         submit.click(submit_job, [token, upload, variant, device, dtype, timeout, outputs, *controls],
                      [notice, operation_generation],
                      **event)
         cancel.click(controller.cancel, [token, operation_generation], notice, **event)
-        open_saved.click(lambda session, selected: guard(controller.open_run, session, selected),
-                         [token, saved_id], open_notice, **event)
+        open_saved.click(open_run, [token, saved_id], **event)
         # This is the sole writer for status, Results, and tab selection. Timer
         # trigger_mode=once prevents overlapping/stale poll responses in a browser.
-        timer.tick(poll, [token, last_view], [run_id, status, result_id, result, tabs, last_view], **event)
+        timer.tick(poll, [token, last_view], [run_id, status, result_id, result, tabs, last_view, viewer, open_notice], **event)
         app.load(lambda: (uuid.uuid4().hex, gr.Button(interactive=True), gr.Button(interactive=True)),
                  outputs=[token, submit, cancel], **event)
     return app

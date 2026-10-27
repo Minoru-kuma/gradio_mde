@@ -12,6 +12,10 @@ class GeometryAdapter(FakeAdapter):
         depth = np.full((h, w), 2.5, dtype=np.float32)
         points = np.zeros((h, w, 3), dtype=np.float32)
         points[..., 0], points[..., 1], points[..., 2] = 0.25, -0.5, depth
+        if action == "viewer":
+            y, x = np.indices((h, w))
+            points[..., 0] = (x-(w-1)/2)*depth/300
+            points[..., 1] = (y-(h-1)/2)*depth/300
         normals = np.zeros_like(points)
         normals[..., 2] = -1
         k = np.array([[300, 0, (w-1)/2], [0, 300, (h-1)/2], [0, 0, 1]], dtype=np.float32)
@@ -40,7 +44,9 @@ class GeometryAdapter(FakeAdapter):
         if action == "mask_dtype": mask = mask.astype(np.float32)
         if action == "provenance": meanings["points"] = {}
         if action == "frame": meanings["points"]["camera_frame"] = "unknown"
-        return PredictionBatch([MDEOutput(request.view_id, depth,
-            {"depth_kind": "ray_distance" if action == "ray" else "z_depth", "scale_type": "relative",
-             "depth_unit": "arbitrary", "camera_frame": "opencv_x_right_y_down_z_forward", "geometry": meanings},
+        metadata = {"depth_kind": "ray_distance" if action == "ray" else "z_depth", "scale_type": "relative",
+             "depth_unit": "arbitrary", "camera_frame": "opencv_x_right_y_down_z_forward", "geometry": meanings}
+        if action == "viewer":
+            metadata["image_to_output"] = {"type": "identity", "pixel_center": "integer"}
+        return PredictionBatch([MDEOutput(request.view_id, depth, metadata,
              points=points, normals=normals, intrinsics=k, mask=mask)])

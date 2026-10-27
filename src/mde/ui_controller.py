@@ -196,14 +196,25 @@ class InferenceController:
             return "cancel_requested; waiting for Backend confirmation."
 
     def open_run(self, token, run_id):
-        location = run_path(self.runner.store.root, run_id)
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("Enter a saved Run ID before opening a Run.")
+        run_id = run_id.strip()
+        try:
+            location = run_path(self.runner.store.root, run_id)
+        except (ValueError, AttributeError) as error:
+            raise ValueError("Enter a valid saved Run ID (UUID), as shown after inference.") from error
         with self._lock:
             session = self._session(token)
             if session.active:
                 raise BackendBusy("Wait for this session's job before selecting a saved Run")
             generation = self._select(session, "LOADING")
+            session.view["load_notice"] = "Loading saved terminal Run; no inference is started."
         threading.Thread(target=self._load, args=(token, session, generation, location), daemon=True).start()
         return "Loading saved terminal Run; no inference is started."
+
+    def load_error(self, token, error):
+        with self._lock:
+            self._session(token).view["load_notice"] = str(error)
 
     def _load(self, token, session, generation, location):
         try:
@@ -215,6 +226,8 @@ class InferenceController:
             # collect rejects active recovery and checks all paths and digests.
             result = self.runner.collect(handle)
             self._publish(token, session, generation, status=result.status, run_id=handle.run_id,
-                          result=result.to_dict(), cancel_requested=result.status == "CANCELLED")
+                          result=result.to_dict(), cancel_requested=result.status == "CANCELLED",
+                          load_notice=f"Loaded saved Run {handle.run_id} · {result.status}.")
         except Exception as error:
-            self._publish(token, session, generation, status="ERROR", error=str(error))
+            self._publish(token, session, generation, status="ERROR", error=str(error),
+                          load_notice=f"Could not load saved Run: {error}")

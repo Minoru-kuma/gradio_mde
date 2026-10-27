@@ -3,7 +3,8 @@
 02Bの実装契約と起動手順。検証結果は [02B](phases/phase-02/phase-02b.md) に記録する。
 Inference / Resultsの2タブ、準備済み1モデル、Local-only、単一application processで使う。
 Resultsは検証済みJobResult / Run ID / metadata / artifact refs / 実測metrics / errorsの共通詳細。
-4モードviewer・artifact download・派生生成は02C、履歴・export・削除等の管理操作は02D。
+4モードviewer・raw depth download・派生生成は02Cで追加（[Results Viewer](results-viewer.md)）。
+履歴・export・削除等の管理操作は02D、未実装・未承認。
 
 ## Environment and dependency pins
 

@@ -194,7 +194,8 @@ frontendはGradio wheelのassetsをlocalhost配信し、analytics / share / 外�
 既存独立model環境 / source / fixed checkpointを事前準備し、CPUを明示選択する。
 Python socketsとbrowser外向きHTTPを遮断したUI smokeの条件・限界と再作成手順は
 [Gradio Inference](gradio-inference.md)、実測は [02B](phases/phase-02/phase-02b.md) を参照。
-02Cのnumeric viewer / 3D rendererは未承認・未実装。GPU / 学会実演は未検証。
+02Cのnumeric viewer / 3D rendererは2026-10-27に全Exit達成でCOMPLETE。既存UI lock内のNumPy / Pillowと同梱Three.js r180を使用。
+[Results Viewer](results-viewer.md)を参照。GPU / 学会実演は未検証。
 
 ## Phase 02A validation environment
 

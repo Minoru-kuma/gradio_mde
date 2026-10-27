@@ -23,9 +23,9 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 
 ## 現在の開発状況
 
-**2026-10-23: Phase 00 / 01 / 01A / 01B / 02A / 02B COMPLETE。Phase 02 は IN_PROGRESS、02C〜02D は NOT_STARTED。**
-Phase 02B の実装・検証・関連docs更新と、全Exit達成後のcommit / main通常pushが承認されています。
-02C以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
+**2026-10-27: Phase 00 / 01 / 01A / 01B / 02A / 02B COMPLETE。Phase 02 は IN_PROGRESS、02C COMPLETE、02D は NOT_STARTED。**
+Phase 02C の実装・検証・関連docs更新と、全Exit達成後のcommit / main通常pushが承認されています。
+02D以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -49,7 +49,7 @@ checkpoint / wheels / runs は Git 管理外です。固定版と実測証拠は
 report / artifact 検証、区間計測、環境 fingerprint、保存済み terminal result の再 collect を追加しました。
 固定環境を再作成し MoGe CPU regression smoke が成功。Run ID は
 `f4a2052f-71da-4664-9c9f-281cca95fb41`。GPU / 精度評価は未検証です。
-GradioのInference / Resultsを02Bで実装しました。3D viewer、Slurm、MLflow、Benchmark、他モデルは未着手です。
+GradioのInference / Resultsを02Bで実装しました。02Cの3D viewerも全Exit達成でCOMPLETEです。Slurm、MLflow、Benchmark、他モデルは未着手です。
 初回調査の根拠と clean-start 決定は [architecture](docs/architecture.md#repository-investigation) を参照してください。
 
 ## 対応予定モデル
@@ -140,7 +140,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
 | [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | COMPLETE。01A / 01B COMPLETE（CPU E2E / Local robustness） |
-| [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | IN_PROGRESS（02A / 02B COMPLETE、02C以降未承認） |
+| [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | IN_PROGRESS（02A / 02B COMPLETE、02C COMPLETE、02D未承認） |
 | [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 未着手 |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |
 | [05](docs/phases/phase-05.md) | Benchmark Mode | 未着手 |
@@ -153,7 +153,7 @@ Phase の完了によって次 phase を自動開始しません。管理方法�
 実行し、共通 MDEOutput の raw depth、metadata / result / logs を Run Directory に保存する段階です。
 cancel / timeout 等は 01B、GPU lease の必要性判断・高度な復旧 / concurrency は後段へ分けます。
 
-## Phase 02 — 02A Geometry / 02B Gradio Inference
+## Phase 02 — Geometry / Gradio / 3D Results
 
 [Phase 02](docs/phases/phase-02.md) は、1モデルのLocal推論と保存成果物を扱う
 **Inference / Results の2タブ**を02Bで実装しました。内部milestoneの順序は次の通りです。
@@ -162,7 +162,7 @@ cancel / timeout 等は 01B、GPU lease の必要性判断・高度な復旧 / c
 | --- | --- | --- |
 | [02A](docs/phases/phase-02/phase-02a.md) | 必須depthとoptional points / normals / intrinsicsの正式保存・検証（COMPLETE） | Phase 01 |
 | [02B](docs/phases/phase-02/phase-02b.md) | GradioからRunnerを操作、入力・状態・cancel・busy・session分離（COMPLETE） | 02A |
-| [02C](docs/phases/phase-02/phase-02c.md) | ResultsのDepth / RawDepth / Point Cloud / Mesh、派生mesh永続化 | 02A・02B |
+| [02C](docs/phases/phase-02/phase-02c.md) | ResultsのDepth / RawDepth / Point Cloud / Mesh、派生mesh永続化（COMPLETE） | 02A・02B |
 | [02D](docs/phases/phase-02/phase-02d.md) | Run履歴・管理情報・export・再生成・archive / restore・明示削除 | 02C |
 
 Geometry artifactsは共通worker / RunStore、3D表示は共通viewer、管理操作は
@@ -173,7 +173,7 @@ Geometry artifactsは共通worker / RunStore、3D表示は共通viewer、管理�
 ノートPC上のローカル起動を優先し、weights・モデル環境・application環境・frontend assetsを
 事前準備すればオフライン利用できる構成を目指します。推論完了後はResultsへ結果を渡し、
 保存Runは再起動後もRun IDから開ける計画です。CPUは明示選択、CUDAからの自動fallbackはありません。
-既存CPU推論成功と、未検証のGradio / 3D / GPU / 学会デモは区別します。
+Gradio / 3Dは固定環境で実CPU・browser検証済み。GPU / 学会デモは未検証です。
 高度な検索・共有ユーザー管理・認証・お気に入り・高度な3D編集は範囲外です。
 
 ## Phase 02A Geometry Artifacts
@@ -193,14 +193,14 @@ maskはeffective validity、model_maskは元モデル判定として別保存し
 旧schema 1.0 / depth-only RunのcollectとCLI互換を維持し、raw / 確定JobResultを上書きしません。
 実CPU native Pointsの保存・再読込・Depth整合と40 tests成功で02A COMPLETE。
 実CPU結果・テスト・制限は [02A](docs/phases/phase-02/phase-02a.md) に記録します。
-Gradioの起動方法は下記を参照してください。3D / derived meshは02C、Run管理は02Dの計画です。
+Gradioの起動方法は下記を参照してください。3D / derived meshは02Cで実装・検証済み、Run管理は02Dの未承認計画です。
 
 ## Phase 02B Gradio Inference
 
 Gradio 6.30.0は独立application環境で動作し、既存Runner / LocalBackend / 独立model workerを利用します。
 全browserが1つのBackendを共有し、busyなら即時拒否して推論をqueueに入れません。
 input / parameters / handle / Resultsはsession別。status / cancelは非同期、progressはindeterminateです。
-Resultsは検証済みJobResultの共通詳細とRun ID読込に限定し、3D viewer・管理操作は提供しません。
+Resultsは検証済みJobResultの共通詳細とRun ID読込に加え、02Cの4モードviewerを提供します。
 
 ```bash
 # Python 3.13.13を事前準備
@@ -216,12 +216,30 @@ CUDA要求の自動fallbackはありません。準備済みmodel環境 / weight
 固定依存・offline再作成・制限・検証方法は [起動仕様](docs/gradio-inference.md)、
 実測結果は [02B](docs/phases/phase-02/phase-02b.md) に記録します。
 
+## Phase 02C 3D Results Viewer
+
+ResultsのDisplay modeから **Depth / RawDepth / Point Cloud / Mesh** を選べます。
+3D用の推論ではRequested artifactsで **points**（必要に応じnormals / intrinsics / mask）を明示要求してください。
+保存Runの表示切替・再読込は再推論しません。旧depth-only RunはDepth / RawDepthを表示し、
+3D情報が足りなければ理由を案内します。
+
+Point CloudはRGB / Depth / native Normal色、MeshはRGB textured / Geometry / Wireframeに切替可能。
+Meshは初回表示時に派生保存し、同条件では再利用します。raw / JobResultは不変です。
+Three.js r180を同梱し、準備済み環境ではCDNなしのoffline操作を検証済み。
+保存Runだけなら上記 `--read-only` 起動でモデル環境・weightsは不要です。
+
+明示CPUのnative MoGeとfake / contract / browser / offlineの全Exitを達成し、02C COMPLETE。
+固定Chrome / Linuxで262,144 output pixelsまで検証。GPU / 他OS/browser / 学会実演は未検証。
+操作・保存schema・制限は [Results Viewer](docs/results-viewer.md)、実測結果は
+[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02D以降は未承認です。
+
 ## ドキュメント一覧
 
 - [AGENTS.md](AGENTS.md): Codex の作業ルール
 - [PLANS.md](PLANS.md): phase の承認範囲・計画・進捗管理
 - [Architecture](docs/architecture.md): 調査結果、責務、依存関係、設計判断
 - [ModelAdapter spec](docs/model-adapter-spec.md): ModelInfo / Capabilities / MDEOutput
+- [Results Viewer](docs/results-viewer.md): 02Cの4表示モード・mesh永続保存・固定版renderer・制限
 - [Gradio Inference](docs/gradio-inference.md): 02B application環境・session / dispatch・offline起動
 - [Environment strategy](docs/environment-strategy.md): Conda、CUDA、subprocess、micromamba
 - [ExecutionBackend spec](docs/execution-backend-spec.md): Job / Resource / backend 契約

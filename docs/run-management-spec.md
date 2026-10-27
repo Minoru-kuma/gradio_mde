@@ -1,8 +1,8 @@
 # Run Management / Derived Storage specification
 
-Status: **設計のみ / NOT_STARTED**。02Cの最小derived生成・保存・読込と02Dの管理service計画。
-現在のsrc/mdeには以下のservice / sidecar / derived manifestは存在しない。
-具体schema / API / path名は実装承認後に確定。関連:
+Status: **02Cの最小derived serviceを実装・検証済み / 02D管理は設計のみ・未承認**。
+02Cの確定API / path / schemaは [Results Viewer](results-viewer.md)。
+以下のproposed layout・管理API・historyは02Dを含む計画であり、02Cの実装と区別する。関連:
 [Phase 02](phases/phase-02.md)、[Run Directory](run-directory-spec.md)、[Architecture](architecture.md)。
 
 ## Responsibility and service boundary

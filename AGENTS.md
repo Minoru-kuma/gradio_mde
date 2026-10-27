@@ -5,15 +5,14 @@
 [phase 文書](docs/phases/) と変更対象の仕様を読む。
 
 1. 作業は phase 単位で行う。ユーザーが指示していない phase に進まない。
-   最新の指示（2026-10-23）により現在の承認範囲は Phase 02B — Gradio Inference の
-   実装・検証・関連docs更新と、02B Exit達成後のcommit / mainへの通常push。
+   最新の指示（2026-10-27）により現在の承認範囲は Phase 02C — 3D Results Viewer の
+   実装・検証・関連docs更新と、02C全Exit達成後のcommit / mainへの通常push。
    開始時にlatest origin/mainを確認する。remote更新・競合・範囲外変更は上書きせず停止・報告。
-   force pushは禁止。Phase 01 / 01A / 01B / 02AはCOMPLETE、Phase 02はIN_PROGRESS。
-   02Bは全Exit達成でCOMPLETE、現在はdocs / Git整理。02C〜02D / 他モデル / MLflow / Benchmark / Slurm /
-   高度なqueue・active recoveryは未承認。02B完了は02Cの開始許可ではない。
-   Gradioは独立application環境で既存Runner / Backendを利用し、全sessionで1つの
-   LocalBackendを共有。Inference / Resultsの2タブ、Resultsは02Bの共通詳細のみ。
-   fake / contract / browser / 実CPU MoGe UI smokeの全Exit達成時のみCOMPLETEとする。
+   force pushは禁止。Phase 01 / 01A / 01B / 02A / 02BはCOMPLETE、Phase 02はIN_PROGRESS。
+   02Cは全Exit達成でCOMPLETE（fake / contract / browser / 実CPU native Points / offline）。
+   02D / 他モデル / MLflow / Benchmark / Slurm / 高度なqueue・active recoveryは未承認。
+   02C完了は02Dの開始許可ではない。Gradioは独立application環境で既存Runner / Backendを利用し、
+   全sessionで1つのLocalBackendを共有。Inference / Resultsの2タブを維持。
    CPUを明示選択し、CUDA要求時の自動fallbackを行わない。
    仮K・便宜的逆投影をmodel由来Pointsにしない。既存depth-only Run / CLI互換とraw不変を維持。
 2. 大規模変更前に PLANS.md の目的・範囲・手順・検証・リスクを更新する。
