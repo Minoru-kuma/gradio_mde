@@ -90,13 +90,16 @@ worker / RegistryはGradioに依存しない。
 
 ## Input and result compatibility
 
-PNG 1枚、最大 **10 MiB / 4,194,304 pixels / 4096 pixels per edge**。
-APNG / multi-frameは拒否する。共通 `inspect_png` に加えapplication側Pillowでverify / loadし、
-空・破損・過大入力をRunner.submit前に拒否する。Gradio upload routeにも10 MiB上限を設定する。
-uploadのowned copyを背景処理へ渡し、寿命をbrowser一時fileに依存させない。
-resize / re-encodeしない。Runnerへ元PNG bytesを渡すため、既存input hash provenanceを維持する。
+PNGまたはJPEG 1枚、最大 **10 MiB / 4,194,304 pixels / 4096 pixels per edge**。
+Pillowのverify / 完全decodeで破損・複数frameを拒否し、Gradio uploadにも10 MiB上限を設定する。
+owned copyを検証し、PNGは再エンコードせずRunnerへ渡す。JPEGはPillowの
+`ImageOps.exif_transpose` 後にRGB変換しPNG保存する。resizeは行わない。
+元JPEGはRun内 `input/views/<view_id>/original.jpg` に保存し、JobSpec入力のoptional `source` に
+形式・SHA-256・byte数・元サイズ・EXIF orientation・変換操作・Pillow版・相対pathを記録する。
+`image.png` とそのdigestは推論の正本で、元JPEGもcollect時にsize / digestを検証する。
+EXIF等の元metadataも元JPEGに保持する。CLIの入力契約は従来通りPNG。
 
-JobSpec / schema 1.0 / depth-only default / optional geometry profileを変更しない。
+JobSpec schema 1.0にoptional sourceを追加し、depth-only default / optional geometry profileを維持する。
 collectのID / path / symlink / digest / geometry検証は既存Backend / Storeを利用する。
 Runnerの `run.json` publicationだけをinstance lockで直列化し、同内容の再collectは再書込しない。
 raw / WorkerResult / 確定JobResultは不変。再表示で再推論しない。

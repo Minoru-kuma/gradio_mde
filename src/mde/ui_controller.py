@@ -14,7 +14,7 @@ import time
 
 from .contracts import ATTEMPT_ID, BackendBusy, JobHandle
 from .registry import validate_parameters
-from .storage import contained_path, inspect_png, read_json, run_path
+from .storage import contained_path, inspect_png, read_json, run_path, sha256_file
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_UPLOAD_PIXELS = 4 * 1024 * 1024
@@ -22,30 +22,56 @@ MAX_UPLOAD_EDGE = 4096
 
 
 def validate_upload(image):
-    """Keep the common PNG contract, then fully decode in the application env.
-
-    Uploads are neither resized nor re-encoded. Original bytes reach Runner.
-    Pillow is optional to the control/CLI package and required only by the UI.
-    """
+    """Validate format and fully decode a bounded PNG or JPEG upload."""
     if not image:
-        raise ValueError("Upload one PNG image")
+        raise ValueError("Upload one PNG or JPEG image")
     path = Path(image)
     if not path.is_file() or not 0 < path.stat().st_size <= MAX_UPLOAD_BYTES:
-        raise ValueError("PNG must be nonempty and at most 10 MiB")
-    width, height = inspect_png(path)
-    if width * height > MAX_UPLOAD_PIXELS or max(width, height) > MAX_UPLOAD_EDGE:
-        raise ValueError("PNG exceeds 4,194,304 pixels or 4096 pixels per edge")
+        raise ValueError("Image must be nonempty and at most 10 MiB")
     from PIL import Image
     try:
         with Image.open(path) as decoded:
-            if decoded.format != "PNG" or getattr(decoded, "n_frames", 1) != 1:
-                raise ValueError("Only single-frame PNG is supported")
+            if decoded.format not in ("PNG", "JPEG") or getattr(decoded, "n_frames", 1) != 1:
+                raise ValueError("Only single-frame PNG or JPEG is supported")
+            width, height = decoded.size
+            if width * height > MAX_UPLOAD_PIXELS or max(width, height) > MAX_UPLOAD_EDGE:
+                raise ValueError("Image exceeds 4,194,304 pixels or 4096 pixels per edge")
+            if decoded.format == "PNG":
+                inspect_png(path)
             decoded.verify()
         with Image.open(path) as decoded:
             decoded.load()
     except Exception as error:
-        raise ValueError(f"Invalid PNG: {error}") from error
+        raise ValueError(f"Invalid image: {error}") from error
     return path
+
+
+def stage_upload(image, directory):
+    """Snapshot first, then validate and convert that same immutable copy."""
+    from PIL import Image, ImageOps, __version__ as pillow_version
+    source = Path(directory) / "upload"
+    if not image:
+        raise ValueError("Upload one PNG or JPEG image")
+    with Path(image).open("rb") as uploaded, source.open("wb") as owned:
+        data = uploaded.read(MAX_UPLOAD_BYTES + 1)
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise ValueError("Image must be nonempty and at most 10 MiB")
+        owned.write(data)
+    validate_upload(source)
+    target = Path(directory) / "image.png"
+    with Image.open(source) as decoded:
+        if decoded.format == "PNG":
+            shutil.copyfile(source, target)
+            return None
+        size = list(decoded.size)
+        orientation = decoded.getexif().get(274, 1)
+        if type(orientation) is not int or orientation not in range(1, 9):
+            raise ValueError("Invalid EXIF orientation")
+        ImageOps.exif_transpose(decoded).convert("RGB").save(target, format="PNG")
+    return {"format": "JPEG", "sha256": sha256_file(source), "size_bytes": source.stat().st_size,
+            "original_size": size, "exif_orientation": orientation,
+            "conversion": {"operation": "Pillow ImageOps.exif_transpose then convert RGB and save PNG",
+                           "pillow_version": pillow_version}, "source_path": source}
 
 
 @dataclass
@@ -113,12 +139,8 @@ class InferenceController:
             capabilities = self.info.variant(variant_id).get("capabilities", self.info.data["capabilities"])
             if any(capabilities.get(key, {}).get("status") not in ("supported", "conditional") for key in outputs):
                 raise ValueError("Unsupported requested output")
-            path = validate_upload(image)
             staged = tempfile.TemporaryDirectory(prefix="mde-ui-input-")
-            copied = Path(staged.name) / "image.png"
-            shutil.copyfile(path, copied)
-            # Validate the owned copy as well; Gradio's upload may be replaced.
-            validate_upload(copied)
+            provenance = stage_upload(image, staged.name)
             with self._lock:
                 session = self._session(token)
                 if session.active:
@@ -126,7 +148,7 @@ class InferenceController:
                 generation = self._select(session, "SUBMITTING")
                 session.active, session.cancel_pending, session.handle = True, False, None
             thread = threading.Thread(target=self._run, args=(token, session, generation, staged,
-                dict(variant_id=variant_id, device=device, dtype=dtype, parameters=parameters,
+                dict(**({"input_provenance": provenance} if provenance else {}), variant_id=variant_id, device=device, dtype=dtype, parameters=parameters,
                      walltime_seconds=timeout, requested_outputs=tuple(outputs))), daemon=True)
             thread.start()
             return "Submission accepted; status will update automatically."

@@ -36,7 +36,8 @@ JobSpec の artifact / input path は Run 相対 path とし、submit 側と nod
   job.json                         # 初回 JobSpec。immutable
   run.json                         # Runner 管理の logical run / selected attempt / parent
   input/
-    views/<view_id>/image.png       # 入力コピー。checksum / 元画像情報は job に保存
+    views/<view_id>/image.png       # 推論入力PNG。checksum / サイズは job に保存
+    views/<view_id>/original.jpg    # UI JPEG時のみ、元bytes
     camera/                        # optional 入力 camera metadata
   attempts/
     attempt-0001/
@@ -252,12 +253,14 @@ numeric filesは一時NPYへ書きrenameし、geometry値検証後にmetadata / 
 
 ## Phase 02B application reads and compatibility
 
-UIのPNGは10 MiB / 4,194,304 pixels / edge 4096を上限とし、共通inspect_pngとapplication
-Pillow完全decodeで事前検証する。resize / re-encodeせず元bytesをRunnerに渡しinput digestを維持。
-JobSpec / WorkerResult / JobResult / geometry profile / CLI defaultを変更しない。
+UIのPNG / JPEGは10 MiB / 4,194,304 pixels / edge 4096を上限とし、Pillowで完全decodeする。
+PNGは元bytesを保持。JPEGはEXIF orientation補正・RGB変換後のPNGを推論入力にし、
+元JPEGを別保存する。JobSpec inputsのoptional `source` に元形式 / SHA-256 / byte数 / 元サイズ /
+orientation / Pillow版と変換操作 / 相対pathを保存し、collectで元JPEGのdigestも検証する。
+既存のinput path / hash / original_sizeは変換後PNGに対応し、旧RunとCLI契約を維持する。
 terminal表示は既存collectのID / path / digest / geometry validation成功後のみpublishする。
 UI serviceはRun IDから保存handleをcontained pathで読んで既存collectへ渡し、active recoveryを拒否。
 Runner.collectのrun.json publicationはinstance lockを取り、同内容ならwriteを省略する。
 複数sessionの同時collectでtemporary fileを競合させず、再表示によるraw / result更新も行わない。
-02Bはrefs / metadataの詳細表示まで。02Cでdownload / viewer / derivedを追加、管理serviceは02D。
-詳細は [Gradio Inference](gradio-inference.md)。
+02Cでdownload / viewer / derivedを追加、管理serviceは02D。
+詳細は [Gradio Inference](gradio-inference.md#input-and-result-compatibility)。

@@ -220,6 +220,11 @@ def validate_job_files(run: Path, spec) -> None:
     path = contained_path(run, source["path"])
     if sha256_file(path) != source["sha256"]:
         raise ArtifactIntegrityError("Input checksum mismatch")
+    if "source" in source:
+        original = source["source"]
+        original_path = contained_path(run, original["path"])
+        if original_path.stat().st_size != original["size_bytes"] or sha256_file(original_path) != original["sha256"]:
+            raise ArtifactIntegrityError("Original input checksum mismatch")
     width, height = inspect_png(path)
     if source["original_size"] != {"width": width, "height": height}:
         raise ArtifactIntegrityError("Input dimensions mismatch")

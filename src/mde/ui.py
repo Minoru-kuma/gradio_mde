@@ -52,8 +52,8 @@ def build_app(controller):
                     variant = gr.Dropdown([v["variant_id"] for v in info["variants"]],
                                           value=info["default_variant"], label="Variant", elem_id="variant-choice")
                     gr.Textbox(value="local", label="Backend", interactive=False)
-                upload = gr.File(label="Input PNG (10 MiB; 4,194,304 pixels; edge ≤ 4096)",
-                                 file_types=[".png"], type="filepath", elem_id="input-png")
+                upload = gr.File(label="Input PNG / JPEG (10 MiB; 4,194,304 pixels; edge ≤ 4096)",
+                                 file_types=[".png", ".jpg", ".jpeg"], type="filepath", elem_id="input-png")
                 with gr.Row():
                     device = gr.Dropdown(info["supported_devices"], value=None, label="Device (choose explicitly)",
                                          elem_id="device-choice")

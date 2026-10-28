@@ -2,6 +2,7 @@
 from dataclasses import asdict
 import hashlib
 import json
+import shutil
 import threading
 import uuid
 from pathlib import Path
@@ -20,7 +21,7 @@ class ExperimentRunner:
     def submit(self, model_id: str, image: Path, *, variant_id: str | None = None,
                device: str = "cuda:0", dtype: str = "float32", parameters: dict | None = None,
                walltime_seconds: int | None = None,
-               requested_outputs: tuple[str, ...] = ("depth",)) -> JobHandle:
+               requested_outputs: tuple[str, ...] = ("depth",), input_provenance: dict | None = None) -> JobHandle:
         info = self.registry.get_model(model_id)
         variant = info.variant(variant_id)
         if device not in info.data["supported_devices"] or dtype not in info.data["supported_dtypes"]:
@@ -45,6 +46,16 @@ class ExperimentRunner:
         digest = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
         run_id = str(uuid.uuid4())
         run = self.store.prepare(run_id, image)
+        input_record = {"view_id": VIEW_ID, "path": f"input/views/{VIEW_ID}/image.png",
+                        "sha256": request["input_sha256"], "original_size": {"width": width, "height": height}}
+        if input_provenance is not None:
+            provenance = dict(input_provenance)
+            source = Path(provenance.pop("source_path"))
+            if sha256_file(source) != provenance.get("sha256") or source.stat().st_size != provenance.get("size_bytes"):
+                raise ValueError("Original input checksum mismatch")
+            provenance["path"] = f"input/views/{VIEW_ID}/original.jpg"
+            shutil.copyfile(source, run / provenance["path"])
+            input_record["source"] = provenance
         sources = hashlib.sha256()
         for directory in (self.project_root / "src", self.registry.models_root / model_id):
             for path in sorted(directory.rglob("*")):
@@ -53,8 +64,7 @@ class ExperimentRunner:
                     sources.update(path.read_bytes())
         spec = JobSpec(run_id, model_ref,
                        environment, self.backend.backend_id, self.backend.profile_id,
-                       [{"view_id": VIEW_ID, "path": f"input/views/{VIEW_ID}/image.png",
-                         "sha256": request["input_sha256"], "original_size": {"width": width, "height": height}}],
+                       [input_record],
                        {"device": device, "dtype": dtype, "seed": 0, "parameters": parameters,
                         "requested_outputs": outputs, "resolution_policy": "native_input_grid"},
                        asdict(ResourceSpec(gpu_count=int(device.startswith("cuda")), walltime_seconds=walltime_seconds)),

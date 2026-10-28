@@ -2,12 +2,25 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 02C — COMPLETE、docs / Git整理**（2026-10-27 明示承認）。
-- Authorization: 02C実装・検証・関連docs更新、全Exit達成後のcommit / main通常push。
+- Current work: **Gradio JPEG入力改善**（2026-10-28 明示承認）。Phase 02C COMPLETEを維持。
+- Authorization: JPEG入力改善・検証・関連docs更新、完了後のcommit / main通常push。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B COMPLETE、Phase 02 IN_PROGRESS。
 - 02D / 03–08、他モデル、Tracking / Benchmark / Slurm / active recoveryは未承認。
-- Start evidence: fetch成功、main clean、HEAD = origin/main `9954b777eef66475015c27da06263679a0b438ed`。
+- Start evidence: fetch成功、main clean、HEAD = origin/main（Git履歴参照）。
 - remote更新・競合・範囲外変更なら停止・報告。force push禁止。
+
+## JPEG input improvement — 2026-10-28
+
+- Scope: Gradio JPEG validation, EXIF transpose / RGB PNG conversion, original bytes and optional JobSpec provenance; preserve CLI and 02C COMPLETE.
+- Order: validate owned upload → convert and record source / transformation → Runner saves both before submit → contract / regression and feasible CPU browser smoke → docs / remote check / commit / normal push.
+- Validation: PNG byte identity, JPEG and EXIF orientation, corrupt / size / pixel limits, provenance and integrity, existing suite and browser smoke.
+- Risks: decoder limits and malformed images, original / converted consistency, optional schema compatibility; preserve the PNG as the authoritative model input and retain source JPEG for reproduction.
+- Evidence: 全67 tests中63成功・opt-in browser 4 skip（153.515秒）。最終controller 13成功。
+  JPEG実MoGe CPU browser / offline 1成功（35.044秒）、Run `8f133a54-fc83-4467-9992-42d33e9c5885`、
+  native Points / 4表示 / 125,125 mesh faces / restart読込、元JPEG digest一致、predict 1回、
+  raw不変・外部HTTP / page errors 0。Linux / Chrome SwiftShader、GPU・他browserは未検証。
+  初回browserはsandbox port制限、次回はtestのPNG固定filename assertionで失敗し修正後成功。
+  suite実行中にowned copyのbounded readを追加し、変更対象controllerとCPU browserを再実行した。
 
 ## Phase 02C implementation plan — 2026-10-27
 

@@ -78,7 +78,7 @@ class BrowserHarness:
     def upload(self, page, path):
         from playwright.sync_api import expect
         page.locator("#input-png input[type=file]").set_input_files(str(path))
-        expect(page.locator("#input-png")).to_contain_text(re.compile(re.escape(path.stem) + r"\s*\.png"), timeout=10000)
+        expect(page.locator("#input-png")).to_contain_text(re.compile(re.escape(path.stem) + r"\s*" + re.escape(path.suffix)), timeout=10000)
 
     def stop(self):
         for job in list(self.runner.backend._jobs.values()):

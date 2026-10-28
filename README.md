@@ -210,7 +210,7 @@ PYTHONPATH=src .local/envs/mde-ui/bin/python -m mde.ui --model moge \
   --checkpoint .local/weights/moge-2-vits-normal.pt
 ```
 
-`http://127.0.0.1:7860` でPNGをuploadし、deviceを明示選択します。CPU利用時は **cpu** を選びます。
+`http://127.0.0.1:7860` でPNGまたはJPEGをuploadし、deviceを明示選択します。CPU利用時は **cpu** を選びます。
 CUDA要求の自動fallbackはありません。準備済みmodel環境 / weightsが必要です。
 保存terminal結果だけなら `--read-only` でmodel環境なしに起動できます。
 固定依存・offline再作成・制限・検証方法は [起動仕様](docs/gradio-inference.md)、

@@ -204,7 +204,12 @@ class CPUViewerBrowserTests(unittest.TestCase, ViewerBrowserHarness):
         from mde.storage import read_json,sha256_file
         self.start(PROJECT/'models','moge',PROJECT/'runs',7864,PROJECT/'.local/weights/moge-2-vits-normal.pt')
         try:
-            page=self.page();self.upload(page,PROJECT/'tests/assets/sample.png')
+            from PIL import Image
+            jpeg = PROJECT / '.local/validation/jpeg-viewer-smoke.jpg'
+            jpeg.parent.mkdir(parents=True, exist_ok=True)
+            with Image.open(PROJECT / 'tests/assets/sample.png') as image:
+                image.convert('RGB').save(jpeg, format='JPEG')
+            page=self.page();self.upload(page,jpeg)
             self.select(page,'#device-choice','cpu')
             for name in ('points','normals','intrinsics','mask'):
                 page.locator('#requested-artifacts').get_by_label(name,exact=True).check()
@@ -212,6 +217,9 @@ class CPUViewerBrowserTests(unittest.TestCase, ViewerBrowserHarness):
             expect(page.locator('#job-status textarea')).to_have_value('COMPLETED',timeout=180000)
             run_id=page.locator('#selected-run-id textarea').input_value();run=self.store.root/run_id
             result=read_json(run/'attempts/attempt-0001/job-result.json')
+            source=read_json(run/'job.json')['inputs'][0]['source']
+            self.assertEqual(source['sha256'], sha256_file(jpeg))
+            self.assertEqual((run/source['path']).read_bytes(), jpeg.read_bytes())
             self.assertEqual(result['execution']['device'],'cpu')
             self.assertIn('force_projection=False',result['outputs'][0]['metadata']['geometry']['points']['native_convention'])
             before={str(p):(sha256_file(p),p.stat().st_mtime_ns) for p in run.rglob('*') if p.is_file()}

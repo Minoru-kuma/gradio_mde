@@ -13,7 +13,7 @@ from mde.contracts import (BackendBusy, CancelReceipt, JobHandle, JobResult,
                            JobStatus, JobStatusSnapshot, utc_now)
 from mde.registry import ModelRegistry
 from mde.storage import RunStore, sha256_file, write_json
-from mde.ui_controller import InferenceController, MAX_UPLOAD_BYTES, validate_upload
+from mde.ui_controller import InferenceController, MAX_UPLOAD_BYTES, validate_upload, stage_upload
 
 PROJECT = Path(__file__).resolve().parents[1]
 IMAGE = PROJECT / "tests/assets/sample.png"
@@ -121,9 +121,36 @@ class ControllerTests(unittest.TestCase):
             validate_upload(path)
         data = bytearray(IMAGE.read_bytes()); data[16:24] = struct.pack(">II", 4096, 4096)
         path.write_bytes(data)
-        with self.assertRaisesRegex(ValueError, "exceeds"):
+        with self.assertRaises(ValueError):
             validate_upload(path)
         self.assertEqual(validate_upload(IMAGE), IMAGE)
+
+    def test_jpeg_conversion_and_png_identity(self):
+        from PIL import Image, ImageOps
+        root = Path(self.temp.name)
+        png_dir = root / "png"; png_dir.mkdir()
+        self.assertIsNone(stage_upload(IMAGE, png_dir))
+        self.assertEqual((png_dir / "image.png").read_bytes(), IMAGE.read_bytes())
+        for orientation in (1, 6):
+            jpeg = root / f"{orientation}.jpeg"
+            exif = Image.Exif(); exif[274] = orientation
+            Image.new("RGB", (24, 12), (40, 80, 120)).save(jpeg, exif=exif)
+            out = root / str(orientation); out.mkdir()
+            provenance = stage_upload(jpeg, out)
+            self.assertEqual(provenance["sha256"], sha256_file(jpeg))
+            self.assertEqual(provenance["exif_orientation"], orientation)
+            with Image.open(jpeg) as source, Image.open(out / "image.png") as converted:
+                expected = ImageOps.exif_transpose(source).convert("RGB")
+                self.assertEqual(converted.mode, "RGB")
+                self.assertEqual(converted.size, expected.size)
+                self.assertEqual(converted.tobytes(), expected.tobytes())
+        bad = root / "bad.jpg"; bad.write_bytes(jpeg.read_bytes()[:-20])
+        with self.assertRaises(ValueError):
+            validate_upload(bad)
+        huge = root / "huge.jpg"
+        Image.new("RGB", (4097, 2)).save(huge)
+        with self.assertRaisesRegex(ValueError, "exceeds"):
+            validate_upload(huge)
 
     def test_immediate_busy_no_queued_inference_and_session_cancel(self):
         self.submit()
@@ -260,6 +287,27 @@ class UILocalContractTests(unittest.TestCase):
 
     def submit(self, token, action="success", timeout=30):
         return self.controller.submit(token, IMAGE, "fake-depth", "cpu", "float32", {"action": action}, timeout, ["depth"])
+
+    def test_jpeg_saved_provenance_and_integrity(self):
+        from PIL import Image
+        from mde.storage import read_json
+        from mde.contracts import ArtifactIntegrityError
+        temp = tempfile.TemporaryDirectory(); self.addCleanup(temp.cleanup)
+        jpeg = Path(temp.name) / "source.jpg"
+        exif = Image.Exif(); exif[274] = 6
+        Image.new("RGB", (32, 16), (32, 80, 140)).save(jpeg, exif=exif)
+        self.controller.submit("jpeg", jpeg, "fake-depth", "cpu", "float32", {}, 30, ["depth"])
+        self.wait("jpeg", lambda v: v["result"] is not None)
+        view = self.controller.snapshot("jpeg")
+        self.assertEqual(view["status"], "COMPLETED")
+        run = self.store.root / view["run_id"]
+        source = read_json(run / "job.json")["inputs"][0]
+        self.assertEqual(source["source"]["sha256"], sha256_file(jpeg))
+        self.assertEqual((run / source["source"]["path"]).read_bytes(), jpeg.read_bytes())
+        self.assertEqual(source["original_size"], {"width": 16, "height": 32})
+        (run / source["source"]["path"]).write_bytes(b"tampered")
+        with self.assertRaises(ArtifactIntegrityError):
+            self.runner.collect(self.controller._sessions["jpeg"].handle)
 
     def test_real_backend_session_busy_cancel_failure_timeout_and_next_job(self):
         self.submit("a", "block")
