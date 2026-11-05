@@ -9,6 +9,7 @@
 - Phase 00 / 01 / 01A / 01B / 02A / 02B COMPLETE、Phase 02 IN_PROGRESS。
 - 03–08、他モデル、Tracking / Benchmark / Slurm / active recovery、高解像度・推定品質改善は未承認。
 - Start evidence: fetch成功、main clean、HEAD = origin/main `7f043c12a454feff401d366d725bcd8c6ae41faf`。
+- 新規作業は作業ブランチを作成し、継続作業は対応する既存ブランチで行う。main上で直接編集・commitしない。
 - remote更新・競合・範囲外変更なら停止・報告。force push禁止。
 
 ## Phase 02D implementation plan — 2026-11-05
@@ -16,11 +17,11 @@
 - Scope: 共通serviceによる履歴 / 詳細 / metadata / archive / export / derived再生成・履歴 / 確認付き削除とResults UI統合。既存raw / JobResult / CLI互換を維持。
 - Order: latest main・契約確認 → 安全な保存 / lock / active判定を設計 → serviceとviewer統合 → UI確認 / session境界 → 隔離Rootでfake・filesystem・競合・browser検証 → Phase 02全Exit監査 → remote再確認・全Exit時のみcommit / 通常push。
 - Verification: 旧Run・sidecar欠如 / 破損、metadataによるraw不変、export選択範囲、再生成とtombstone、stale / active / symlink / traversal / partial failure / concurrent access、確認cancelと削除範囲、既存suiteとoffline再表示。
-- Risks: 共有lockの欠落、別processや外部変更によるTOCTOU、部分削除、unknown active状態、export容量。単一process境界を明確化し不明時は拒否。破壊試験は隔離Rootのみ。全Exit未達ならCOMPLETE / commit / pushしない。
+- Risks: 共有lockの欠落、別processや外部変更によるTOCTOU、部分削除、unknown active状態、export容量。単一process境界を明確化し不明時は拒否。破壊試験は隔離Rootのみ。全Exit未達ならCOMPLETE / main反映しない。承認済みの作業ブランチへの途中commit / pushは可能。
 - 現状: 共通ServiceとUIにmetadata / archive、ZIP export、derived再生成 / 履歴、確認付き削除、共有Run lockを追加。隔離Rootのservice / Results 17件、管理browser 1件成功（22.907秒）。管理単独は9件成功。全Run削除の部分失敗→確認付き再試行ServiceとUIを追加し、Service fixture成功。
   実装更新中の全体suiteでimport / UI event数の混在が発生。固定sourceで全77件中72成功・opt-in 5 skip（176.958秒）。
   固定sourceの管理browser 1成功（21.495秒）。その後directory inode確認を追加し管理10件成功。
-- 未達: 再試行UIのbrowser受入、derived部分削除のpointer / 再試行fixture、全削除pathのTOCTOU / session競合監査、最終docs整合監査。02D / Phase 02はIN_PROGRESS、commit / pushしない。
+- 未達: 再試行UIのbrowser受入、derived部分削除のpointer / 再試行fixture、全削除pathのTOCTOU / session競合監査、最終docs整合監査。02D / Phase 02はIN_PROGRESS、main反映しない。途中実装は承認済み作業ブランチへcommit / pushする。
 
 ## JPEG input improvement — 2026-10-28
 
