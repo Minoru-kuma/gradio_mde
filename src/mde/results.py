@@ -18,6 +18,7 @@ import numpy as np
 from PIL import Image
 
 from .contracts import ATTEMPT_ID, ArtifactIntegrityError, JobHandle
+from .run_access import run_lock, locked_view, write_sidecar
 from .geometry import FRAME
 from .storage import (artifact_ref, contained_path, read_json, run_path,
                       sha256_file, validate_artifact, write_json)
@@ -115,15 +116,21 @@ class DerivedStore:
     _guard = threading.Lock()
     _locks = {}
 
-    def get(self, run, identity, generate):
+    def get(self, run, identity, generate, *, force=False):
         key = hashlib.sha256(canonical(identity)).hexdigest()
         location = derived_path(run, f"derived/{key}")
         with self._guard:
             lock = self._locks.setdefault(str(location), threading.Lock())
-        with lock:
+        with run_lock(run), lock:
             location.mkdir(parents=True, exist_ok=True)
-            complete = sorted(p for p in location.iterdir() if not p.name.startswith(".partial-"))
-            if complete:
+            complete = sorted(p for p in location.iterdir() if not p.name.startswith(".partial-") and p.name != "current.json")
+            pointer = location / "current.json"
+            if pointer.exists():
+                selected = read_json(derived_path(run, pointer.relative_to(run).as_posix()))["generation_id"]
+                if len(selected) != 32 or any(c not in "0123456789abcdef" for c in selected):
+                    raise ArtifactIntegrityError("Invalid generation pointer")
+                complete = [location / selected]
+            if complete and not force:
                 if len(complete) != 1 or not complete[0].is_dir():
                     raise ArtifactIntegrityError("Invalid derived cache generations; explicit repair required")
                 folder = derived_path(run, complete[0].relative_to(run).as_posix())
@@ -144,8 +151,16 @@ class DerivedStore:
             generation = uuid.uuid4().hex
             staging = derived_path(run, f"derived/{key}/.partial-{generation}")
             staging.mkdir()
-            arrays = generate()
-            self._validate(arrays)
+            try:
+                arrays = generate()
+                self._validate(arrays)
+            except Exception as error:
+                history_path = derived_path(run, "derived/history.json")
+                history = read_json(history_path) if history_path.exists() else {"schema_version": "1.0", "events": []}
+                history["events"].append({"operation": "failed", "generation_id": generation,
+                    "identity": identity, "error": str(error)})
+                write_sidecar(run, "derived/history.json", history)
+                raise
             path = staging / "geometry.npz"
             with path.open("xb") as stream:
                 np.savez(stream, **arrays)
@@ -161,6 +176,11 @@ class DerivedStore:
                 "warnings": ["No coordinate transform or LOD; raw geometry is unchanged"]}
             write_json(staging / "manifest.json", manifest)
             os.rename(staging, final)
+            write_sidecar(run, (location / "current.json").relative_to(run).as_posix(), {"generation_id": generation})
+            history_path = derived_path(run, "derived/history.json")
+            history = read_json(history_path) if history_path.exists() else {"schema_version": "1.0", "events": []}
+            history["events"].append({"operation": "regenerate" if force else "generate", "manifest": manifest})
+            write_sidecar(run, "derived/history.json", history)
             return arrays, manifest, False
 
     @staticmethod
@@ -197,6 +217,7 @@ class ResultsService:
         self.store, self.collect = store, collect
         self.derived = DerivedStore()
 
+    @locked_view
     def load(self, run_id):
         run = run_path(self.store.root, run_id)
         data = read_json(contained_path(run, f"attempts/{ATTEMPT_ID}/handle.json"))
@@ -211,7 +232,8 @@ class ResultsService:
             raise ValueError(f"Viewer unavailable: exceeds {MAX_PIXELS:,} output pixels; raw artifacts are preserved")
         return run, result, output
 
-    def view(self, run_id, mode):
+    @locked_view
+    def view(self, run_id, mode, *, regenerate=False):
         if mode not in ("Depth", "RawDepth", "Point Cloud", "Mesh"):
             raise ValueError("Unknown Results mode")
         run, result, output = self.load(run_id)
@@ -258,7 +280,7 @@ class ResultsService:
         faces = None
         if mode == "Mesh":
             arrays, generated, reuse = self.derived.get(run, identity,
-                lambda: {"points": points, "faces": triangulate(points, depth, valid, identity["parameters"])})
+                lambda: {"points": points, "faces": triangulate(points, depth, valid, identity["parameters"])}, force=regenerate)
             points, faces = arrays["points"], arrays["faces"]
             payload.update(origin="derived mesh from " + payload["origin"], cache_reused=reuse)
         # RGB mapping is deliberately conservative. Do not guess resize/crop.

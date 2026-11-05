@@ -25,7 +25,7 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 
 **2026-10-27: Phase 00 / 01 / 01A / 01B / 02A / 02B COMPLETE。Phase 02 は IN_PROGRESS、02C COMPLETE、02D は NOT_STARTED。**
 Phase 02C の実装・検証・関連docs更新と、全Exit達成後のcommit / main通常pushが承認されています。
-02D以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
+02Dは実装承認済み・検証中、Phase 03以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -140,7 +140,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
 | [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | COMPLETE。01A / 01B COMPLETE（CPU E2E / Local robustness） |
-| [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | IN_PROGRESS（02A / 02B COMPLETE、02C COMPLETE、02D未承認） |
+| [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | IN_PROGRESS（02A / 02B COMPLETE、02C COMPLETE、02D実装中） |
 | [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 未着手 |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |
 | [05](docs/phases/phase-05.md) | Benchmark Mode | 未着手 |
@@ -193,7 +193,7 @@ maskはeffective validity、model_maskは元モデル判定として別保存し
 旧schema 1.0 / depth-only RunのcollectとCLI互換を維持し、raw / 確定JobResultを上書きしません。
 実CPU native Pointsの保存・再読込・Depth整合と40 tests成功で02A COMPLETE。
 実CPU結果・テスト・制限は [02A](docs/phases/phase-02/phase-02a.md) に記録します。
-Gradioの起動方法は下記を参照してください。3D / derived meshは02Cで実装・検証済み、Run管理は02Dの未承認計画です。
+Gradioの起動方法は下記を参照してください。3D / derived meshは02Cで実装・検証済み、Run管理は02Dで実装・検証中です。
 
 ## Phase 02B Gradio Inference
 
@@ -231,7 +231,7 @@ Three.js r180を同梱し、準備済み環境ではCDNなしのoffline操作を
 明示CPUのnative MoGeとfake / contract / browser / offlineの全Exitを達成し、02C COMPLETE。
 固定Chrome / Linuxで262,144 output pixelsまで検証。GPU / 他OS/browser / 学会実演は未検証。
 操作・保存schema・制限は [Results Viewer](docs/results-viewer.md)、実測結果は
-[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02D以降は未承認です。
+[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは実装承認済み・検証中、Phase 03以降は未承認です。
 
 ## ドキュメント一覧
 

@@ -35,7 +35,7 @@ class UIBoundaryTests(unittest.TestCase):
                 LocalBackend(store.root), store, PROJECT), "moge")
             app = build_app(controller)
             events = app.config["dependencies"]
-            self.assertEqual(len(events), 5)
+            self.assertEqual(len(events), 16)
             self.assertTrue(all(e["queue"] is False for e in events))
             self.assertTrue(all(e["trigger_mode"] == "once" for e in events))
             # No inference listener owns status or Results outputs. One timer is

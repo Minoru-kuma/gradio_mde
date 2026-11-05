@@ -1,14 +1,14 @@
 # Phase 02D — Run Management
 
-Status: **NOT_STARTED / 実装未承認**。Phase 02の内部milestone。以下は設計のみ。
+Status: **IN_PROGRESS / 実装承認済み（2026-11-05）**。Phase 02の内部milestone。実装・検証中。
 親: [Phase 02](../phase-02.md)、管理: [PLANS](../../../PLANS.md)。
-現在の実装承認は02Cまで。このmilestoneは未承認のため開始しない。
+02Dの実装・検証・関連docsと全Exit達成後のcommit / main通常pushを承認。Phase 03以降は未承認。
 
 ## Goal / Background
 
 Resultsから保存Runを安全に管理する。確定推論の証拠とユーザー管理情報を分離し、
 callbackにfilesystem操作を埋め込まず共通Run Management Serviceへ委譲する。
-現在はterminal collectがあるが、一覧 / archive / delete等の管理serviceは未実装。
+共通serviceとUIを追加中。全Exitの監査完了まではIN_PROGRESS。
 
 ## Scope / Non-goals
 
@@ -78,3 +78,22 @@ Service分離、sidecar更新、raw不変、履歴付きderived再生成、archi
 sidecar schema / export形式 / delete失敗時の診断保存・再試行手順 / lock具体方式は実装前に確定。
 削除失敗を成功とせず、確認された同一対象への明示再試行に限定する。
 お気に入り、検索、共有・認証は後続Phase（時期未定）。
+
+
+## Working evidence (not Exit completion)
+
+隔離RootのService / Results tests 17件成功、管理browser 1件成功（22.907秒）。
+確認cancel、derived削除のraw保持、Run削除の別Run保持、exportリンク、Mesh再生成を確認。
+Serviceでstale確認・別Run・未入力確認、active / restart未知状態、export中削除待機、
+symlink置換拒否・削除失敗の隔離保持を検証。既存実験Runは削除していない。
+全体suiteはcode更新中のimport混在失敗のため最終版で再実行する。
+全Runの部分削除後の明示再試行Service / UIを追加、Service fixture成功。
+再試行UIのbrowser、derivedの部分失敗 / pointer / 再試行fixture、TOCTOU / session競合の
+包括監査が未達。全Exitは未チェックのまま維持。
+
+最終固定source回帰: 77件中72成功・opt-in browser 5 skip（176.958秒）。
+別実行の管理browser 1成功（21.495秒）、その後のdirectory identity補強で管理10件成功。
+既存JPEG実CPU Run `8f133a54-fc83-4467-9992-42d33e9c5885` をread-only backendで
+詳細 / ZIP exportし、元fileのSHA-256 / mtime不変。旧Runに管理sidecarは追加していない。
+証拠: `.local/validation/02d-{suite-stable,browser-stable,inode-final}.log`。
+未達Exitを残すためcommit / pushなし。

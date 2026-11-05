@@ -1,8 +1,8 @@
 # Run Management / Derived Storage specification
 
-Status: **02Cの最小derived serviceを実装・検証済み / 02D管理は設計のみ・未承認**。
+Status: **02Cの最小derived serviceを実装・検証済み / 02D実装中（未完）**。
 02Cの確定API / path / schemaは [Results Viewer](results-viewer.md)。
-以下のproposed layout・管理API・historyは02Dを含む計画であり、02Cの実装と区別する。関連:
+02Dでは共通service・Results UI・Run単位lock・export・再生成・確認付き削除を実装中。全Exit監査は未完であり、以下は残る計画を含む。関連:
 [Phase 02](phases/phase-02.md)、[Run Directory](run-directory-spec.md)、[Architecture](architecture.md)。
 
 ## Responsibility and service boundary
@@ -102,3 +102,40 @@ path / symlink / race、derived履歴とpartial failureを検証する。詳細�
 API / sidecar schema / format / key canonicalization / lockingは実装前にfixture付きで確定する。
 容量・filesystem race・browser format / offline制約は未検証。
 検索・favorites・共有 / 認証・自動retention・multi-process調停は後続の別承認対象。
+
+
+## 02D working implementation — acceptance pending
+
+`RunManagementService` はdetail / list_runs / update_metadata / export /
+regenerate_derived / prepare_delete / deleteを提供する。UIは管理用にInspectしたRunと
+入力Run IDの一致を検証し、入力変更時は確認状態を破棄する。metadata更新後は再Inspectする。
+表示名は256文字、メモは16,384文字以内。archive / restoreはarchived flag更新で行う。
+sidecar schema 1.0、revisionによる古い更新拒否、旧Runでsidecar欠如はrevision 0。
+
+`run_access.run_lock` は同一processの全serviceとRunner.collect、Results view / load、
+DerivedStoreで共有するRLock。生成・export・削除は同一Runについて直列化する。
+raw・確定resultは更新しない。新しい推論は既存Inferenceから新Runとしてsubmitする。
+通常derivedはcurrent.jsonのgenerationをreuse。明示再生成は新generationを保存し、
+`derived/history.json` に生成 / 再生成 / 生成失敗 / 削除要求 / 削除完了のeventを記録する。
+02Cの単一generation cacheはpointerなしで読み戻す。
+
+Exportは最大256 MiBの入力・raw・derivedとjob/result snapshots、digest manifest・管理metadata・
+derived履歴をZIPに格納する。保存ref以外のlogsや環境設定は含めない。
+ZIPはメモリ内で作成し、ブラウザーへdata URLで渡す。永続exportファイルや自動掃除は作らない。
+大容量ZIPはbrowser memoryを消費する。ref・digestを検証し、ファイル読込はO_NOFOLLOWと
+directory descriptorでsymlink置換を拒否する。
+
+削除確認はRun ID、generation相対path（空なら全Run）、全fileのdigest snapshotと範囲を持つ。
+確認時と実行時にterminal collectを行い、状態不明・active・変更済みinventoryを拒否する。
+対象directoryのdevice / inodeも確認に含め、同じbytesの別directoryへの置換も拒否する。
+入力したRun IDの完全一致も必要。確認cancelは確認状態の破棄だけである。
+全Run削除はdescriptorに固定したRootから `.management-quarantine/<Run ID>-<nonce>` へ
+renameしてからsymlink耐性のあるrmtreeを使用。失敗は例外で返し隔離先を保持する。
+失敗したquarantineはReview deletion retryから再確認し、対象Run IDを入力して明示再試行する。
+Serviceの部分失敗→再試行fixtureは成功。再試行UIのbrowser受入は未完。
+derived削除は履歴を残し、manifestが部分削除された場合はdelete_requested履歴から対象を再確認する。
+部分失敗時のpointer整合性と再試行の包括fixtureは未完。
+
+単一application processでの調停。外部processが同時にRun Rootを書き換える運用は未検証。
+TOCTOUの読込置換fixtureは検証済みだが、全削除pathの置換・途中中断・別session競合の
+包括監査は未完。これらの未達を解消するまで02D / Phase 02 COMPLETE・commit / pushしない。
