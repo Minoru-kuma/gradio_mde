@@ -23,9 +23,9 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 
 ## 現在の開発状況
 
-**2026-10-27: Phase 00 / 01 / 01A / 01B / 02A / 02B COMPLETE。Phase 02 は IN_PROGRESS、02C COMPLETE、02D は NOT_STARTED。**
-Phase 02C の実装・検証・関連docs更新と、全Exit達成後のcommit / main通常pushが承認されています。
-02Dは実装承認済み・検証中、Phase 03以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
+**Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。**
+Phase 02Dを `codex/phase-02d-run-management` で実装・検証しています。作業ブランチへの通常pushのみ承認され、今回mainへの反映は禁止です。
+02Dは全Exit達成済み、Phase 03以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -140,7 +140,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
 | [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | COMPLETE。01A / 01B COMPLETE（CPU E2E / Local robustness） |
-| [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | IN_PROGRESS（02A / 02B COMPLETE、02C COMPLETE、02D実装中） |
+| [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | COMPLETE（02A〜02D全Exit達成） |
 | [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 未着手 |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |
 | [05](docs/phases/phase-05.md) | Benchmark Mode | 未着手 |
@@ -193,7 +193,7 @@ maskはeffective validity、model_maskは元モデル判定として別保存し
 旧schema 1.0 / depth-only RunのcollectとCLI互換を維持し、raw / 確定JobResultを上書きしません。
 実CPU native Pointsの保存・再読込・Depth整合と40 tests成功で02A COMPLETE。
 実CPU結果・テスト・制限は [02A](docs/phases/phase-02/phase-02a.md) に記録します。
-Gradioの起動方法は下記を参照してください。3D / derived meshは02Cで実装・検証済み、Run管理は02Dで実装・検証中です。
+Gradioの起動方法は下記を参照してください。3D / derived meshは02Cで実装・検証済み、Run管理は02Dで実装・検証済みです。
 
 ## Phase 02B Gradio Inference
 
@@ -231,7 +231,20 @@ Three.js r180を同梱し、準備済み環境ではCDNなしのoffline操作を
 明示CPUのnative MoGeとfake / contract / browser / offlineの全Exitを達成し、02C COMPLETE。
 固定Chrome / Linuxで262,144 output pixelsまで検証。GPU / 他OS/browser / 学会実演は未検証。
 操作・保存schema・制限は [Results Viewer](docs/results-viewer.md)、実測結果は
-[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは実装承認済み・検証中、Phase 03以降は未承認です。
+[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは全Exit達成済み、Phase 03以降は未承認です。
+
+## Phase 02D Run Management
+
+Resultsの **Run management** を開き、Saved terminal Run IDを入力して **Inspect saved Run ID** を押します。
+履歴の表示、表示名・メモ、archive / restore、ZIP export、Mesh再生成を利用できます。
+metadata更新後は再Inspectしてください。archiveはファイルを保持します。
+
+削除は **Review deletion** で対象と範囲を確認し、正確なRun IDを入力して **Confirm deletion** を押します。
+derived pathが空ならrawを含む全Run削除です。入力を変えた場合は再確認が必要です。
+失敗した全Run削除は診断の隔離名を **Retry an interrupted Run deletion** で再確認できます。
+モデル環境なしの保存Run起動でも、これらの明示管理操作は利用できます。
+手順・世代選択・サイズ制限・失敗時の扱いは [管理仕様](docs/run-management-spec.md)、
+検証証拠は [02D](docs/phases/phase-02/phase-02d.md) を参照してください。
 
 ## ドキュメント一覧
 
@@ -246,5 +259,5 @@ Three.js r180を同梱し、準備済み環境ではCDNなしのoffline操作を
 - [Slurm integration](docs/slurm-integration.md): 将来の接続方式と研究室確認事項
 - [MLflow design](docs/mlflow-design.md): Params / Metrics / Artifacts / Tags
 - [Run Directory spec](docs/run-directory-spec.md): file protocol、Run ID、attempt、保存形式
-- [Run Management spec](docs/run-management-spec.md): Phase 02C / 02D の派生保存・管理service計画
+- [Run Management spec](docs/run-management-spec.md): 派生世代の選択・管理Service・export・確認付き削除
 - [Phase 00–08](docs/phases/): 各段階の tasks / tests / exit criteria

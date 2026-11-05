@@ -139,6 +139,7 @@ def build_app(controller):
                         retry_details = gr.JSON(label="Retry confirmation")
                         retry_typed = gr.Textbox(label="Type exact Run ID for retry")
                         confirm_retry = gr.Button("Confirm deletion retry")
+                        cancel_retry = gr.Button("Cancel deletion retry")
                     management_notice = gr.Textbox(label="Management action", interactive=False)
 
         timer = gr.Timer(0.5)
@@ -219,13 +220,21 @@ def build_app(controller):
         def prepare_retry(entry):
             try:
                 value = management.prepare_retry(entry.strip())
-                return value, value
+                return value, value, "Deletion retry review ready"
             except Exception as error:
-                return None, {"error": str(error)}
-        review_retry.click(prepare_retry, quarantine_entry, [retry_state, retry_details], **event)
-        confirm_retry.click(lambda confirmation, typed: text_guard(
-            lambda: management.retry_delete(confirmation, typed_run_id=typed)),
-            [retry_state, retry_typed], management_notice, **event)
+                return None, {"error": str(error)}, str(error)
+
+        def retry_action(confirmation, typed, entry):
+            if not confirmation or confirmation["quarantine_name"] != entry.strip():
+                raise ValueError("Retry target changed; review again")
+            return management.retry_delete(confirmation, typed_run_id=typed)
+
+        quarantine_entry.input(lambda: (None, None), outputs=[retry_state, retry_details], **event)
+        review_retry.click(prepare_retry, quarantine_entry, [retry_state, retry_details, management_notice], **event)
+        confirm_retry.click(lambda confirmation, typed, entry: text_guard(retry_action, confirmation, typed, entry),
+            [retry_state, retry_typed, quarantine_entry], management_notice, **event)
+        cancel_retry.click(lambda: (None, None, "Deletion retry cancelled"),
+            outputs=[retry_state, retry_details, management_notice], **event)
 
         def prepare_management(selection, selected, target):
             try:

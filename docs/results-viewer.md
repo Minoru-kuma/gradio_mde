@@ -3,7 +3,7 @@
 02Cの共通reader / numeric処理は `mde.results.ResultsService`、派生保存は同moduleの
 `DerivedStore`、描画は `viewer_assets/viewer.js`。UI環境のみNumPy 2.5.4 / Pillow 12.3.0を利用する。
 Registry / Runner / Backend / worker / adapterの契約とCLIのdepth-only defaultは維持する。
-検証証拠は [02C](phases/phase-02/phase-02c.md)。履歴・再生成・削除等の02D管理操作は提供しない。
+検証証拠は [02C](phases/phase-02/phase-02c.md)。履歴・再生成・削除等は02Dの [管理Service](run-management-spec.md) が提供する。
 
 ## Library selection and pins
 
@@ -80,7 +80,8 @@ model由来raw / WorkerResult / JobResultへderived refを後付けしない。
 同一条件はprocess内の共通lockで1回生成。stagingへ数値配列を書きfsync、manifestを最後に書き、
 directoryを同一filesystem内でatomic renameする。complete generationだけをreuseし、毎回
 identity / path / digest / dtype / shape / index boundsを検証する。途中stagingは保持する。
-壊れたcomplete cacheは明示エラー、上書き・自動削除をしない。修復・明示再生成UIは02Dの未承認範囲。
+壊れたcomplete cacheは明示エラー、上書き・自動削除をしない。明示再生成UIは02D管理Serviceを利用する。
+複数generation、current pointer、削除後fallbackと公開失敗の候補除外は [管理仕様](run-management-spec.md#derived-identity-publication-and-selection) を参照。
 バックプロジェクションはalgorithm `pinhole-backprojection` version `1`、同じ保存/検証方式。
 単一application processを対象とし、multi-process調停・電源断後のdurabilityは保証しない。
 

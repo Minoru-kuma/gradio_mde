@@ -141,6 +141,58 @@ class ResultsContractTests(unittest.TestCase):
         self.assertEqual(result.status, 'COMPLETED', result.error)
         return handle, result, ResultsService(self.store, self.runner.collect)
 
+    def test_three_real_mesh_generations_latest_and_nonlatest_delete_restart(self):
+        from mde.run_management import RunManagementService
+        from mde.results import ResultsService
+        handle, result, views = self.make_run(('depth', 'points', 'normals', 'intrinsics', 'mask'))
+        run = self.store.root/handle.run_id
+        before = {p.relative_to(run): (sha256_file(p), p.stat().st_mtime_ns) for p in run.rglob('*') if p.is_file()}
+        management = RunManagementService(self.store, self.runner.collect)
+        first = views.view(handle.run_id, 'Mesh')['derived']
+        second = management.regenerate_derived(handle.run_id)
+        third = management.regenerate_derived(handle.run_id)
+        target = str(Path(third['output']['path']).parent)
+        management.delete(management.prepare_delete(handle.run_id, generation=target), handle.run_id, typed_run_id=handle.run_id)
+        restored = ResultsService(self.store, self.runner.collect).view(handle.run_id, 'Mesh')
+        self.assertTrue(restored['cache_reused']); self.assertEqual(restored['derived'], second)
+        # Deleting an older generation preserves the explicitly current generation.
+        target = str(Path(first['output']['path']).parent)
+        management.delete(management.prepare_delete(handle.run_id, generation=target), handle.run_id, typed_run_id=handle.run_id)
+        self.assertEqual(views.view(handle.run_id, 'Mesh')['derived'], second)
+        import io, json, zipfile, hashlib
+        with zipfile.ZipFile(io.BytesIO(management.export(handle.run_id))) as archive:
+            exported = json.loads(archive.read('export-manifest.json'))
+            self.assertEqual(exported['run_id'],handle.run_id)
+            for entry in exported['files']:
+                self.assertEqual(hashlib.sha256(archive.read(entry['path'])).hexdigest(),entry['sha256'])
+            self.assertEqual(json.loads(archive.read('attempts/attempt-0001/job-result.json')),result.to_dict())
+
+        self.assertEqual(before, {p:(sha256_file(run/p), (run/p).stat().st_mtime_ns) for p in before})
+        self.assertEqual((run/'logs/attempt-0001/stdout.log').read_text().count('geometry predict'), 1)
+
+    def test_export_waits_for_regeneration_and_includes_committed_generation(self):
+        from concurrent.futures import ThreadPoolExecutor
+        import threading, io, zipfile
+        from unittest.mock import patch
+        from mde.run_management import RunManagementService
+        handle, result, views = self.make_run(('depth','points'))
+        manager = RunManagementService(self.store,self.runner.collect)
+        entered, release = threading.Event(), threading.Event()
+        original = views.derived.get
+        def blocked(*args,**kwargs):
+            entered.set()
+            if not release.wait(5): raise RuntimeError('gate timeout')
+            return original(*args,**kwargs)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            with patch.object(views.derived,'get',side_effect=blocked):
+                generation = pool.submit(views.view,handle.run_id,'Mesh',regenerate=True)
+                self.assertTrue(entered.wait(2))
+                exported = pool.submit(manager.export,handle.run_id)
+                self.assertFalse(exported.done())
+                release.set(); view = generation.result(); package = exported.result()
+        with zipfile.ZipFile(io.BytesIO(package)) as archive:
+            self.assertIn(view['derived']['output']['path'],archive.namelist())
+
     def test_four_views_rgb_mapping_mesh_lazy_reuse_and_raw_result_unchanged(self):
         import base64
         import numpy as np

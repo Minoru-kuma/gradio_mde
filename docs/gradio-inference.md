@@ -4,7 +4,7 @@
 Inference / Resultsの2タブ、準備済み1モデル、Local-only、単一application processで使う。
 Resultsは検証済みJobResult / Run ID / metadata / artifact refs / 実測metrics / errorsの共通詳細。
 4モードviewer・raw depth download・派生生成は02Cで追加（[Results Viewer](results-viewer.md)）。
-履歴・export・削除等の管理操作は02D、未実装・未承認。
+履歴・export・削除・再試行は02Dの [Run Management Service](run-management-spec.md) が提供する。
 
 ## Environment and dependency pins
 
@@ -154,3 +154,12 @@ UI依存がないcontrol環境ではUI専用testsもskipする。未実行を成
 [Timer](https://www.gradio.app/docs/gradio/timer)、[Queue](https://www.gradio.app/guides/queuing)、
 [PyPI release](https://pypi.org/project/gradio/6.30.0/)。
 版固定のinstalled source signature / browser requestを実際の判断根拠とする。
+
+
+## Run management (02D)
+
+ResultsのRun managementでSaved terminal Run IDをInspectして操作する。
+管理用の選択・削除確認・再試行確認はGradio Stateとしてsession別に保持する。
+入力変更や確認cancelで確認を破棄し、Serviceでも対象・scope・revision / inventoryを再検証する。
+全callbackは既存同様queue=False。管理操作は共通Serviceに委譲し、filesystemを直接操作しない。
+操作手順と失敗時retryは [管理仕様](run-management-spec.md)、受入は [02D](phases/phase-02/phase-02d.md)。

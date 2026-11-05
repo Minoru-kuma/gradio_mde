@@ -1,24 +1,20 @@
 """Run management primitives; terminal validation is delegated to the backend.
 
-Deletion, export and derived regeneration are deliberately not exposed here until
-all viewer operations participate in the same per-Run coordination protocol.
+Viewer and management operations share a per-Run coordination protocol.
+All destructive operations require an explicit, revalidated confirmation.
 """
 from datetime import datetime, timezone
 from pathlib import Path
-import threading
 import uuid
 
 from .run_access import run_lock, write_sidecar
 
 from .contracts import (ATTEMPT_ID, ArtifactIntegrityError, JobHandle,
                         ResultNotReady, UnknownJob, UnsupportedOperation)
-from .storage import contained_path, read_json, run_path, write_json
+from .storage import contained_path, run_path
 
 
 class RunManagementService:
-    _guard = threading.Lock()
-    _locks = {}
-
     def __init__(self, store, collect):
         self.store, self.collect = store, collect
 
@@ -35,7 +31,7 @@ class RunManagementService:
         if not path.exists():
             return {'schema_version': '1.0', 'revision': 0, 'display_name': '',
                     'notes': '', 'archived': False, 'updated_at': None}
-        data = read_json(path)
+        data = self._read_json(run, path.relative_to(run).as_posix())
         if (set(data) != {'schema_version', 'revision', 'display_name', 'notes', 'archived', 'updated_at'}
                 or data['schema_version'] != '1.0' or type(data['revision']) is not int
                 or data['revision'] < 1 or type(data['archived']) is not bool
@@ -47,34 +43,50 @@ class RunManagementService:
     def detail(self, run_id, *, include_derived=True):
         with self._lock(run_id):
             run = run_path(self.store.root, run_id)
-            saved = read_json(contained_path(run, f'attempts/{ATTEMPT_ID}/handle.json'))
+            saved = self._read_json(run, f'attempts/{ATTEMPT_ID}/handle.json')
             handle = JobHandle(**{key: saved[key] for key in JobHandle.__dataclass_fields__ if key in saved})
             if handle.run_id != run_id:
                 raise ArtifactIntegrityError('Run / handle identity mismatch')
             result = self.collect(handle).to_dict()
             if result.get('status') not in ('COMPLETED', 'FAILED', 'CANCELLED'):
                 raise ResultNotReady(run_id)
-            generations = []
+            history_path = self._safe_file(run, 'derived/history.json')
+            history = self._read_json(run, history_path.relative_to(run).as_posix()) if history_path.exists() else {'schema_version': '1.0', 'events': []}
+            excluded = {e.get('target') for e in history['events'] if e.get('operation') in ('delete_requested', 'deleted', 'failed')}
+            committed = {e.get('manifest', {}).get('generation_id') for e in history['events'] if e.get('operation') in ('generate', 'regenerate')}
+            generations, derived_errors = [], []
             derived = run / 'derived'
             if derived.is_symlink():
                 raise ArtifactIntegrityError('Symlink derived directory')
             if derived.exists() and include_derived:
                 from .storage import validate_artifact
                 for path in sorted(derived.glob('*/*/manifest.json')):
-                    if path.parent.name.startswith('.partial-'):
+                    if path.parent.name.startswith('.partial-') or path.parent.relative_to(run).as_posix() in excluded:
                         continue
-                    manifest = read_json(self._safe_file(run, path.relative_to(run).as_posix()))
-                    ref = manifest['output']
-                    if ref['path'] != (path.parent / 'geometry.npz').relative_to(run).as_posix():
-                        raise ArtifactIntegrityError('Invalid generation output reference')
-                    self._safe_file(run, ref['path'])
-                    validate_artifact(run, ref)
-                    generations.append(manifest)
-            history_path = self._safe_file(run, 'derived/history.json')
-            history = read_json(history_path) if history_path.exists() else {'schema_version': '1.0', 'events': []}
-            return {'run_id': run_id, 'job': read_json(contained_path(run, 'job.json')),
+                    try:
+                        manifest = self._read_json(run, path.relative_to(run).as_posix())
+                        if manifest.get('publication_protocol') == 'history-commit-v1' and manifest.get('generation_id') not in committed:
+                            continue
+                        import hashlib, json
+                        identity_key = hashlib.sha256(json.dumps(manifest['identity'], sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+                        if (manifest.get('schema_version') != '1.0' or manifest.get('origin') != 'derived'
+                                or manifest.get('key') != path.parent.parent.name or identity_key != manifest.get('key')
+                                or manifest.get('generation_id') != path.parent.name):
+                            raise ArtifactIntegrityError('Invalid generation identity')
+                        if manifest.get('publication_protocol') == 'history-commit-v1' and not any(
+                                e.get('operation') in ('generate', 'regenerate') and e.get('manifest') == manifest for e in history['events']):
+                            raise ArtifactIntegrityError('Generation commit mismatch')
+                        ref = manifest['output']
+                        if ref['path'] != (path.parent / 'geometry.npz').relative_to(run).as_posix():
+                            raise ArtifactIntegrityError('Invalid generation output reference')
+                        self._safe_file(run, ref['path'])
+                        validate_artifact(run, ref)
+                        generations.append(manifest)
+                    except (ValueError, OSError, KeyError, TypeError) as error:
+                        derived_errors.append({'path': path.parent.relative_to(run).as_posix(), 'error': str(error)})
+            return {'run_id': run_id, 'job': self._read_json(run, 'job.json'),
                     'result': result, 'user_metadata': self._metadata(run),
-                    'derived': generations, 'history': history}
+                    'derived': generations, 'derived_errors': derived_errors, 'history': history}
 
     def list_runs(self, include_archived=False):
         root = Path(self.store.root)
@@ -128,6 +140,22 @@ class RunManagementService:
                 raise ArtifactIntegrityError('Symlinks are forbidden')
         return contained_path(run, relative)
 
+    def _read_json(self, run, relative):
+        import json
+        def pairs(items):
+            value = {}
+            for key, item in items:
+                if key in value:
+                    raise ArtifactIntegrityError('Duplicate JSON key')
+                value[key] = item
+            return value
+        def invalid(value):
+            raise ArtifactIntegrityError('Nonfinite JSON scalar')
+        value = json.loads(self._read_file(run, relative), object_pairs_hook=pairs, parse_constant=invalid)
+        if not isinstance(value, dict):
+            raise ArtifactIntegrityError('JSON record must be an object')
+        return value
+
     def _open_directory(self, root, relative):
         import os
         contained_path(root, relative)
@@ -169,6 +197,8 @@ class RunManagementService:
         from .storage import sha256_file
         with self._lock(run_id):
             detail = self.detail(run_id)
+            if detail['derived_errors']:
+                raise ArtifactIntegrityError('Export unavailable: incomplete or corrupt derived generation')
             run = run_path(self.store.root, run_id)
             refs = list(detail['result'].get('artifacts', []))
             for source in detail['job'].get('inputs', []):
@@ -179,27 +209,18 @@ class RunManagementService:
             expected = {}
             for ref in refs:
                 names.add(ref['path']); expected[ref['path']] = ref['sha256']
-            derived = run / 'derived'
-            if derived.exists():
-                for path in derived.rglob('manifest.json'):
-                    if any(part.startswith('.partial-') for part in path.relative_to(derived).parts):
-                        continue
-                    manifest = read_json(self._safe_file(run, path.relative_to(run).as_posix()))
-                    ref = manifest['output']
-                    if ref['path'] != (path.parent / 'geometry.npz').relative_to(run).as_posix():
-                        raise ArtifactIntegrityError('Invalid derived export reference')
-                    names.add(path.relative_to(run).as_posix())
-                    names.add(ref['path']); expected[ref['path']] = ref['sha256']
+            for generation in detail['derived']:
+                ref = generation['output']
+                names.add(str(Path(ref['path']).parent / 'manifest.json'))
+                names.add(ref['path']); expected[ref['path']] = ref['sha256']
             stream = io.BytesIO(); manifest = []
             with zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as archive:
                 total = 0
                 for relative in sorted(names):
                     path = self._safe_file(run, relative)
-                    total += path.stat().st_size
-                    if total > 256 * 1024 * 1024:
-                        raise ValueError('Export exceeds 256 MiB')
                     data = self._read_file(run, relative)
-                    if len(data) > 256 * 1024 * 1024:
+                    total += len(data)
+                    if total > 256 * 1024 * 1024:
                         raise ValueError('Export exceeds 256 MiB')
                     digest = hashlib.sha256(data).hexdigest()
                     if relative in expected and digest != expected[relative]:
@@ -217,7 +238,10 @@ class RunManagementService:
         for path in sorted(run.rglob('*')):
             path = self._safe_file(run, path.relative_to(run).as_posix())
             if path.is_file():
-                result[path.relative_to(run).as_posix()] = hashlib.sha256(self._read_file(run, path.relative_to(run).as_posix())).hexdigest()
+                data = self._read_file(run, path.relative_to(run).as_posix())
+                if len(data) > 256 * 1024 * 1024:
+                    raise ValueError('Management inventory exceeds 256 MiB per file')
+                result[path.relative_to(run).as_posix()] = hashlib.sha256(data).hexdigest()
             elif not path.is_dir():
                 raise ArtifactIntegrityError('Nonregular Run entry')
         return result
@@ -225,8 +249,8 @@ class RunManagementService:
     def _generation_manifest(self, run, generation):
         path = self._safe_file(run, generation + '/manifest.json')
         if path.exists():
-            return read_json(path)
-        history = read_json(self._safe_file(run, 'derived/history.json'))
+            return self._read_json(run, path.relative_to(run).as_posix())
+        history = self._read_json(run, 'derived/history.json')
         for event in reversed(history['events']):
             if event.get('target') == generation and event.get('operation') == 'delete_requested':
                 return event['manifest']
@@ -243,11 +267,12 @@ class RunManagementService:
                     raise ValueError('Expected derived/key/generation')
                 target = self._safe_file(run, generation)
                 self._generation_manifest(run, generation)
-                if not target.is_dir():
-                    raise ValueError('Missing generation')
-            target_identity = (self._safe_file(run, generation) if generation else run).stat()
+                if target.exists() and not target.is_dir():
+                    raise ValueError('Invalid generation directory')
+            target = self._safe_file(run, generation) if generation else run
+            target_identity = target.stat() if target.exists() else None
             return {'run_id': run_id, 'generation': generation,
-                    'directory_identity': [target_identity.st_dev, target_identity.st_ino],
+                    'directory_identity': [target_identity.st_dev, target_identity.st_ino] if target_identity else None,
                     'inventory': self._inventory(run),
                     'scope': 'derived generation only' if generation else 'entire Run including raw and history'}
 
@@ -269,17 +294,22 @@ class RunManagementService:
                 # Keep original identity and a tombstone even if removal fails.
                 manifest = self._generation_manifest(run, generation)
                 history_path = self._safe_file(run, 'derived/history.json')
-                history = read_json(history_path) if history_path.exists() else {'schema_version': '1.0', 'events': []}
+                history = self._read_json(run, history_path.relative_to(run).as_posix()) if history_path.exists() else {'schema_version': '1.0', 'events': []}
                 history['events'].append({'operation': 'delete_requested', 'target': generation, 'manifest': manifest})
                 write_sidecar(run, 'derived/history.json', history)
                 parent_fd = self._open_directory(run, str(Path(generation).parent))
                 try:
-                    target_stat = os.stat(Path(generation).name, dir_fd=parent_fd, follow_symlinks=False)
-                    if [target_stat.st_dev, target_stat.st_ino] != confirmation['directory_identity']:
+                    try:
+                        target_stat = os.stat(Path(generation).name, dir_fd=parent_fd, follow_symlinks=False)
+                    except FileNotFoundError:
+                        target_stat = None
+                    actual = [target_stat.st_dev, target_stat.st_ino] if target_stat else None
+                    if actual != confirmation['directory_identity']:
                         raise ArtifactIntegrityError('Generation directory changed after review')
-                    shutil.rmtree(Path(generation).name, dir_fd=parent_fd)
+                    if target_stat is not None:
+                        shutil.rmtree(Path(generation).name, dir_fd=parent_fd)
                     pointer = self._safe_file(run, str(Path(generation).parent / 'current.json'))
-                    if pointer.exists() and read_json(pointer).get('generation_id') == Path(generation).name:
+                    if pointer.exists() and self._read_json(run, pointer.relative_to(run).as_posix()).get('generation_id') == Path(generation).name:
                         os.unlink('current.json', dir_fd=parent_fd)
                 finally:
                     os.close(parent_fd)
@@ -325,14 +355,18 @@ class RunManagementService:
         run_id = quarantine_name[:36]
         with self._lock(run_id):
             root = Path(self.store.root)
-            record = read_json(self._safe_file(root, '.management-quarantine/' + quarantine_name + '.json'))
+            record = self._read_json(root, '.management-quarantine/' + quarantine_name + '.json')
             if (record.get('schema_version') != '1.0' or record.get('run_id') != run_id
                     or record.get('quarantine_name') != quarantine_name or record.get('terminal_validated') is not True):
                 raise ArtifactIntegrityError('Invalid deletion record')
             folder = self._safe_file(root, '.management-quarantine/' + quarantine_name)
             if not folder.is_dir() or (root / run_id).exists():
                 raise ValueError('Quarantine entry unavailable or Run ID reused')
+            identity = folder.stat()
+            if [identity.st_dev, identity.st_ino] != record['confirmation'].get('directory_identity'):
+                raise ArtifactIntegrityError('Quarantined directory identity changed')
             return {'run_id': run_id, 'quarantine_name': quarantine_name,
+                    'directory_identity': [identity.st_dev, identity.st_ino],
                     'inventory': self._inventory(folder), 'record': record}
 
     def retry_delete(self, confirmation, *, typed_run_id):
@@ -349,6 +383,10 @@ class RunManagementService:
             directory = os.open(Path(self.store.root) / '.management-quarantine',
                                 os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
             try:
+                import stat
+                entry = os.stat(confirmation['quarantine_name'], dir_fd=directory, follow_symlinks=False)
+                if not stat.S_ISDIR(entry.st_mode) or [entry.st_dev, entry.st_ino] != confirmation['directory_identity']:
+                    raise ArtifactIntegrityError('Retry target changed after review')
                 shutil.rmtree(confirmation['quarantine_name'], dir_fd=directory)
             finally:
                 os.close(directory)

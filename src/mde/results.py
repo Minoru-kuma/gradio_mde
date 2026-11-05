@@ -123,17 +123,8 @@ class DerivedStore:
             lock = self._locks.setdefault(str(location), threading.Lock())
         with run_lock(run), lock:
             location.mkdir(parents=True, exist_ok=True)
-            complete = sorted(p for p in location.iterdir() if not p.name.startswith(".partial-") and p.name != "current.json")
-            pointer = location / "current.json"
-            if pointer.exists():
-                selected = read_json(derived_path(run, pointer.relative_to(run).as_posix()))["generation_id"]
-                if len(selected) != 32 or any(c not in "0123456789abcdef" for c in selected):
-                    raise ArtifactIntegrityError("Invalid generation pointer")
-                complete = [location / selected]
-            if complete and not force:
-                if len(complete) != 1 or not complete[0].is_dir():
-                    raise ArtifactIntegrityError("Invalid derived cache generations; explicit repair required")
-                folder = derived_path(run, complete[0].relative_to(run).as_posix())
+            folder = self._select(run, location) if not force else None
+            if folder is not None:
                 manifest_path = derived_path(run, (folder / "manifest.json").relative_to(run).as_posix())
                 if not manifest_path.is_file():
                     raise ArtifactIntegrityError("Incomplete derived cache; explicit repair required")
@@ -141,6 +132,11 @@ class DerivedStore:
                 if (manifest.get("schema_version") != "1.0" or manifest.get("key") != key
                         or manifest.get("identity") != identity or manifest.get("generation_id") != folder.name):
                     raise ArtifactIntegrityError("Derived cache identity mismatch; explicit repair required")
+                if manifest.get("publication_protocol") == "history-commit-v1":
+                    history_path = derived_path(run, "derived/history.json")
+                    events = read_json(history_path)["events"] if history_path.exists() else []
+                    if not any(e.get("operation") in ("generate", "regenerate") and e.get("manifest") == manifest for e in events):
+                        raise ArtifactIntegrityError("Uncommitted derived generation")
                 ref = manifest.get("output", {})
                 if ref.get("path") != (folder / "geometry.npz").relative_to(run).as_posix():
                     raise ArtifactIntegrityError("Invalid derived output path")
@@ -154,34 +150,82 @@ class DerivedStore:
             try:
                 arrays = generate()
                 self._validate(arrays)
+                path = staging / "geometry.npz"
+                with path.open("xb") as stream:
+                    np.savez(stream, **arrays)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                final = location / generation
+                ref = artifact_ref(run, path, media_type="application/x-npz")
+                ref["path"] = (final / "geometry.npz").relative_to(run).as_posix()
+                shapes = {name: {"shape": list(a.shape), "dtype": str(a.dtype)} for name, a in arrays.items()}
+                manifest = {"schema_version": "1.0", "origin": "derived", "key": key,
+                    "generation_id": generation, "publication_protocol": "history-commit-v1", "created_at": datetime.now(timezone.utc).isoformat(),
+                    "identity": identity, "output": ref, "arrays": shapes,
+                    "warnings": ["No coordinate transform or LOD; raw geometry is unchanged"]}
+                write_json(staging / "manifest.json", manifest)
+                os.rename(staging, final)
+                history_path = derived_path(run, "derived/history.json")
+                history = read_json(history_path) if history_path.exists() else {"schema_version": "1.0", "events": []}
+                history["events"].append({"operation": "regenerate" if force else "generate", "manifest": manifest})
+                write_sidecar(run, "derived/history.json", history)
+                write_sidecar(run, (location / "current.json").relative_to(run).as_posix(), {"generation_id": generation})
+                return arrays, manifest, False
             except Exception as error:
                 history_path = derived_path(run, "derived/history.json")
                 history = read_json(history_path) if history_path.exists() else {"schema_version": "1.0", "events": []}
                 history["events"].append({"operation": "failed", "generation_id": generation,
+                    "target": (location / generation).relative_to(run).as_posix(),
                     "identity": identity, "error": str(error)})
                 write_sidecar(run, "derived/history.json", history)
                 raise
-            path = staging / "geometry.npz"
-            with path.open("xb") as stream:
-                np.savez(stream, **arrays)
-                stream.flush()
-                os.fsync(stream.fileno())
-            final = location / generation
-            ref = artifact_ref(run, path, media_type="application/x-npz")
-            ref["path"] = (final / "geometry.npz").relative_to(run).as_posix()
-            shapes = {name: {"shape": list(a.shape), "dtype": str(a.dtype)} for name, a in arrays.items()}
-            manifest = {"schema_version": "1.0", "origin": "derived", "key": key,
-                "generation_id": generation, "created_at": datetime.now(timezone.utc).isoformat(),
-                "identity": identity, "output": ref, "arrays": shapes,
-                "warnings": ["No coordinate transform or LOD; raw geometry is unchanged"]}
-            write_json(staging / "manifest.json", manifest)
-            os.rename(staging, final)
-            write_sidecar(run, (location / "current.json").relative_to(run).as_posix(), {"generation_id": generation})
-            history_path = derived_path(run, "derived/history.json")
-            history = read_json(history_path) if history_path.exists() else {"schema_version": "1.0", "events": []}
-            history["events"].append({"operation": "regenerate" if force else "generate", "manifest": manifest})
-            write_sidecar(run, "derived/history.json", history)
-            return arrays, manifest, False
+
+    def _select(self, run, location):
+        """Prefer the recorded selection; otherwise newest completed generation.
+
+        Deletion requests are durable exclusions, including partially removed
+        generations. Corruption is reported rather than silently skipped.
+        """
+        history_path = derived_path(run, "derived/history.json")
+        history = read_json(history_path) if history_path.exists() else {"events": []}
+        excluded = {e.get("target") for e in history["events"]
+                    if e.get("operation") in ("delete_requested", "deleted", "failed")}
+        committed = {e.get("manifest", {}).get("generation_id") for e in history["events"]
+                     if e.get("operation") in ("generate", "regenerate")}
+        pointer = derived_path(run, (location / "current.json").relative_to(run).as_posix())
+        if pointer.exists():
+            selected = read_json(pointer).get("generation_id")
+            if not isinstance(selected, str) or len(selected) != 32 or any(c not in "0123456789abcdef" for c in selected):
+                raise ArtifactIntegrityError("Invalid generation pointer")
+            candidate = location / selected
+            if candidate.relative_to(run).as_posix() not in excluded:
+                if not candidate.is_dir():
+                    raise ArtifactIntegrityError("Incomplete derived cache; explicit repair required")
+                return derived_path(run, candidate.relative_to(run).as_posix())
+        candidates = []
+        for folder in location.iterdir():
+            if folder.name == "current.json" or folder.name.startswith(".partial-"):
+                continue
+            relative = folder.relative_to(run).as_posix()
+            derived_path(run, relative)
+            if relative in excluded:
+                continue
+            if not folder.is_dir():
+                raise ArtifactIntegrityError("Invalid derived cache entry")
+            path = derived_path(run, relative + "/manifest.json")
+            if not path.is_file():
+                raise ArtifactIntegrityError("Incomplete derived cache; explicit repair required")
+            manifest = read_json(path)
+            if manifest.get("publication_protocol") == "history-commit-v1" and folder.name not in committed:
+                continue
+            try:
+                created = datetime.fromisoformat(manifest["created_at"])
+                if created.tzinfo is None:
+                    raise ValueError("Missing timezone")
+            except (KeyError, TypeError, ValueError) as error:
+                raise ArtifactIntegrityError("Invalid generation creation time") from error
+            candidates.append((created, folder.name, folder))
+        return max(candidates, key=lambda item: (item[0], item[1]))[2] if candidates else None
 
     @staticmethod
     def _validate(arrays):
