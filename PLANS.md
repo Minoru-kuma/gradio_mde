@@ -7,6 +7,7 @@
 - Phase 00 / 01 / 01A / 01B / 02A / 02B COMPLETE、Phase 02 IN_PROGRESS。
 - 02D / 03–08、他モデル、Tracking / Benchmark / Slurm / active recoveryは未承認。
 - Start evidence: fetch成功、main clean、HEAD = origin/main（Git履歴参照）。
+- 新規作業は作業ブランチを作成し、継続作業は対応する既存ブランチで行う。main上で直接編集・commitしない。
 - remote更新・競合・範囲外変更なら停止・報告。force push禁止。
 
 ## JPEG input improvement — 2026-10-28

@@ -38,6 +38,12 @@
     restart recovery、複雑な concurrency を 01A の完了条件に追加しない。
     基本的な cancel / timeout 等は 01B、より高度な堅牢化は Phase 06 以降へ段階分けする。
 
+12. 新規作業は最新の `origin/main` と作業ツリーを確認し、変更前に作業内容に対応した
+    作業ブランチ（例: `codex/<task-name>`）を作成する。同じ作業の継続は既存の作業ブランチで行う。
+    `main` 上で直接編集・commitしない。既に未commit変更がある場合は保持したまま
+    作業ブランチへ移し、破棄・reset・上書きをしない。commit / pushは作業ブランチを対象とする。
+    `main` への反映はユーザーが承認した範囲・Exit条件を満たした後に行う。
+
 詳細: [Architecture](docs/architecture.md) / [Model contracts](docs/model-adapter-spec.md) /
 [Environment](docs/environment-strategy.md) / [Execution](docs/execution-backend-spec.md) /
 [Run Directory](docs/run-directory-spec.md) / [MLflow](docs/mlflow-design.md)。
