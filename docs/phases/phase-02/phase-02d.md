@@ -2,7 +2,7 @@
 
 Status: **COMPLETE / 全Exit達成**。Phase 02の内部milestone。
 親: [Phase 02](../phase-02.md)、管理: [PLANS](../../../PLANS.md)。
-作業ブランチへのcommit / 通常pushのみ承認。今回mainへの反映は禁止。Phase 03以降は未承認。
+2026-11-09にPR経由のmain統合を承認。Phase 03以降は未承認。
 
 ## Goal / Background
 
@@ -140,4 +140,4 @@ ZIP 256 MiB / inventory 1file 256 MiB、viewer上限は02Cと同じ。高解像�
 `02d-session-final-browser.log` / `02d-race-final.log` / `02d-final-delete-contracts.log` /
 `02d-compatibility.json`。環境・weights・Run・生成物はcommitしない。
 
-**02D COMPLETE、Phase 02 COMPLETE。main反映なし、Phase 03以降未承認。**
+**02D COMPLETE、Phase 02 COMPLETE。Phase 03以降未承認。**

@@ -5,10 +5,10 @@
 [phase 文書](docs/phases/) と変更対象の仕様を読む。
 
 1. 作業は phase 単位で行う。ユーザーが指示していない phase に進まない。
-   最新の指示（2026-11-05）により現在の承認範囲は Phase 02D — Run Management の
-   実装・検証・関連docs更新と作業ブランチへの通常push。最新指示により今回mainへの反映は禁止。
+   最新の指示（2026-11-09）により現在の承認範囲は Phase 02D — Run Management の
+   実装・検証・関連docs更新と作業ブランチへの通常push。今回のPhase 02DはPR経由のmain統合を承認済み。
    開始時にlatest origin/mainを確認する。remote更新・競合・範囲外変更は上書きせず停止・報告。
-   追加承認により、途中実装の作業ブランチへのcommit / 通常pushは可能。main反映には別途指示が必要。
+   追加承認により、途中実装の作業ブランチへのcommit / 通常pushは可能。今後のmain反映には別途指示が必要。
    force pushは禁止。Phase 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02はCOMPLETE。
    02Cは全Exit達成でCOMPLETE（fake / contract / browser / 実CPU native Points / offline）。
    他モデル / MLflow / Benchmark / Slurm / 高度なqueue・active recoveryは未承認。

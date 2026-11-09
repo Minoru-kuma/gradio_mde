@@ -24,7 +24,7 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 ## 現在の開発状況
 
 **Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。**
-Phase 02Dを `codex/phase-02d-run-management` で実装・検証しています。作業ブランチへの通常pushのみ承認され、今回mainへの反映は禁止です。
+Phase 02Dは `codex/phase-02d-run-management` で実装・検証を完了し、PR経由のmain統合が承認されています。
 02Dは全Exit達成済み、Phase 03以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、

@@ -3,9 +3,9 @@
 ## Current authorization and status
 
 - Current work: **Phase 02D Run Management — COMPLETE / 全Exit達成**。Phase 02全体もCOMPLETE。
-- Authorization: 02D実装・検証・関連docs更新、作業ブランチへの通常push。最新指示により今回mainへの反映は禁止。
+- Authorization: 02D実装・検証・関連docs更新、作業ブランチへの通常push。2026-11-09 指示によりPR経由のmain統合を承認。
 - 追加承認: 途中実装を作業ブランチ `codex/phase-02d-run-management` にcommit / 通常pushする。
-  全Exit達成後のみCOMPLETEと判定する。mainへの反映には別途指示が必要。
+  全Exit達成済み。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
 - 03–08、他モデル、Tracking / Benchmark / Slurm / active recovery、高解像度・推定品質改善は未承認。
 - Start evidence: fetch成功、main clean、HEAD = origin/main `7f043c12a454feff401d366d725bcd8c6ae41faf`。
