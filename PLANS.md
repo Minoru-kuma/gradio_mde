@@ -2,15 +2,168 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 02D Run Management — COMPLETE / 全Exit達成**。Phase 02全体もCOMPLETE。
-- Authorization: 02D実装・検証・関連docs更新、作業ブランチへの通常push。2026-11-09 指示によりPR経由のmain統合を承認。
-- 追加承認: 途中実装を作業ブランチ `codex/phase-02d-run-management` にcommit / 通常pushする。
-  全Exit達成済み。
+- Current work: **Phase 03 — 調査・計画・設計中 / production実装未着手**。
+- Authorization: 2026-11-09の最新ユーザー指示によりPhase 03の調査と段階的実装計画の整理のみ承認。
+  production実装、環境構築・weights取得・新モデル実推論、mainへの反映は行わない。
+  同日の追加指示により、今回の計画を含め各作業の完了・検証後は作業ブランチへcommit / 通常pushする。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
-- 03–08、他モデル、Tracking / Benchmark / Slurm / active recovery、高解像度・推定品質改善は未承認。
-- Start evidence: fetch成功、main clean、HEAD = origin/main `7f043c12a454feff401d366d725bcd8c6ae41faf`。
-- 新規作業は作業ブランチを作成し、継続作業は対応する既存ブランチで行う。main上で直接編集・commitしない。
-- remote更新・競合・範囲外変更なら停止・報告。force push禁止。
+- Phase 03実装、04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
+- Start evidence: fetch成功。最新origin/mainは `8a6d5082ecf64eb9b9bcb8c668c41c0c3f145333`
+  （02D PR #1統合）。開始時の `codex/phase-02d-run-management` はcleanでmainの1 commit前、
+  tree差分なし。競合・範囲外差分なしを確認し最新origin/mainから
+  `codex/phase-03-plugin-planning` を作成した。
+- 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、下記関連仕様。
+  AGENTS / README / 他仕様の「03未承認」は今回指示前の状態。最新指示は計画・設計のみを許可する。
+  以下の02D以前の承認・main反映方針は当時の履歴であり今回の承認ではない。
+- 新規作業は作業ブランチ、main直接編集・commit禁止。remoteの追加更新・競合・範囲外変更は
+  上書きせず停止・報告。force push禁止。
+
+## Phase 03 investigation and staged design — 2026-11-09
+
+### Purpose, scope and evidence
+
+目的は既存MoGe / CLI / 保存Runを保ったまま、model directory追加で複数モデルを
+共通Runner / Backendから実行できる契約を設計すること。**本節は設計案であり実装済み仕様ではない。**
+今回変更するのは本計画とphase文書の状態・計画参照、およびAGENTSの承認範囲・commit / push方針。
+実装は改めて指示を受けて開始する。
+
+調査基準は上記main commit。参照した契約は
+[Architecture](docs/architecture.md)、[Model adapter](docs/model-adapter-spec.md)、
+[Environment](docs/environment-strategy.md)、[Execution](docs/execution-backend-spec.md)、
+[Run Directory](docs/run-directory-spec.md)、[Gradio](docs/gradio-inference.md)、
+[Results Viewer](docs/results-viewer.md)、[Run Management](docs/run-management-spec.md)。
+先行する将来設計と末尾の01B / 02A / 02B実装契約を区別してコードと照合した。
+
+| 対象 / 確認箇所 | 実装済み・単一モデル前提 / 不足 | Phase 03の変更案 |
+| --- | --- | --- |
+| `src/mde/registry.py`: `ModelRegistry.get_model` | 指定directoryのmanifestだけを読む。adapter非importは成立。ID形式・一致・entrypoint・majorの検査はあるが一覧探索、全manifestの重複検出、詳細schema検査はない | metadata-only discoveryと一覧API。model / variant ID重複、default参照、schema subset、environment参照を検査。環境未準備とmanifest不正を区別 |
+| `contracts.py`: `ModelInfo.variant`、`runner.py`: `submit` | モデルIDは既に汎用。capabilityはvariant優先だがparameters / devices / dtypes / input constraintsはvariant解決が不十分。environmentは常に先頭 | 共通の実効variant metadata解決をRegistry / Runner / UIで共有。単一環境の従来fallbackを維持し、複数候補は明示選択・曖昧なら拒否 |
+| `ui.py`: `build_app/main`、`ui_controller.py`: `InferenceController` | 起動時1モデル固定、Model欄は非編集Textbox。controlsは初期schema、outputsはvariants[0]で固定。controllerのmodel_id / infoは共有 | model選択とvariant変更でschema / choicesを再構成。選択model / parametersをsession別に保持しsubmit時にsnapshot化。共有controllerのmodel_idを書き換えない |
+| `environments.py`: `WorkerManager`、UI / CLI composition roots | Resolver自体は複数profile対応。起動時は1環境のみ登録。checkpoint overrideはmanager全体の `MDE_CHECKPOINT_PATH` 1個 | target設定のlogical environment mapとmodel / variant別local weights map。実行jobごとに解決し他モデルへoverrideが漏れない。adapterにhost設定を持たせない |
+| `worker.py`: `execute`、`LoadedModelInfo` | 選択entrypointだけをimportしload / predict / unload。返されたruntime capabilitiesは共通preflightで照合・保存していない。欠落optionalはserialize段階で拒否 | manifest宣言とruntime能力を照合しpredict前に要求可否判定、実出力presenceも検証。実効能力と理由を結果へ保存 |
+| `contracts.py`: `PredictionRequest/Batch`、`JobSpec.from_dict` | BatchはlistだがRequestはimage / view_id単体。Jobはinputs=1 / view-0001 / attempt-0001、cpu・cuda:0 / float32を強制 | 最初は1viewとdevice / dtype制限を維持。後段で入力view listとscene metadataの互換方式を設計し、multi-view契約をfixtureで通す |
+| `contracts.py`: `OUTPUT_NAMES`、`worker.py`、`geometry.py` | depth / points / normals / intrinsics / maskのみ保存・検証。rays / confidence / camera_poseはMDEOutputの型だけ。extrasはJSONとして渡すがtyped refsの専用検証はない。scene_metadataは保存しない | 新出力ごとに要求名・保存・値 / 意味検証・profileを一組で追加。typed extrasとscene情報のserializationも契約化 |
+| `storage.py`: `validate_outputs/validate_job_files`、`geometry.py` | 固定1view path / outputs[0] / metadata views=1を検証。z / ray_distance、metric / relative / unknownは既に受理。Pointsとdepthの数値整合もある | depthの意味を新設し直さず再利用。新profileと後段multi-viewでID集合・per-view検証へ広げ、旧reader経路を保持 |
+| `results.py`、`run_management.py` | Resultsは最初のviewを使用。native pointsを優先し、明示pinhole Kの場合のみderived逆投影。RGB / textureはidentity gridだけ。管理は共通collector / artifact inventoryを利用 | 初回はDepth / RawDepth中心、optionalなしを正常表示。新refsのexport / 再読込を監査。新モデルのresize対応不明ならRGBを無効のままにし、仮Kを補わない |
+| `models/moge/adapter.py/manifest.json` | 固定MoGe v2 / metric scale head / float32専用。固有APIはplugin内に隔離済み。depth-onlyとPoints要求でforce_projectionが異なる | この制約はcoreの欠陥ではない。既存variant / pin / 引数 / checkpoint digest / native Pointsを維持。新世代は別variantとして後から検証 |
+
+再利用する検証資産は `tests/test_local_contract.py`、`test_local_robustness.py`、
+`test_geometry_artifacts.py`、`test_ui_controller.py`、`test_ui_structure.py`、
+`test_results.py`、`test_run_management.py` とbrowser suites、`tests/fixtures/` のfake / geometry plugin。
+過去の個別実行コードは今回未取得・未調査。必要時の参考とし、取得をE2Eのgateにしない。
+
+外部の参考確認（2026-11-09、mutable main。採用pin・実機検証ではない）:
+[UniK3D公式README](https://github.com/lpiccinelli-eth/UniK3D)はinferとcamera入力を示す。
+[DA3公式API](https://github.com/ByteDance-Seed/Depth-Anything-3/blob/main/docs/API.md)は
+view配列・optional confidence・w2c extrinsicsを示すが、返値説明の(N,3,4)と例の(N,4,4)に
+相違がある。文書だけでshapeを断定せず採用revisionのsourceと実配列で確認する。
+新モデルのdepthの意味・scale、CPU対応、依存・license・weightsは今回確定していない。
+
+### Contract proposals and compatibility gates
+
+1. **Manifest / discovery**: `models/*/manifest.json` の決定的な列挙とmetadata検証を追加する。
+   未installでも発見可能。壊れたmanifestは診断として一覧で識別し、そのmodelのsubmitを拒否。
+   重複IDは曖昧なregistryを作らず拒否する。runtime import / install / weights downloadは行わない。
+   許可schemaは既存scalar型 / enum / bounds / defaultsを先に使い、実モデルで必要な条件だけ拡張。
+   variantの上書き規則は明示し、parameter schemaは丸ごと置換を推奨（暗黙deep mergeしない）。
+2. **Request / environment / weights**: model / variantの実効metadataを一度解決しJobSpecへsnapshot。
+   logical EnvironmentRefはJobに、prefixとlocal checkpoint pathはtarget設定へ分離する。
+   checkpointのrevision / digestはmodel_refに残しadapterで検証する。既存CLIの
+   `--model moge --variant ... --checkpoint ... --conda-env/--conda-prefix` は単一job overrideとして維持。
+   global環境変数の書換えでmodelを切り替えない。全sessionで1つのBackend・busy即拒否を維持。
+3. **Capabilities**: supported / conditional / unsupportedとtested状態を別軸で管理。
+   conditionalの条件文を評価コードとして実行しない。表現可能な条件は共通validatorで判定し、
+   未解決条件はworker preflightへ渡す。runtime能力 / 欠如理由を記録し、要求した出力不足は失敗。
+4. **Geometry / extras**: 既存depth必須、float32 / camera frame / 単位 / invalid規則を維持。
+   raysはcamera model / grid / unit direction / validity、confidenceはnative meaning / range / direction、
+   poseはc2w・world frame / reference view / translation scaleを必須の意味metadata案とする。
+   raysの後方向・非正zを通常z-depthへ無条件変換しない。pose欠如をidentityで埋めない。
+   extrasの未知JSONを保持し、typed refsはpath / dtype / shape / unit / digestを検証して保存・exportする。
+   confidence / ray独自のvalidityとdepth maskの関係、poseの剛体性・invertibilityの許容差はfixtureで確定する。
+5. **Version / profiles**: `01A-depth-only`（profileなしを含む）と `02A-geometry-v1` のreader / writerは維持。
+   新出力は別serialization profile案で扱い、古いprofileの許可fieldを黙って変えない。
+   optionalな加算で済むmanifest / metadataは同majorのminor案、必須項目・意味・Request signatureの
+   破壊変更はmajor案とadapter移行手順を仕様化する。番号はまだ未決定。
+   現行check_schemaは任意の1.xを受理するため、minor番号だけで旧worker互換とは主張しない。
+   worker protocol / profileの対応確認とunknown profile拒否を試験する。新reader→旧Runの互換は必須、
+   旧reader→新profileの読込は保証せず明示拒否とする。旧Runを書き換えるmigrationは行わない。
+6. **Multi-view**: 初回single-view成功から独立した後段。入力IDの順序と集合の対応、重複 / 欠落 /
+   未知view拒否、per-view artifact path、scene metadata / extrasのround-tripを必須とする。
+   `PredictionRequest` にview listを加算し旧single fieldsを維持する案と、版付きbatch requestを
+   追加する案を比較する。既存MoGeへ複数viewを渡さない。Job readerだけの制限解除で済ませず、
+   worker / Store / metadata / export全経路をfakeで確認する。1attempt制約は解除しない。
+
+これらは実装時にModel adapter / Environment / Execution / Run Directory / Gradio仕様へ
+同時反映する。viewer / exportの意味やAPI変更を伴う段階ではResults Viewer / Run Management仕様も更新する。
+
+### Recommended implementation order (after separate implementation authorization)
+
+以下の03.1〜03.6はPhase 03内の作業区切り案で、承認済みの新phase名ではない。
+各段階を小さなレビュー単位とし、先行段階の成功後に進む。初回E2Eへ全契約拡張を詰め込まない。
+
+| 順序 | 変更対象と成果 | 受入証拠 / 次へのgate |
+| --- | --- | --- |
+| 03.1 既存経路の固定とdiscovery | Registry一覧・manifest検証・実効variant metadataを整理。既存MoGe + directory追加だけの第2fake pluginを同じRunner / Backendで順次実行 | import境界、重複 / 不正schema / 未準備環境、異なるparametersとcapabilities、既存MoGe CLI / 旧Run回帰。新出力・UI刷新を待たずfake E2Eを成立 |
+| 03.2 第2実モデルのdepth-only E2E | 下記条件で代表variantを1つ選定・pin。plugin / environment / preparation docsを追加。既存CLI→Runner→Backend→独立worker→depth保存→新instance collect | 1 PNG / 明示CPU / 1variant。Run ID、実測runtime、depth_kind / scale / unit / shape、logs・cleanup・digest、再collectのhash / mtime不変。CPU不可なら原因・実行機材を確認し、CUDA要求をCPUへfallbackしない |
+| 03.3 UIのmodel切替 | environment / weights mapを組み込み、session別model / variant / schema controls・requested outputsを更新。単一Runner / Backend共有 | 2browserで別model選択、同時submitは1受理1busy、未準備表示、切替後の古いcallback / parameters / checkpoint混入なし。既存2タブ・cancel / timeout / 保存Runを回帰 |
+| 03.4 第3実モデルと必要optional | 残るmodelのdepth-only E2Eを先に成立。実モデルが必要とする順にrays / non-pinhole、confidence / pose / extrasを1契約ずつ追加 | 各新出力はfake数値fixture→worker保存→stdlib reader検証→実モデルで実出力照合。unsupported / 不要求の欠如は正常、要求欠落は失敗。仮K / native points捏造なし |
+| 03.5 Multi-view契約 | 版 / adapter互換案を確定しinput list・ID mapping・scene serialization / Store / exportを更新 | fake 2viewで入力順序・出力ID対応 / 欠落 / 重複 / 不正refs、unknown extras round-trip。single-view MoGe互換。実モデルmulti-view UI / 評価は追加scopeであり必須にしない |
+| 03.6 統合受入 | 3つの独立環境、代表variant各1つのsingle-view Local E2E、capability matrix・再作成条件を揃える | 下記回帰とphase正本の全Exitを照合。成功していないvariant / GPUをtestedとしない。Phase 03完了をPhase 04開始許可にしない |
+
+第2モデルは**暫定的にDA3のsingle-view小型variantを先に評価し、UniK3Dを後にする案**。
+既存1view depth契約で通せるかを先に確認し、non-pinhole / raysの拡張を初回成功から分けるため。
+具体的variant / pin / CPU可否を確認した採用決定ではない。CPUでの依存・資源・license条件が
+UniK3Dの方が適する証拠が得られれば順序を交換する。MoGe追加variantは3family統合後を推奨する。
+
+### Verification, risks and rollback
+
+- 実装前baseline: 既存unittest suiteと必要browser opt-inを実行し環境 / skip理由を記録。
+  各段階では変更境界のcontract tests、受入時には既存全回帰を行う。
+- GPU不要: fake pluginのdirectory追加だけでdiscovery / submit / collect、新旧manifest互換、
+  unsupported / conditional / runtime欠落、scalar型 / 非有限値 / unknown parameter、
+  adapter非import、選択workerのみimport、環境 / checkpointの交差混入なしを検証する。
+- 幾何fixture: z vs range、metric vs relative、non-pinhole / 負z ray、normalized Kの画素中心、
+  w2c→c2w、mask / invalid、confidenceの意味、poseとscene scale、typed extras / view ID、
+  unknown major / profile、corrupt dtype / shape / path / symlink / digestを検証する。
+- 互換性: 旧schema 1.0 / depth-only / geometry / JPEG Run、CLI既定・flags、native Points、
+  4表示・derived再利用・履歴 / export / archive / 削除確認、busy / cancel / timeoutを回帰。
+  saved Runsのraw / WorkerResult / JobResult hash・mtime不変とpredict回数を確認する。
+- 実機: 固定MoGe明示CPUを回帰し、新モデルも各single-viewの正式worker経路を実測する。
+  過去証拠は当時の成功であり今回の実行成功ではない。GPU・依存再作成・offlineは実施した条件だけ報告。
+  事前準備後のoffline推論 / browser / 保存Runを確認し、自動download / installしない。
+- リスク: upstream出力解釈、巨大weights / CPU memory、native extension、依存衝突、
+  schema変更による旧Run拒否、UI切替race、global checkpoint漏れ、non-identity RGB誤対応。
+  追加geometryに旧profileを流用せず、旧readerと固定MoGe経路を先に回帰する。
+- Rollback: 今回は計画文書のみの差分。将来は段階ごとに追加plugin / UI切替 / 新profileを
+  独立して戻せる変更単位とし、既存Runや確定resultの移設・上書き・自動削除を伴わせない。
+  環境 / weights / runs / credentialsはGitへ追加せず、base / system Pythonを変更しない。
+
+### Decisions and items to settle
+
+| Decision / 提案 | Reason | Trade-off | Future extension / 判断時点と必要証拠 |
+| --- | --- | --- | --- |
+| directory manifest discoveryを先行 | 既存plugin境界を活用 | 外部package配布をまだ扱わない | package entrypoint / hot reloadは将来。今回はsource checkout |
+| depth-onlyの第2実モデルを最初の実E2Eにする | 小さな成功を優先しMoGeを保つ | optional全対応は後続 | 実装前にvariant / immutable source・weights revision / SHA-256 / license / CPU依存と資源を確認して採用決定 |
+| variant metadata共通解決、schemaは全体置換を推奨 | UI / Runnerの判定差を防ぐ | manifestに重複記述があり得る | 03.1前にfallback / override規則とconditionalの検証可能subsetを仕様確定 |
+| target設定に環境・weights map | adapter / Jobへhost prefixを漏らさない | 設定形式が追加になる | 03.2〜03.3前にJSON等の形式・lookup key・既存CLI overrideの優先順位とdigest記録を確定 |
+| UI model選択はsession別snapshot | 実行中のmodel / checkpoint混線防止 | controlsの再構成が必要 | 03.3前にmodel切替と実行中編集の扱い、staleイベント破棄規則を確定。read-only起動互換も確認 |
+| 新optionalは別profile、番号未決定 | 旧profile検証を保つ | readerにprofile分岐が増える | 03.4前にfieldごとのvalidity / provenance・unknown refs保持 / 検証・対応worker versionを確定 |
+| multi-viewはsingle-view成功後、Request互換方式未決定 | 旧MoGe adapterに破壊変更を押し付けない | fake contract段階が必要 | 03.5前にadditive fields vs versioned request、scene schema・pose基準view / scaleを決定 |
+| 実装成功とcapability宣言を分離 | upstreamの対応と実測を混同しない | matrix管理が必要 | model / variant / output / device / environment別tested・conditional・untestedとRun証拠を記録 |
+
+### Completed / remaining in this planning task
+
+- 完了: main / clean tree確認、作業ブランチ作成、仕様とsource調査、単一モデル前提・契約差分、
+  段階計画・受入条件・互換性・リスク・要決定事項の整理。
+- 未実施: production実装、test追加、suite / browser / 実モデル推論、環境構築・weights取得。
+  既存環境・weightsの現在の可用性は未確認。Phase 03の実装Exitは未達。
+- 今回の検証: `git diff --check`成功。変更Markdown 2件のlocal links / anchors 34件と
+  fencesを検証し成功。変更は本計画とPhase 03文書のみ。終了前の再fetchでもorigin/mainは
+  開始時の `8a6d5082ecf64eb9b9bcb8c668c41c0c3f145333` のまま。
+  上記は計画整理時点の検証記録。同日の追加指示によりAGENTSへ作業ブランチのcommit / 通常push方針を
+  記録し、3文書の最終差分・リンク・fencesを確認後にcommit / 通常pushする。main反映は行わない。
+  最終検証: 3文書のlocal links / anchors 44件・fencesと `git diff --check` 成功。
+  実装着手には次のユーザー指示が必要。
 
 ## Phase 02D review continuation
 

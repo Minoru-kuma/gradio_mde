@@ -1,7 +1,11 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: 未着手・未承認。
+Status: 調査・計画・設計中（2026-11-09指示）。production実装は未着手・未承認。
+今回の承認は計画・設計まで。実装・環境構築・main反映へ進まない。
 管理: [PLANS.md](../../PLANS.md)。
+調査結果・契約変更案・段階的実装順序・要決定事項は
+[Phase 03 planning](../../PLANS.md#phase-03-investigation-and-staged-design--2026-11-09)を参照。
+以下はPhase 03全体の目標・Exitであり、今回実装を許可するものではない。
 
 ## Goal
 

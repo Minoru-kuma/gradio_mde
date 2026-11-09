@@ -5,8 +5,9 @@
 [phase 文書](docs/phases/) と変更対象の仕様を読む。
 
 1. 作業は phase 単位で行う。ユーザーが指示していない phase に進まない。
-   最新の指示（2026-11-09）により現在の承認範囲は Phase 02D — Run Management の
-   実装・検証・関連docs更新と作業ブランチへの通常push。今回のPhase 02DはPR経由のmain統合を承認済み。
+   最新の指示（2026-11-09）により現在の承認範囲は Phase 03 — Model Plugin Architecture /
+   Multi-model Support の調査・計画・設計、関連docs更新と作業ブランチへのcommit / 通常push。
+   Phase 03のproduction実装・環境構築・main反映は未承認。Phase 02DはPR経由でmain統合済み。
    開始時にlatest origin/mainを確認する。remote更新・競合・範囲外変更は上書きせず停止・報告。
    追加承認により、途中実装の作業ブランチへのcommit / 通常pushは可能。今後のmain反映には別途指示が必要。
    force pushは禁止。Phase 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02はCOMPLETE。
@@ -42,7 +43,9 @@
 12. 新規作業は最新の `origin/main` と作業ツリーを確認し、変更前に作業内容に対応した
     作業ブランチ（例: `codex/<task-name>`）を作成する。同じ作業の継続は既存の作業ブランチで行う。
     `main` 上で直接編集・commitしない。既に未commit変更がある場合は保持したまま
-    作業ブランチへ移し、破棄・reset・上書きをしない。commit / pushは作業ブランチを対象とする。
+    作業ブランチへ移し、破棄・reset・上書きをしない。
+    承認範囲の作業と必要な検証を終えたら、作業ブランチへcommitし、同名のremoteブランチへ
+    通常pushまで行う（2026-11-09ユーザー指示）。同じ作業の継続では既存ブランチを使う。
     `main` への反映はユーザーが承認した範囲・Exit条件を満たした後に行う。
 
 詳細: [Architecture](docs/architecture.md) / [Model contracts](docs/model-adapter-spec.md) /
