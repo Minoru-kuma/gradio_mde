@@ -191,9 +191,9 @@ input hash と immutable JobSpec snapshots も照合する。
 terminal 再 collect は読み取り専用で、artifact の checksum / mtime と predict log の回数を tests /
 MoGe regression で確認した。active job を directory から再 submit する機能はない。
 
-## Phase 02 additive artifacts and management — 設計のみ
+## Phase 02 additive artifacts and management
 
-Phase 02はIN_PROGRESS、02A / 02B COMPLETE、02CはCOMPLETE / 全Exit達成、02DはNOT_STARTED / 未承認。
+Phase 02は02A〜02Dの全Exit達成でCOMPLETE。
 以下の02A記述は実装前の計画であり、確定契約は末尾を参照。上記layoutのoptional geometryは現行exportではない。
 [02A](phases/phase-02/phase-02a.md) でdepth必須、points / normals / intrinsics / maskのoptional
 保存・参照検証を追加する計画。既存depth.npy / metadata / reportの場所と意味を維持する。
@@ -203,7 +203,7 @@ Phase 02はIN_PROGRESS、02A / 02B COMPLETE、02CはCOMPLETE / 全Exit達成、0
 [02C](phases/phase-02/phase-02c.md) のderived meshは既存output / job-resultとは別領域・manifestに
 遅延生成・永続保存する。確定JobResultにrefを追加しない。model由来rawとderivedを明示し、
 algorithm / params / 使用入力digestを記録して同条件reuse。raw / WorkerResult / JobResultは不変。
-管理metadata / derived generation / 履歴のpath案は [Run Management](run-management-spec.md)。
+管理metadata / derived generation / 履歴の確定pathとAPIは [Run Management](run-management-spec.md)。
 Run / attempt / viewを検証し、別Run path / symlinkを許容しない。
 
 [02D](phases/phase-02/phase-02d.md) は表示名・メモ・archiveをsidecarで更新し、archiveでfileを削除しない。
@@ -213,7 +213,7 @@ derived明示再生成は新generationと履歴。active restart recoveryは依�
 
 ## Implemented Phase 02A wire format and validation
 
-先行節の02A設計を以下の追加契約として実装。02C derivedは [Results Viewer](results-viewer.md)の追加契約を実装、02D user metadataは設計のみ。
+先行節の02A設計を以下の追加契約として実装。02C derivedは [Results Viewer](results-viewer.md)の追加契約を実装、02D user metadataと履歴・削除確認は [Run Management](run-management-spec.md)の追加契約。
 既存schema_version `1.0` / layout / depth意味は維持し、optional output refsを追加する。
 新profile `execution.serialization_profile=02A-geometry-v1` を旧 `01A-depth-only` と区別する。
 旧profile（profile field欠如も含む）は従来depth-onlyとして読込可能。旧Runへgeometryを後付けしない。

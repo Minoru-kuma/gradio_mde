@@ -1,8 +1,8 @@
 # Phase 02 — Geometry Artifacts / Gradio / 3D Results / Run Management
 
-Status: **IN_PROGRESS**。02Aは実CPU native Pointsを含むExit達成でCOMPLETE。
+Status: **COMPLETE / 02A〜02D全Exit達成**。02Aは実CPU native Pointsを含むExit達成でCOMPLETE。
 02Bは **COMPLETE / 全Exit達成、commit / main通常push承認済み**。
-02Cは **COMPLETE / 全Exit達成（2026-10-27）**、02Dは **NOT_STARTED / 未承認**。02A / 02Bの証拠は内部文書を参照。
+02Cは **COMPLETE / 全Exit達成（2026-10-27）**、02Dは **COMPLETE / 全Exit達成**。02A / 02Bの証拠は内部文書を参照。
 管理: [PLANS](../../PLANS.md)。Phase 01 / 01A / 01BはCOMPLETE。
 
 ## Goal
@@ -16,7 +16,7 @@ Local推論、2D / 3D閲覧、保存Runの安全な管理を行えるように�
 Phase 01のCLI → ExperimentRunner → LocalBackend → 独立Conda worker → ModelAdapterを維持する。
 Phase 01はPNG 1枚 / attempt-0001 / depth-onlyの保存経路、schema 1.0。
 02Aで明示要求のoptional geometry保存・RunStore検証を追加し、既定depth-onlyを維持する。
-02BでGradioの操作・共通結果詳細を実装。02Cで3D viewer / 最小派生保存を実装・検証済み。02D管理serviceは未実装。
+02BでGradioの操作・共通結果詳細を実装。02Cで3D viewer / 最小派生保存を実装・検証済み。02D管理serviceは実装・検証済み。
 実モデルCPU成功は [Phase 01](phase-01.md) の証拠であり、GPU / UI / 学会デモ成功ではない。
 
 ## Scope
@@ -62,8 +62,8 @@ Phase 03: 複数モデル統合。04: MLflow。05: Benchmark / 比較評価。
 - [x] 02A: 共通serializationとartifact検証、native / standard provenance、旧Run互換。
 - [x] 02B: Runner操作・非同期poll・session分離・busy表示、application依存pin。
 - [x] 02C: 4表示モード・色/描画切替・視点管理、derived meshの遅延生成・永続保存。
-- [ ] 02D: callbackと分離した管理service、安全な明示操作と履歴。
-- [ ] ローカル起動・事前準備・offline・明示CPU・保存結果デモの再現手順。
+- [x] 02D: callbackと分離した管理service、安全な明示操作と履歴。
+- [x] ローカル起動・事前準備・offline・明示CPU・保存結果デモの再現手順。
 
 ## Tests
 
@@ -81,7 +81,8 @@ UIから1モデルをLocalで実行し、完了後すぐResultsで確認・downl
 optional欠如時は理由を表示し、存在しないgeometry / metricsを捏造しない。
 raw / JobResultのdigest不変、derived条件の追跡、archive非削除と実行中削除拒否を確認する。
 pin済み環境とoffline起動手順・検証結果を記録し、GPU / 学会実演の未検証項目を明示する。
-今回の文書完成ではこれらを達成済みにしない。
+02Dの最終suite / browser / CPU / offline / 互換検証で全項目を達成。詳細は [02D evidence](phase-02/phase-02d.md#final-acceptance-evidence)。
+今回mainには反映せず、Phase 03以降は未承認。
 
 ## Known risks
 

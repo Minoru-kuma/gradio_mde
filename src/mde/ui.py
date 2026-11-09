@@ -19,10 +19,12 @@ from .ui_controller import InferenceController, MAX_UPLOAD_BYTES
 def build_app(controller):
     import gradio as gr
     from .results import ResultsService
+    from .run_management import RunManagementService
 
     assets = Path(__file__).with_name("viewer_assets")
     gr.set_static_paths(paths=[assets / "vendor"])
     results_service = ResultsService(controller.runner.store, controller.runner.collect)
+    management = RunManagementService(controller.runner.store, controller.runner.collect)
 
     def render_view(request):
         try:
@@ -39,6 +41,10 @@ def build_app(controller):
             return fn(*args)
         except Exception as error:
             return f"{type(error).__name__}: {error}"
+
+    def text_guard(fn, *args):
+        value = guard(fn, *args)
+        return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
 
     with gr.Blocks(title="MGE Experiment Platform", analytics_enabled=False) as app:
         token = gr.State(value=None, delete_callback=controller.forget)
@@ -104,6 +110,38 @@ def build_app(controller):
                     server_functions=[render_view], elem_id="results-viewer",
                     css_template=".viewer-controls {display:flex;gap:16px;flex-wrap:wrap} select, button {padding:6px;border:1px solid #888;border-radius:4px} pre {font-size:13px} [data-message] {white-space:pre-line}")
                 result = gr.JSON(label="Validated JobResult", elem_id="validated-result")
+                with gr.Accordion("Run management", open=False):
+                    management_selection = gr.State(value=None)
+                    deletion = gr.State(value=None)
+                    include_archived = gr.Checkbox(label="Include archived Runs")
+                    refresh = gr.Button("Refresh history")
+                    history = gr.JSON(label="Run history")
+                    inspect_run = gr.Button("Inspect saved Run ID")
+                    details = gr.JSON(label="Run details and provenance")
+                    display_name = gr.Textbox(label="Display name")
+                    notes = gr.Textbox(label="Notes")
+                    archived = gr.Checkbox(label="Archived (files are retained)")
+                    save_metadata = gr.Button("Save metadata / archive status")
+                    regenerate = gr.Button("Regenerate Mesh (new generation)")
+                    export_run = gr.Button("Export validated input / raw / derived")
+                    download_export = gr.HTML()
+                    generation = gr.Textbox(label="Derived path to delete (blank = entire Run)")
+                    prepare = gr.Button("Review deletion")
+                    review = gr.JSON(label="Deletion confirmation")
+                    typed_id = gr.Textbox(label="Type the exact Run ID to confirm deletion")
+                    with gr.Row():
+                        confirm = gr.Button("Confirm deletion")
+                        dismiss = gr.Button("Cancel deletion")
+                    with gr.Accordion("Retry an interrupted Run deletion", open=False):
+                        retry_state = gr.State(value=None)
+                        quarantine_entry = gr.Textbox(label="Quarantine entry from failure diagnostic")
+                        review_retry = gr.Button("Review deletion retry")
+                        retry_details = gr.JSON(label="Retry confirmation")
+                        retry_typed = gr.Textbox(label="Type exact Run ID for retry")
+                        confirm_retry = gr.Button("Confirm deletion retry")
+                        cancel_retry = gr.Button("Cancel deletion retry")
+                    management_notice = gr.Textbox(label="Management action", interactive=False)
+
         timer = gr.Timer(0.5)
 
         def submit_job(session, image, selected_variant, selected_device, selected_dtype, seconds, requested, *values):
@@ -138,6 +176,77 @@ def build_app(controller):
                 controller.open_run(session, selected)
             except Exception as error:
                 controller.load_error(session, error)
+
+        def inspect_management(selected):
+            try:
+                detail = management.detail(selected.strip())
+                meta = detail["user_metadata"]
+                return detail, detail, meta["display_name"], meta["notes"], meta["archived"], None, None, "Loaded management selection"
+            except Exception as error:
+                return None, None, "", "", False, None, None, str(error)
+
+        def managed_action(selection, selected, operation, *args):
+            if not selection or selection["run_id"] != selected.strip():
+                raise ValueError("Inspect the selected Run again before this operation")
+            run_id = selection["run_id"]
+            if operation == "save":
+                return management.update_metadata(run_id, selection["user_metadata"]["revision"],
+                    display_name=args[0], notes=args[1], archived=args[2])
+            if operation == "regenerate":
+                return management.regenerate_derived(run_id)
+            if operation == "prepare":
+                return management.prepare_delete(run_id, generation=args[0].strip() or None)
+            if operation == "delete":
+                if not args[0] or args[0]["generation"] != (args[2].strip() or None):
+                    raise ValueError("Deletion scope changed; review again")
+                return management.delete(args[0], run_id, typed_run_id=args[1])
+            if operation == "export":
+                import base64
+                data = base64.b64encode(management.export(run_id)).decode()
+                return f'<a download="{run_id}.zip" href="data:application/zip;base64,{data}">Download export ZIP</a>'
+
+        saved_id.input(lambda: (None, None, None), outputs=[management_selection, deletion, review], **event)
+        refresh.click(lambda show: guard(management.list_runs, show), include_archived, history, **event)
+        inspect_run.click(inspect_management, saved_id,
+            [management_selection, details, display_name, notes, archived, deletion, review, management_notice], **event)
+        save_metadata.click(lambda selection, selected, name, note, archive: text_guard(managed_action,
+            selection, selected, "save", name, note, archive),
+            [management_selection, saved_id, display_name, notes, archived], management_notice, **event)
+        regenerate.click(lambda selection, selected: text_guard(managed_action, selection, selected, "regenerate"),
+            [management_selection, saved_id], management_notice, **event)
+        export_run.click(lambda selection, selected: guard(managed_action, selection, selected, "export"),
+            [management_selection, saved_id], download_export, **event)
+
+        def prepare_retry(entry):
+            try:
+                value = management.prepare_retry(entry.strip())
+                return value, value, "Deletion retry review ready"
+            except Exception as error:
+                return None, {"error": str(error)}, str(error)
+
+        def retry_action(confirmation, typed, entry):
+            if not confirmation or confirmation["quarantine_name"] != entry.strip():
+                raise ValueError("Retry target changed; review again")
+            return management.retry_delete(confirmation, typed_run_id=typed)
+
+        quarantine_entry.input(lambda: (None, None), outputs=[retry_state, retry_details], **event)
+        review_retry.click(prepare_retry, quarantine_entry, [retry_state, retry_details, management_notice], **event)
+        confirm_retry.click(lambda confirmation, typed, entry: text_guard(retry_action, confirmation, typed, entry),
+            [retry_state, retry_typed, quarantine_entry], management_notice, **event)
+        cancel_retry.click(lambda: (None, None, "Deletion retry cancelled"),
+            outputs=[retry_state, retry_details, management_notice], **event)
+
+        def prepare_management(selection, selected, target):
+            try:
+                confirmation = managed_action(selection, selected, "prepare", target)
+                return confirmation, confirmation, "Deletion review ready"
+            except Exception as error:
+                return None, {"error": str(error)}, str(error)
+        prepare.click(prepare_management, [management_selection, saved_id, generation], [deletion, review, management_notice], **event)
+        dismiss.click(lambda: (None, None, "Deletion cancelled"), outputs=[deletion, review, management_notice], **event)
+        confirm.click(lambda selection, selected, confirmation, typed, target: text_guard(managed_action,
+            selection, selected, "delete", confirmation, typed, target),
+            [management_selection, saved_id, deletion, typed_id, generation], management_notice, **event)
 
         submit.click(submit_job, [token, upload, variant, device, dtype, timeout, outputs, *controls],
                      [notice, operation_generation],

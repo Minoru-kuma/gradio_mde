@@ -78,6 +78,11 @@ class ExperimentRunner:
         return self.backend.status(handle)
 
     def collect(self, handle: JobHandle):
+        from .run_access import run_lock
+        with run_lock(run_path(self.store.root, handle.run_id)):
+            return self._collect(handle)
+
+    def _collect(self, handle: JobHandle):
         result = self.backend.collect(handle)
         summary = {"schema_version": result.schema_version, "run_id": handle.run_id,
                    "selected_attempt_id": handle.attempt_id, "status": result.status}

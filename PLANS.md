@@ -2,13 +2,33 @@
 
 ## Current authorization and status
 
-- Current work: **Gradio JPEG入力改善**（2026-10-28 明示承認）。Phase 02C COMPLETEを維持。
-- Authorization: JPEG入力改善・検証・関連docs更新、完了後のcommit / main通常push。
-- Phase 00 / 01 / 01A / 01B / 02A / 02B COMPLETE、Phase 02 IN_PROGRESS。
-- 02D / 03–08、他モデル、Tracking / Benchmark / Slurm / active recoveryは未承認。
-- Start evidence: fetch成功、main clean、HEAD = origin/main（Git履歴参照）。
+- Current work: **Phase 02D Run Management — COMPLETE / 全Exit達成**。Phase 02全体もCOMPLETE。
+- Authorization: 02D実装・検証・関連docs更新、作業ブランチへの通常push。2026-11-09 指示によりPR経由のmain統合を承認。
+- 追加承認: 途中実装を作業ブランチ `codex/phase-02d-run-management` にcommit / 通常pushする。
+  全Exit達成済み。
+- Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
+- 03–08、他モデル、Tracking / Benchmark / Slurm / active recovery、高解像度・推定品質改善は未承認。
+- Start evidence: fetch成功、main clean、HEAD = origin/main `7f043c12a454feff401d366d725bcd8c6ae41faf`。
 - 新規作業は作業ブランチを作成し、継続作業は対応する既存ブランチで行う。main上で直接編集・commitしない。
 - remote更新・競合・範囲外変更なら停止・報告。force push禁止。
+
+## Phase 02D review continuation
+
+- 承認: `codex/phase-02d-run-management` で実装・最終検証を継続。作業ブランチへの通常pushのみ。mainへの反映は禁止。
+- 優先: Meshを3世代以上作成し最新を削除した後、残る完成世代のcreated_at / generation_id降順で検証・選択し、再起動後もreuseする。削除要求中・失敗partial・tombstoneは候補外。
+- 検証: 選択pointer欠如 / 破損、最新 / 非最新削除、全世代削除、途中失敗と再試行、generation / export / delete競合、TOCTOU、2browser session、retry UI、既存browser全回帰。全破壊fixtureはtemporary Root。
+- 手順: selector修正と安全性監査 → service / filesystem tests → browser retry / session tests → source固定で全suiteと既存browser → docs / Exit判定 → 作業ブランチcommit / push。mainには反映しない。
+
+## Phase 02D implementation plan — 2026-11-05
+
+- Scope: 共通serviceによる履歴 / 詳細 / metadata / archive / export / derived再生成・履歴 / 確認付き削除とResults UI統合。既存raw / JobResult / CLI互換を維持。
+- Order: latest main・契約確認 → 安全な保存 / lock / active判定を設計 → serviceとviewer統合 → UI確認 / session境界 → 隔離Rootでfake・filesystem・競合・browser検証 → Phase 02全Exit監査 → remote再確認・全Exit時のみcommit / 通常push。
+- Verification: 旧Run・sidecar欠如 / 破損、metadataによるraw不変、export選択範囲、再生成とtombstone、stale / active / symlink / traversal / partial failure / concurrent access、確認cancelと削除範囲、既存suiteとoffline再表示。
+- Risks: 共有lockの欠落、別processや外部変更によるTOCTOU、部分削除、unknown active状態、export容量。単一process境界を明確化し不明時は拒否。破壊試験は隔離Rootのみ。全Exit未達ならCOMPLETE / main反映しない。承認済みの作業ブランチへの途中commit / pushは可能。
+- 完了: Service / UI、3世代以上の選択・再利用、公開失敗 / 部分削除・retry、共有lock / TOCTOU / session分離、旧Run互換を検証。02D全Exit達成。
+- 最終証拠: 固定production source全87件中82成功・opt-in 5 skip（322.291秒）、別browser5件成功（247.236秒）、追加2session browser成功（38.598秒）、追加generation / export競合1成功（5.392秒）。旧4Runのdetail各2回 / exportで全hash・mtime不変。
+- 最終CPU Run `67d893e9-f399-4c9f-a7c5-405b52976a6f` / source digest一致、native Points / JPEG / 3D / 再起動・offline成功。GPU / 他OS/browser / 学会実演は未検証。全破壊fixtureは隔離Root。
+- Phase 02全体もCOMPLETE。mainへは反映せず作業ブランチのみcommit / push。Phase 03以降は未承認。詳細は [02D evidence](docs/phases/phase-02/phase-02d.md#final-acceptance-evidence)。
 
 ## JPEG input improvement — 2026-10-28
 
@@ -23,7 +43,7 @@
   初回browserはsandbox port制限、次回はtestのPNG固定filename assertionで失敗し修正後成功。
   suite実行中にowned copyのbounded readを追加し、変更対象controllerとCPU browserを再実行した。
 
-## Phase 02C implementation plan — 2026-10-27
+## Phase 02C implementation plan — 2026-10-27（完了時点の履歴）
 
 - Goal / scope: ResultsのDepth / RawDepth / Point Cloud / Mesh、保存Run再表示、
   RGB / Depth / Normal色、texture / Geometry / Wireframe、meshの初回遅延生成・永続reuse。
@@ -205,14 +225,14 @@ Points [256,256,3] / m、65,536 valid、points.z-depth誤差0 m、Normals / Intr
 | [02D — Run Management](docs/phases/phase-02/phase-02d.md) | 02C | 共通service経由の一覧/編集/export/再生成/archive/restore/確認付き削除 |
 
 02A–02DはPhase 02の内部milestoneであり独立Phaseではない。全exit達成でPhase 02 COMPLETE。
-文書作成と実装の開始・完了は別。02AはCOMPLETE。02BはCOMPLETE、02Cは2026-10-27承認済み、02Dは将来の受入条件。
+文書作成と実装の開始・完了は別。02A / 02B / 02C / 02Dは全Exit達成でCOMPLETE。
 
 ## Phase management
 
 状態は `NOT_STARTED → PLANNED → IN_PROGRESS → REVIEW_READY → COMPLETE` を基本とし、
 外部条件の不足は `BLOCKED` として理由を残す。`PLANNED` は計画文書の準備状態であり、
 production code の実装承認・開始を意味しない。実験 JobStatus とは別の管理状態である。
-文書準備だけでは実装を開始しない。現在は02Cの明示承認に従って作業し、02D以降は未承認。
+文書準備だけでは実装を開始しない。02Dの承認範囲で全Exit達成済み。Phase 03以降は未承認。
 
 各 phase 開始前に、最新のユーザー指示がその phase の実作業を承認していることを確認する。
 必要な通常作業のたびに承認を取り直す必要はないが、未指示の phase に進んではならない。
@@ -225,7 +245,7 @@ Tests、Exit criteria、Known risks、Decisions deferred to later phases を維�
 | --- | --- | --- | --- |
 | [00](docs/phases/phase-00.md) | clean-start の正式確認 | 調査記録・共通契約・段階計画の整合 | COMPLETE |
 | [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | COMPLETE、01A / 01B exit 達成 |
-| [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | IN_PROGRESS（02A / 02B COMPLETE、02C COMPLETE、02D以降未承認） |
+| [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | COMPLETE（02A〜02D全Exit達成） |
 | [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 未着手 |
 | [04](docs/phases/phase-04.md) | 03 | Runner から MLflow、失敗時にも結果保存 | 未着手 |
 | [05](docs/phases/phase-05.md) | 03・04 | 同じ single inference に基づく比較評価 | 未着手 |
