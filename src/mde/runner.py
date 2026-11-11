@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .contracts import ATTEMPT_ID, VIEW_ID, ExecutionBackend, JobHandle, JobSpec, ResourceSpec, normalize_outputs
 from .registry import ModelRegistry, validate_parameters
-from .storage import RunStore, inspect_png, read_json, run_path, sha256_file, write_json
+from .storage import RunStore, contained_path, inspect_png, read_json, run_path, sha256_file, write_json
 
 
 class ExperimentRunner:
@@ -21,20 +21,26 @@ class ExperimentRunner:
     def submit(self, model_id: str, image: Path, *, variant_id: str | None = None,
                device: str = "cuda:0", dtype: str = "float32", parameters: dict | None = None,
                walltime_seconds: int | None = None,
-               requested_outputs: tuple[str, ...] = ("depth",), input_provenance: dict | None = None) -> JobHandle:
+               requested_outputs: tuple[str, ...] = ("depth",), input_provenance: dict | None = None,
+               environment_id: str | None = None) -> JobHandle:
         info = self.registry.get_model(model_id)
-        variant = info.variant(variant_id)
-        if device not in info.data["supported_devices"] or dtype not in info.data["supported_dtypes"]:
+        variant = info.effective_variant(variant_id)
+        if device not in variant["supported_devices"] or dtype not in variant["supported_dtypes"]:
             raise ValueError("Unsupported device or dtype")
         outputs = normalize_outputs(requested_outputs)
-        capabilities = variant.get("capabilities", info.data["capabilities"])
+        capabilities = variant["capabilities"]
         for key in outputs:
             if capabilities.get(key, {}).get("status") not in ("supported", "conditional"):
                 raise ValueError(f"Unsupported requested output: {key}")
-        parameters = validate_parameters(info.data.get("parameter_schema", {}), parameters or {})
+        parameters = validate_parameters(variant["parameter_schema"], {} if parameters is None else parameters)
+        constraints = variant["input_constraints"]
+        if not constraints.get("min_views", 1) <= 1 <= constraints.get("max_views", 1):
+            raise ValueError("Selected variant does not support single-view input")
+        if constraints.get("format", "PNG") != "PNG" or constraints.get("worker_mode", "RGB") != "RGB":
+            raise ValueError("Selected variant requires unsupported input format / mode")
         width, height = inspect_png(image)
-        environment = dict(info.data["environment_refs"][0])
-        definition = self.project_root / environment["definition_ref"]
+        environment = info.environment(variant_id, environment_id)
+        definition = contained_path(self.project_root, environment["definition_ref"])
         environment["definition_digest"] = sha256_file(definition)
         model_ref = {"model_id": model_id, "variant": variant, "manifest": info.data}
         request = {"model_ref": model_ref, "parameters": parameters,

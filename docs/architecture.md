@@ -2,7 +2,7 @@
 
 Status: Phase 00 COMPLETE。Phase 01A の最小経路を実装し、fake tests を確認済み。
 MoGe の明示 CPU E2E と成果物検証、Local robustness / CPU regression により
-01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02Cは2026-10-27に全Exit達成でCOMPLETE、02Dも全Exit達成でCOMPLETE。Phase 03以降は未承認。
+01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02Cは2026-10-27に全Exit達成でCOMPLETE、02Dも全Exit達成でCOMPLETE。Phase 03は2026-11-11に実装承認、段階実装中。Phase 04以降は未承認。
 以下の全体図には将来設計も含む。
 
 ## Repository investigation
@@ -254,3 +254,12 @@ server-side State tokenとgenerationでhandle / cancel / result selectionを分�
 PNG制限、pin / offline条件、callback / lifecycleの詳細は [Gradio Inference](gradio-inference.md)。
 保存schemaは変更せず、Runner.collectのsummary publicationを同instance内で直列化して
 同内容の再collectをread-onlyにした。raw / 確定JobResultを変更しない。
+
+## Phase 03.1 implemented plugin discovery
+
+Registryにmetadata-only directory探索・一覧・不正manifest診断・重複ID拒否を追加。
+ModelInfoの実効variant解決をRunner / CLI / controllerが共有する。
+Environment / Backend / workerの責務は維持し、core / UI / backendにモデル名分岐を追加しない。
+source checkoutのdirectory追加だけでfake pluginを発見・実行できる。
+model別target設定と動的UIは03.3、geometry拡張とmulti-viewは03.4 / 03.5で追加予定。
+詳細は [Model adapter](model-adapter-spec.md#phase-031-discovery-and-effective-variant-metadata)。

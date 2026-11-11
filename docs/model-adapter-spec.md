@@ -3,7 +3,8 @@
 Status: schema `1.0` の最小型と MoGe adapter / manifest を Phase 01A で実装。
 fake tests と MoGe の CPU 実推論・depth 保存を確認済み。GPU は未検証。
 01B の区間計測・fingerprint は共通 worker が担当し adapter signature は維持。
-02A geometry保存・検証は末尾の実装契約を参照。複数モデルは将来仕様。
+02A geometry保存・検証と03.1 discovery / variant解決は末尾の実装契約を参照。
+実モデル追加とUI切替等はPhase 03の後続段階。
 関連: [Architecture](architecture.md)、[Execution](execution-backend-spec.md)、
 [Environment](environment-strategy.md)、[Run Directory](run-directory-spec.md)。
 
@@ -243,3 +244,35 @@ native K数値と式をmetadataに保持する。RGB対応はidentityとして�
 確認根拠: [固定MoGe infer](https://github.com/microsoft/MoGe/blob/07444410f1e33f402353b99d6ccd26bd31e469e8/moge/model/v2.py)、
 [固定utils3d denormalize_intrinsics](https://github.com/EasternJournalist/utils3d/blob/3fab839f0be9931dac7c8488eb0e1600c236e183/utils3d/torch/transforms.py)。
 実測・Exit証拠は [02A](phases/phase-02/phase-02a.md) に記録する。
+
+## Phase 03.1 discovery and effective variant metadata
+
+2026-11-11実装。source checkoutの`models/*/manifest.json`をdirectory順に探索する。
+`ModelRegistry.discover()`はvalidな`models`とdirectory ID別`diagnostics`を返す。
+`list_models()`はvalid metadata一覧、`get_model(id)`は選択metadataを返し、不正・不在を拒否。
+他directoryの不正manifestは診断に残しvalidモデルの利用を妨げない。
+model ID重複はdirectory不一致のmanifestも含め探索全体を拒否する。
+環境の存在・upstream install・weights可用性はdiscoveryで検査せず、未準備と不正metadataを区別する。
+Registryはadapter / torch / numeric librariesをimportしない。
+
+既存`variant(id)`は元の宣言を返す。追加の`effective_variant(id)`は独立したsnapshotを返し、
+`capabilities`、`parameter_schema`、`supported_devices`、`supported_dtypes`、`input_constraints`、
+`environment_refs`をvariant優先で項目ごと全体置換する。未指定だけmodel値へfallbackし、deep mergeしない。
+`environment(variant_id, environment_id)`は1候補なら従来どおり省略可能、複数候補なら明示IDを要求する。
+logical IDのtarget設定解決はEnvironmentResolverの責務。未登録環境はworker起動前に拒否する。
+
+manifest major、directory / model ID一致、variant重複・default参照、entrypoint構文、capability status、
+環境ID・相対定義path・protocol major、device / dtype一覧、view数とparameter schemaを検証する。
+未知optional metadataは保持する。entrypointのimport可否はworkerで検証する。
+scalar subsetはobject / properties / required / additionalProperties=falseと
+integer / number / boolean / string、enum、minimum / maximum、default、title / description。
+従来fixtureのobject type / additionalProperties省略は許容し、未知parameterは常に拒否する。
+未対応schema keyword、型違いdefault / enum、非有限数、逆転bounds、未知requiredを拒否する。
+conditionalの`condition`は説明文として保持し実行しない。03.1はstatusの事前判定と
+既存workerの要求出力presence検証を使用。LoadedModelInfoのruntime能力照合は後段で追加予定。
+
+Runner / CLI / controllerは実効metadataでdevice / dtype / parameters / requested outputsを検証する。
+現在の入力契約は1view PNG / RGB、実行契約はcpu / cuda:0・float32のまま。
+Gradioの動的なmodel / variant切替とcontrols更新は03.3、追加出力とmulti-viewは03.4 / 03.5。
+JobSpec.model_ref.variantへ実効snapshotを保存し、元manifestもそのまま保持する。
+adapter signature、schema major、既存serialization profiles、旧Run readerは変更しない。

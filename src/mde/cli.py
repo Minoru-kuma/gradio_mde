@@ -22,6 +22,7 @@ def main(argv=None) -> int:
     run = commands.add_parser("run", help="Run one PNG image through a Conda worker")
     run.add_argument("--model", required=True)
     run.add_argument("--variant")
+    run.add_argument("--environment-id", help="Logical environment when a variant declares multiple candidates")
     run.add_argument("--input", type=Path, required=True)
     run.add_argument("--backend", choices=["local"], default="local")
     run.add_argument("--device", choices=["cuda:0", "cpu"], default="cuda:0")
@@ -61,7 +62,7 @@ def main(argv=None) -> int:
             previous_signals[sig] = signal.signal(sig, lambda *_: interrupted.set())
         registry = ModelRegistry(root / "models")
         info = registry.get_model(args.model)
-        environment_id = info.data["environment_refs"][0]["environment_id"]
+        environment_id = info.environment(args.variant, args.environment_id)["environment_id"]
         profile = EnvironmentProfile(environment_id, None if args.conda_prefix else args.conda_env or environment_id,
                                      args.conda_prefix)
         resolver = EnvironmentResolver({environment_id: profile})
@@ -73,7 +74,7 @@ def main(argv=None) -> int:
             raise ValueError("--params must be a JSON object")
         handle = runner.submit(args.model, args.input, variant_id=args.variant, device=args.device,
                                dtype=args.dtype, parameters=parameters, walltime_seconds=args.timeout_seconds,
-                               requested_outputs=tuple(args.outputs))
+                               requested_outputs=tuple(args.outputs), environment_id=environment_id)
         print(json.dumps({"run_id": handle.run_id, "status": "SUBMITTED", "run_root": str(store.root)}), flush=True)
         while not runner.status(handle).status.terminal:
             if interrupted.is_set():

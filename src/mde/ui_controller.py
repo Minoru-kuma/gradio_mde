@@ -126,17 +126,17 @@ class InferenceController:
             raise BackendBusy("Local backend is busy; retry after the current job finishes. No job was queued.")
         staged = None
         try:
-            self.info.variant(variant_id)
-            if device not in self.info.data["supported_devices"] or dtype not in self.info.data["supported_dtypes"]:
+            variant = self.info.effective_variant(variant_id)
+            if device not in variant["supported_devices"] or dtype not in variant["supported_dtypes"]:
                 raise ValueError("Unsupported device or dtype")
             if not isinstance(parameters, dict):
                 raise ValueError("Parameters must be a JSON object")
-            parameters = validate_parameters(self.info.data.get("parameter_schema", {}), parameters)
+            parameters = validate_parameters(variant["parameter_schema"], parameters)
             if timeout is not None and (type(timeout) is not int or timeout < 1):
                 raise ValueError("Timeout must be a positive integer, or empty")
             from .contracts import normalize_outputs
             outputs = normalize_outputs(outputs)
-            capabilities = self.info.variant(variant_id).get("capabilities", self.info.data["capabilities"])
+            capabilities = variant["capabilities"]
             if any(capabilities.get(key, {}).get("status") not in ("supported", "conditional") for key in outputs):
                 raise ValueError("Unsupported requested output")
             staged = tempfile.TemporaryDirectory(prefix="mde-ui-input-")

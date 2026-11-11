@@ -24,8 +24,8 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 ## 現在の開発状況
 
 **Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。**
-Phase 02Dは `codex/phase-02d-run-management` で実装・検証を完了し、PR経由のmain統合が承認されています。
-02Dは全Exit達成済み、Phase 03以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
+Phase 02Dは `codex/phase-02d-run-management` で実装・検証を完了し、PR経由でmain統合済みです。
+02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1の受入検証を完了し、03.2以降は未着手です。Phase 04以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -141,7 +141,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
 | [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | COMPLETE。01A / 01B COMPLETE（CPU E2E / Local robustness） |
 | [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | COMPLETE（02A〜02D全Exit達成） |
-| [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 未着手 |
+| [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 実装中（03.1受入完了、Phase全体Exit未達） |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |
 | [05](docs/phases/phase-05.md) | Benchmark Mode | 未着手 |
 | [06](docs/phases/phase-06.md) | Execution Backend Expansion / MockSlurm | 未着手 |
@@ -231,7 +231,7 @@ Three.js r180を同梱し、準備済み環境ではCDNなしのoffline操作を
 明示CPUのnative MoGeとfake / contract / browser / offlineの全Exitを達成し、02C COMPLETE。
 固定Chrome / Linuxで262,144 output pixelsまで検証。GPU / 他OS/browser / 学会実演は未検証。
 操作・保存schema・制限は [Results Viewer](docs/results-viewer.md)、実測結果は
-[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは全Exit達成済み、Phase 03以降は未承認です。
+[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1の受入検証を完了し、03.2以降は未着手です。Phase 04以降は未承認です。
 
 ## Phase 02D Run Management
 

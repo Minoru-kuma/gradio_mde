@@ -205,3 +205,14 @@ geometry用のNumPyはworker環境の既存依存、controlのgeometry readerは
 02A serialization_secondsは要求されたnumeric artifactsの変換・NPY保存・geometry値検証・checksumを
 含むscopeを各metricに明記する。01A形式の保存metricのscopeを変更せず読み戻す。
 CPUなのでCUDA allocator値は省略、GPU / driver互換は未検証。
+
+## Phase 03.1 variant environment selection
+
+metadata discoveryは環境を起動・作成せず、未準備でもmanifestを一覧できる。
+実効variantの`environment_refs`で1候補なら省略時に採用し、複数候補では明示IDを要求する。
+Runner.submitのoptional `environment_id`とCLIの`--environment-id`で選択する。
+既存`--conda-env / --conda-prefix / --checkpoint`は選択した単一jobのoverrideとして維持。
+logical環境IDを先頭候補で推測せず、対象profileがなければworker起動前に拒否する。
+03.1の追加fake pluginは2 logical IDを既存の同じtest環境へ割り当てる契約テストであり、
+実モデルの独立した2環境を検証した証拠ではない。実モデル追加は03.2以降で行う。
+複数モデルのtarget環境 / checkpoint mapとUIの未準備表示は03.3で追加予定。

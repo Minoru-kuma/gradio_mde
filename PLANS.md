@@ -2,21 +2,79 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03 — 調査・計画・設計中 / production実装未着手**。
-- Authorization: 2026-11-09の最新ユーザー指示によりPhase 03の調査と段階的実装計画の整理のみ承認。
-  production実装、環境構築・weights取得・新モデル実推論、mainへの反映は行わない。
-  同日の追加指示により、今回の計画を含め各作業の完了・検証後は作業ブランチへcommit / 通常pushする。
+- Current work: **Phase 03 — 03.1受入完了 / 03.2以降未着手（2026-11-11）**。COMPLETEではない。
+- Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
+  各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
+  `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
-- Phase 03実装、04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
-- Start evidence: fetch成功。最新origin/mainは `8a6d5082ecf64eb9b9bcb8c668c41c0c3f145333`
-  （02D PR #1統合）。開始時の `codex/phase-02d-run-management` はcleanでmainの1 commit前、
-  tree差分なし。競合・範囲外差分なしを確認し最新origin/mainから
-  `codex/phase-03-plugin-planning` を作成した。
-- 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、下記関連仕様。
-  AGENTS / README / 他仕様の「03未承認」は今回指示前の状態。最新指示は計画・設計のみを許可する。
-  以下の02D以前の承認・main反映方針は当時の履歴であり今回の承認ではない。
-- 新規作業は作業ブランチ、main直接編集・commit禁止。remoteの追加更新・競合・範囲外変更は
-  上書きせず停止・報告。force push禁止。
+- PR作成・main統合・Phase 04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
+- Start evidence: fetch成功。最新origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`
+  （Phase 03計画PR #2統合）。開始時の計画ブランチはcleanでmainとtree差分なし。
+  最新origin/mainから指定の実装ブランチを作成。競合・範囲外差分なし。
+- 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、関連仕様。
+  以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
+- main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
+
+## Phase 03 implementation record — 2026-11-11
+
+- Purpose / scope: 既存MoGe / CLI / Gradio / 旧Run / raw不変を維持し、下記03.1〜03.6を順次実装。
+  新モデルの採用はimmutable upstream / checkpoint・digest・license・CPU根拠を確定してから行う。
+  根拠不足・互換性問題・外部障害は停止して報告し、未達gateを飛ばさない。
+- 03.1変更順: baseline suite / browser → metadata-only discoveryと診断 → manifest scalar schema検証 →
+  実効variant / environment選択の共通化 → Runner / CLI / 現行controllerへ適用 → fakeと既存回帰。
+- 03.1設計: variantのcapabilities / parameter_schema / devices / dtypes / input_constraints /
+  environment_refsは項目単位で全体置換、未指定のみmodel値へfallback。元manifest / variantは保持。
+  複数environmentは明示ID必須、1候補は従来fallback。conditional説明文は実行せず、
+  statusで事前検査、出力の欠如は既存workerで拒否。runtime能力照合は後段03.4で追加する。
+- 検証: directory追加の第2fakeを同一Runner / Backendで順次実行、import境界・不正manifest・
+  duplicate IDs・variant差異・未準備環境を検証。既存suite / opt-in browser、明示MoGe CPU CLI、
+  旧Run読込のhash / mtime不変を記録。GPU / 新モデルはこの段階の検証に含めない。
+- Risks / rollback: discoveryによる不正pluginの巻込み、variantの暗黙merge、曖昧な環境選択を拒否。
+  新schema major / geometry profileは03.1では追加しない。旧Runへのmigration / 上書きなし。
+  環境・weights・runsはGit管理外。段階単位の修正commitで戻し、force pushしない。
+- Completed / remaining: 実装ブランチ作成、正本確認、承認状態更新。03.1受入完了、03.2〜03.6未着手。
+
+### 03.1 acceptance evidence — PASS
+
+- 実装: metadata-only discovery / diagnostics / duplicate ID拒否、manifest scalar schema検証、
+  実効variant全体置換とenvironment選択、Runner / CLI / 現行controllerの共通解決。
+  adapter / worker protocol / serialization profilesは変更せず、新実モデルはまだ追加しない。
+- fake: `tests/fixtures/models/alternate/`のdirectory追加だけで発見・実行。
+  fake → alternate(depth + mask) → alternate別variant → fakeを同一Runner / Backendで成功。
+  parameter / capability / environmentの切替、選択adapterだけのimport、新instance collect不変を確認。
+  未登録profile / 未作成Conda prefixの失敗を不正manifestと区別し、自動installしないことを確認。
+- 実MoGe + fakeの同一instance検証: `6e2d58ec-6101-45a7-aa2f-1c220b3302b8` →
+  `3b594338-702a-4781-81a8-ab436fe651b6`、両方COMPLETED / 新instance collect hash・mtime不変。
+  一時registryに既存MoGe directoryと追加fake directoryを置いた検証。
+  このfixtureは既存単一checkpoint設定を共有し、model / variant別weights mapは03.3で追加予定。
+- 最終production sourceでMoGe CLI CPU: `a9ed78c0-314e-49cf-aec2-05fd4a1e12e1`、
+  source_digest `2e9c296bd71caba77196eebbcee4a71e1a1ee6f5d80124781e6f8ece5397a933`一致。
+  Python 3.11.14 / torch 2.6.0+cu124 / CUDA runtime 12.4 / cuda_available=false / cpu。
+  depth float32 [256,256] / z_depth / metric / m、65,536 pixel有効。
+  同一入力の01A Run `9c5b6556-30d3-43ae-827f-7bd8b0a47580`とmax absolute error=0。
+  実行と数値回帰の証拠でありmetric accuracy評価ではない。
+- 旧Run 4件（01A depth-only、02C geometry、JPEG、02D）を各2回CLI collectし全fileのhash / mtime不変。
+  01B履歴Run `f4a2052f-71da-4664-9c9f-281cca95fb41`はローカルdirectoryがなく未検証。
+  01B形式の互換性は既存contract fixtureでも検証する。
+- browser: 既存5件成功（231.693秒）。Python非loopback / DNSとbrowser外部HTTP遮断下で
+  MoGe CPU推論 / native Points・4表示・mesh / 再起動保存読込 / busy・cancel・timeout・管理操作成功。
+  CPU UI Run `4026bcb2-e92b-4068-ae10-1e4edf15e110`、native Points Run
+  `70f69f38-2473-4ede-b3fc-154204e8f8a4`（125,125 faces、predict 1回、raw不変）。
+  Chrome 154.0.8037.92 / Linux / SwiftShader、外部requests・page errorsなし。
+  browser検証中にregistryの不正JSON検査を強化したため、最終source一致の実推論証拠は上記CLIを使う。
+- baseline: control Pythonの初回suiteはNumPy不在で6 errors / 29 skip。
+  origin/mainの隔離sourceを独立UI環境で実行し88件中82成功 / 5 skip / 1 failure（266.924秒）。
+  4秒timeoutがfixture子processのreadiness前に終了した。単独再実行1成功（4.268秒）。
+  baseline browser 3件成功（187.534秒）。変更後の初回suiteも同じtimeout fixtureだけ失敗
+  （97件中91成功 / 5 skip、364.042秒）。
+  テストのbudgetを10秒へ変更し、submitから15秒以内にstatus pollingなしでTIMEOUT・子process停止を
+  確認する方式を維持。productionのtimeout動作・既定値は変更していない。最終固定sourceのsuiteは
+  **100件中95成功 / opt-in browser 5 skip（206.751秒）**。browser 5件は上記別実行で全成功。
+- 静的検証: Markdown 28件 / local links・anchors 224件 / Python AST 35件、errors 0。
+  `git diff --check`成功。GPU・新モデル・新しい独立環境・他OS/browserは未検証。
+- 03.1受入条件達成。commit / 通常push後に03.2の代表variant・依存・checkpoint / license根拠確認へ進む。
+  終了前fetchでorigin/mainは開始時の`e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま。
+  ローカル証拠は`.local/validation/phase-03*`、生成Runと同様Git管理外。
 
 ## Phase 03 investigation and staged design — 2026-11-09
 
@@ -96,7 +154,7 @@ view配列・optional confidence・w2c extrinsicsを示すが、返値説明の(
 これらは実装時にModel adapter / Environment / Execution / Run Directory / Gradio仕様へ
 同時反映する。viewer / exportの意味やAPI変更を伴う段階ではResults Viewer / Run Management仕様も更新する。
 
-### Recommended implementation order (after separate implementation authorization)
+### Recommended implementation order (2026-11-11に実装承認済み)
 
 以下の03.1〜03.6はPhase 03内の作業区切り案で、承認済みの新phase名ではない。
 各段階を小さなレビュー単位とし、先行段階の成功後に進む。初回E2Eへ全契約拡張を詰め込まない。
@@ -385,7 +443,7 @@ Points [256,256,3] / m、65,536 valid、points.z-depth誤差0 m、Normals / Intr
 状態は `NOT_STARTED → PLANNED → IN_PROGRESS → REVIEW_READY → COMPLETE` を基本とし、
 外部条件の不足は `BLOCKED` として理由を残す。`PLANNED` は計画文書の準備状態であり、
 production code の実装承認・開始を意味しない。実験 JobStatus とは別の管理状態である。
-文書準備だけでは実装を開始しない。02Dの承認範囲で全Exit達成済み。Phase 03以降は未承認。
+文書準備だけでは実装を開始しない。02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認。Phase 04以降は未承認。
 
 各 phase 開始前に、最新のユーザー指示がその phase の実作業を承認していることを確認する。
 必要な通常作業のたびに承認を取り直す必要はないが、未指示の phase に進んではならない。
@@ -399,7 +457,7 @@ Tests、Exit criteria、Known risks、Decisions deferred to later phases を維�
 | [00](docs/phases/phase-00.md) | clean-start の正式確認 | 調査記録・共通契約・段階計画の整合 | COMPLETE |
 | [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | COMPLETE、01A / 01B exit 達成 |
 | [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | COMPLETE（02A〜02D全Exit達成） |
-| [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 未着手 |
+| [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 実装中（03.1、Exit未達） |
 | [04](docs/phases/phase-04.md) | 03 | Runner から MLflow、失敗時にも結果保存 | 未着手 |
 | [05](docs/phases/phase-05.md) | 03・04 | 同じ single inference に基づく比較評価 | 未着手 |
 | [06](docs/phases/phase-06.md) | 01–05 | Mock backend で非同期・状態・再収集を検証 | 未着手 |

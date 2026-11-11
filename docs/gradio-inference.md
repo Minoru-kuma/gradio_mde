@@ -163,3 +163,12 @@ ResultsのRun managementでSaved terminal Run IDをInspectして操作する。
 入力変更や確認cancelで確認を破棄し、Serviceでも対象・scope・revision / inventoryを再検証する。
 全callbackは既存同様queue=False。管理操作は共通Serviceに委譲し、filesystemを直接操作しない。
 操作手順と失敗時retryは [管理仕様](run-management-spec.md)、受入は [02D](phases/phase-02/phase-02d.md)。
+
+## Phase 03.1 metadata compatibility
+
+初期controls / device / dtype / outputsはdefault variantの実効metadataから作り、
+controllerのsubmit検証も共通ModelInfo解決を使用する。
+この段階のUIは起動時1モデル固定のまま。model選択・variant変更時の動的controls再構成・
+複数target環境 / weights map・未準備表示は03.3の受入対象。
+Inference / Resultsの2タブ、共有Backend、sessionごとのhandle / generation、
+busy即拒否・cancel / timeout・旧Run読込の契約を維持する。

@@ -282,3 +282,12 @@ requested outputsは条件digestにも含む（既定depth-onlyのdigest入力�
 JobSpecの旧[depth]制限を拡張し、single-view / single-attempt / cpu・cuda:0 / float32の制限は維持。
 新profile・geometry保存後のcollectは同じBackend境界で行い、cancel / timeout / busyを変更しない。
 terminal JobResultはimmutable。02BのUI / sessionは上記の実装境界。数値progress契約は追加せずunavailableとする。
+
+## Phase 03.1 model metadata snapshot
+
+Runnerは実効variantを共通ModelInfo経由で解決し、device / dtype / parameters / capabilityと
+single-view PNG / RGB制約を検査してJobSpecへsnapshotする。
+`model_ref.manifest`は元manifest、`model_ref.variant`は全体置換・fallback後の実効値。
+optionalな`environment_id`指定をvariantの候補と照合し、1候補のみ従来fallbackを許す。
+CLIは同じ解決結果でtarget profileを構成する。Backendにモデル名分岐は追加しない。
+Job schema / attempt制約 / status / busy / cancel / timeout / 保存済みcollect契約は維持する。

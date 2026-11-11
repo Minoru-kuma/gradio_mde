@@ -33,6 +33,7 @@ def build_app(controller):
             return {"error": str(error)}
 
     info = controller.info.data
+    initial_variant = controller.info.effective_variant()
     event = dict(queue=False, concurrency_limit=None, trigger_mode="once",
                  api_visibility="private", show_progress="hidden")
 
@@ -61,14 +62,14 @@ def build_app(controller):
                 upload = gr.File(label="Input PNG / JPEG (10 MiB; 4,194,304 pixels; edge ≤ 4096)",
                                  file_types=[".png", ".jpg", ".jpeg"], type="filepath", elem_id="input-png")
                 with gr.Row():
-                    device = gr.Dropdown(info["supported_devices"], value=None, label="Device (choose explicitly)",
+                    device = gr.Dropdown(initial_variant["supported_devices"], value=None, label="Device (choose explicitly)",
                                          elem_id="device-choice")
-                    dtype = gr.Dropdown(info["supported_dtypes"], value=info["supported_dtypes"][0], label="Dtype")
+                    dtype = gr.Dropdown(initial_variant["supported_dtypes"], value=initial_variant["supported_dtypes"][0], label="Dtype")
                     timeout = gr.Number(value=300, precision=0, minimum=1, label="Timeout (seconds, includes worker startup)",
                                         elem_id="timeout-seconds")
                 controls, names = [], []
                 gr.Markdown("### Model parameters")
-                for name, rule in info.get("parameter_schema", {}).get("properties", {}).items():
+                for name, rule in initial_variant["parameter_schema"].get("properties", {}).items():
                     options = dict(label=name, value=rule.get("default"), elem_id=f"parameter-{name}")
                     if "enum" in rule:
                         control = gr.Dropdown(rule["enum"], **options)
@@ -81,7 +82,7 @@ def build_app(controller):
                         control = gr.Textbox(**options)
                     names.append(name)
                     controls.append(control)
-                capabilities = info["variants"][0].get("capabilities", info["capabilities"])
+                capabilities = initial_variant["capabilities"]
                 from .contracts import OUTPUT_NAMES
                 outputs = gr.CheckboxGroup([key for key in OUTPUT_NAMES if
                     capabilities.get(key, {}).get("status") in ("supported", "conditional")],
@@ -286,7 +287,7 @@ def main(argv=None):
     info = registry.get_model(args.model)
     manager = None
     if not args.read_only:
-        environment_id = info.data["environment_refs"][0]["environment_id"]
+        environment_id = info.environment()["environment_id"]
         resolver = EnvironmentResolver({environment_id: EnvironmentProfile(
             environment_id, name=None if args.conda_prefix else args.conda_env or environment_id,
             prefix=args.conda_prefix)})

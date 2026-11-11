@@ -73,13 +73,19 @@ class LocalRobustnessTests(unittest.TestCase):
         self.assertFalse(self.runner.collect(handle).execution["process_cleanup"]["sigkill_used"])
 
     def test_timeout_runs_without_status_polling_and_stops_children(self):
-        handle, job, pids = self.start_block(timeout=4)
+        # Include Conda startup and fingerprint IO in the execution budget. Four
+        # seconds could expire before this child-tree fixture announced readiness
+        # on the unchanged baseline under concurrent browser / CPU acceptance.
+        timeout = 10
+        submitted = time.monotonic()
+        handle, job, pids = self.start_block(timeout=timeout)
         # No status calls: the independent execution timer must enforce the limit.
-        deadline = time.monotonic() + 10
+        deadline = submitted + timeout + 5
         while not (job.run / "attempts/attempt-0001/job-result.json").exists():
             self.assertLess(time.monotonic(), deadline)
             time.sleep(0.02)
         result = self.runner.collect(handle)
+        self.assertLess(time.monotonic(), deadline)
         self.assertEqual(result.status, "FAILED")
         self.assertEqual(result.error["code"], "TIMEOUT")
         self.assertFalse(self.runner.status(handle).cancel_requested)

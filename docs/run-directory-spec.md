@@ -264,3 +264,10 @@ Runner.collectのrun.json publicationはinstance lockを取り、同内容なら
 複数sessionの同時collectでtemporary fileを競合させず、再表示によるraw / result更新も行わない。
 02Cでdownload / viewer / derivedを追加、管理serviceは02D。
 詳細は [Gradio Inference](gradio-inference.md#input-and-result-compatibility)。
+
+## Phase 03.1 compatibility
+
+JobSpecのmodel_ref.variantに実効metadata snapshotを加算し、元manifestも保持する。
+旧schema 1.0 Runに実効snapshotを要求するreader変更やmigrationは行わない。
+01A-depth-only / 02A-geometry-v1のwire format、raw / 確定result不変を維持する。
+複数pluginの新instance collectも再推論せず、hash / mtime不変で検証する。

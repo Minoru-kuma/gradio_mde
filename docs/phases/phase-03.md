@@ -1,11 +1,12 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: 調査・計画・設計中（2026-11-09指示）。production実装は未着手・未承認。
-今回の承認は計画・設計まで。実装・環境構築・main反映へ進まない。
-管理: [PLANS.md](../../PLANS.md)。
-調査結果・契約変更案・段階的実装順序・要決定事項は
-[Phase 03 planning](../../PLANS.md#phase-03-investigation-and-staged-design--2026-11-09)を参照。
-以下はPhase 03全体の目標・Exitであり、今回実装を許可するものではない。
+Status: **実装中 / 03.1受入完了、03.2以降未着手（2026-11-11実装承認）**。Exit未達、COMPLETEではない。
+`codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
+PR作成・main統合・Phase 04以降には進まない。
+履歴: 2026-11-09は調査・計画・設計のみ承認、production実装・環境構築は未承認だった。
+管理: [PLANS.md](../../PLANS.md)。段階計画と実装記録は
+[Phase 03 planning](../../PLANS.md#phase-03-investigation-and-staged-design--2026-11-09)と
+[implementation record](../../PLANS.md#phase-03-implementation-record--2026-11-11)を参照。
 
 ## Goal
 
@@ -82,3 +83,11 @@ multi-view sequence の高度な UI、3D / pose / normal benchmark、全 variant
 | --- | --- | --- | --- |
 | representative variant を先に統合 | family ごとの能力差を検証可能な範囲にする | 全 variant 対応を主張しない | manifest に variant を追加 |
 | single-view 共通契約を必須にする | MDE 比較の最小単位を先に安定させる | 完全な multi-view 評価は後回し | 同じ PredictionBatch に scene 情報を追加 |
+
+## Stage acceptance status — 2026-11-11
+
+03.1 PASS。metadata-only discovery / manifest検証・実効variant解決、directory追加fakeの
+同一Runner / Backend実行、MoGe CPU CLI数値回帰（01Aとの差0）、旧4Runの再読込不変を確認。
+最終suiteは100件中95成功・opt-in browser 5 skip（206.751秒）、別browser 5件全成功（231.693秒）。
+03.2〜03.6は未着手、Phase 03全体のExitは未達。GPU / 新モデル / 新規独立環境は未検証。
+詳細・baseline失敗と修正・Run IDは [03.1 evidence](../../PLANS.md#031-acceptance-evidence--pass)。

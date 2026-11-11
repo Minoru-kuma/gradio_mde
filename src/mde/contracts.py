@@ -1,5 +1,6 @@
 """Small, dependency-free model and execution contracts (protocol 1.0)."""
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -92,6 +93,27 @@ class ModelInfo:
             if variant["variant_id"] == key:
                 return variant
         raise ValueError(f"Unknown variant: {key}")
+
+    def effective_variant(self, variant_id: str | None = None) -> dict:
+        """Resolve whole-field overrides without mutating the manifest snapshot."""
+        variant = deepcopy(self.variant(variant_id))
+        for key in ("capabilities", "parameter_schema", "supported_devices", "supported_dtypes",
+                    "input_constraints", "environment_refs"):
+            if key not in variant:
+                variant[key] = deepcopy(self.data.get(key, {} if key in (
+                    "capabilities", "parameter_schema", "input_constraints") else []))
+        return variant
+
+    def environment(self, variant_id: str | None = None, environment_id: str | None = None) -> dict:
+        references = self.effective_variant(variant_id)["environment_refs"]
+        if environment_id is None:
+            if len(references) != 1:
+                raise ValueError("Multiple environments; select an environment_id explicitly")
+            return references[0]
+        for reference in references:
+            if reference["environment_id"] == environment_id:
+                return reference
+        raise ValueError(f"Unknown environment for selected variant: {environment_id}")
 
 
 @dataclass(frozen=True)

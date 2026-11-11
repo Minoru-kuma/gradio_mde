@@ -5,15 +5,18 @@
 [phase 文書](docs/phases/) と変更対象の仕様を読む。
 
 1. 作業は phase 単位で行う。ユーザーが指示していない phase に進まない。
-   最新の指示（2026-11-09）により現在の承認範囲は Phase 03 — Model Plugin Architecture /
-   Multi-model Support の調査・計画・設計、関連docs更新と作業ブランチへのcommit / 通常push。
-   Phase 03のproduction実装・環境構築・main反映は未承認。Phase 02DはPR経由でmain統合済み。
+   最新の指示（2026-11-11）によりPhase 03 — Model Plugin Architecture /
+   Multi-model Support の実装・独立環境構築・検証・関連docs更新を承認。
+   `codex/phase-03-implementation` をPhase 03完了まで継続使用し、PLANS.mdの03.1〜03.6を
+   順番に実施する。先行段階の受入条件を満たした後に次へ進み、成功した段階ごとにcommit / 通常push。
+   PR作成・main反映・Phase 04以降は未承認。Phase 02DはPR経由でmain統合済み。
    開始時にlatest origin/mainを確認する。remote更新・競合・範囲外変更は上書きせず停止・報告。
-   追加承認により、途中実装の作業ブランチへのcommit / 通常pushは可能。今後のmain反映には別途指示が必要。
+   履歴: 2026-11-09はPhase 03調査・計画・設計と作業ブランチcommit / 通常pushのみ承認。
+   当時未承認だったPhase 03実装・環境構築は2026-11-11の指示で承認された。
    force pushは禁止。Phase 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02はCOMPLETE。
    02Cは全Exit達成でCOMPLETE（fake / contract / browser / 実CPU native Points / offline）。
-   他モデル / MLflow / Benchmark / Slurm / 高度なqueue・active recoveryは未承認。
-   02D完了はPhase 03の開始許可ではない。Gradioは独立application環境で既存Runner / Backendを利用し、
+   Phase 03のMoGe / UniK3D / DA3以外のモデル、MLflow / Benchmark / Slurm / 高度なqueue・active recoveryは未承認。
+   phase完了による次phaseの自動開始はしない。Gradioは独立application環境で既存Runner / Backendを利用し、
    全sessionで1つのLocalBackendを共有。Inference / Resultsの2タブを維持。
    CPUを明示選択し、CUDA要求時の自動fallbackを行わない。
    仮K・便宜的逆投影をmodel由来Pointsにしない。既存depth-only Run / CLI互換とraw不変を維持。

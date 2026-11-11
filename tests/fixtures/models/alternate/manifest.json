@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "model_id": "alternate",
+  "display_name": "Independent alternate fixture",
+  "adapter_entrypoint": "tests.fixtures.models.alternate.adapter:AlternateAdapter",
+  "upstream_revision": "test-fixture",
+  "default_variant": "distance",
+  "variants": [
+    {"variant_id": "distance", "checkpoint": null},
+    {"variant_id": "offset", "checkpoint": null,
+     "parameter_schema": {"properties": {"offset": {"type": "integer", "default": 4, "minimum": 1}}},
+     "capabilities": {"depth": {"status": "supported"}},
+     "environment_refs": [{"environment_id": "mde-fake-alternate", "definition_ref": "models/moge/environment.yml"}]}
+  ],
+  "capabilities": {"depth": {"status": "supported"}, "mask": {"status": "conditional", "condition": "fixture native mask"}},
+  "environment_refs": [{"environment_id": "mde-moge", "definition_ref": "models/moge/environment.yml"}],
+  "supported_devices": ["cpu"],
+  "supported_dtypes": ["float32"],
+  "input_constraints": {"min_views": 1, "max_views": 1, "format": "PNG", "worker_mode": "RGB"},
+  "parameter_schema": {"properties": {"distance": {"type": "number", "default": 3.5, "minimum": 0.1, "maximum": 10}}},
+  "test_extension": {"preserve": true}
+}
