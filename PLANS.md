@@ -2,12 +2,13 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03 — 再開、03.4採用前調査で停止（license根拠不足、2026-11-11）**。COMPLETEではない。
+- Current work: **Phase 03 — 03.4の独立実装・合成検証を継続、実checkpoint保留（2026-11-11）**。COMPLETEではない。
 - Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
   最新の追加指示「再開して」により03.4から再開。03.3まで完了して停止する指示は当時の履歴として保持する。
-  ただし採用根拠不足・重大な互換性問題・外部環境 / license障害では推測せず停止・報告する。
+  最新指示でlicense不確実性による一律停止を見直す。実checkpoint取得・利用・再配布のみ根拠確認まで保留し、
+  独立adapter / fake / 幾何検証は継続。明確な禁止条件との衝突は該当作業を停止。03.4実E2E未達で03.5へ進まない。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
 - PR作成・main統合・Phase 04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
 - Start evidence: fetch成功。最新origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`
@@ -21,7 +22,7 @@
 
 - Purpose / scope: 既存MoGe / CLI / Gradio / 旧Run / raw不変を維持し、下記03.1〜03.6を順次実装。
   新モデルの採用はimmutable upstream / checkpoint・digest・license・CPU根拠を確定してから行う。
-  根拠不足・互換性問題・外部障害は停止して報告し、未達gateを飛ばさない。
+  根拠不足に依存する採用作業・互換性問題・外部障害は停止して報告し、未達gateを飛ばさない。
 - 03.1変更順: baseline suite / browser → metadata-only discoveryと診断 → manifest scalar schema検証 →
   実効variant / environment選択の共通化 → Runner / CLI / 現行controllerへ適用 → fakeと既存回帰。
 - 03.1設計: variantのcapabilities / parameter_schema / devices / dtypes / input_constraints /
@@ -219,7 +220,7 @@ Trade-off: plain state_dict読込は使用しない。Future extension: 他varia
   未検証: UniK3D、追加optional / multi-view、実GPU、他OS/browser、DA3 lock再作成・process_res=504。
   commit / pushの確定結果はGit履歴と同名remote refで確認する。
 
-### 03.4 resume and adoption gate — license evidence unresolved
+### 03.4 initial resume and adoption gate — historical stop
 
 - Scope / authorization: 最新の再開指示により03.4〜03.6を同じブランチで順次進める。
   03.3の受入 / commit / pushは完了済み。03.4の成功前に03.5へ進まず、PR / main統合・Phase 04以降なし。
@@ -249,6 +250,41 @@ Trade-off: plain state_dict読込は使用しない。Future extension: 他varia
   候補metadata / 固定sourceの記述一致、`git diff --check`とdocs-only file set確認も成功。
 - Result: **03.4は未達で停止**。調査記録を作業ブランチへcommit / 通常pushし、採用条件の確認後に再開する。
   Phase 03はCOMPLETEではない。作者の明確なlicense文書・許諾等を待ち、外部連絡は行わない。
+
+### 03.4 revised stop conditions and independent implementation — 2026-11-11
+
+- Authorization / history: 上記の調査結果と当時の一律停止を履歴として保持。最新ユーザー指示により、
+  license不確実性だけで技術的に独立した作業を止めない。実checkpoint取得・利用・再配布は保留し、
+  明確な禁止との衝突は該当作業を停止する。外部連絡は行わず作者への質問を文書化する。
+- Start: cleanな既存ブランチ、HEAD / remoteは`11fa2c589d6affb2b8e77a2a924ddc822cdcb046`。
+  fetch / ls-remote成功、origin/mainは`e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま。
+- Purpose / scope: independently authored `models/unik3d/` adapterのload / predict / unloadと
+  native形式の合成NumPy出力変換を既存契約で実装。production loadはcheckpointへ触れる前に保留を明示。
+  runnable manifest / real runtime bridge / UniK3D環境構築は今回追加せず、supportedとの誤表示を防ぐ。
+- Design evidence: 固定sourceのinferはdistance=norm(points)、depth=points.zを返す。
+  canonical depthにdistanceを選びray_distanceと明記し、負のzを持つnative Pointsを保持。
+  BCHW→HWCのlayout変換のみで仮K・逆投影・resamplingをしない。実scale根拠未検証のためunknown / unknown。
+  computed validityをmodel maskと偽らずdepthのNaNに反映し、既存workerのeffective maskを利用する。
+  既存01A / 02A profile内のdepth / pointsのみ。rays / confidence / poseの保存、新profile、runtime能力照合は未実装。
+- Order: plan / 停止条件更新 → 独立adapter / 数値fixture → 隔離test registryでfake worker保存・stdlib読戻し →
+  既存回帰・旧Run不変・静的検証 → docs実績更新 → 部分進捗commit / 通常push。
+- Validation: 合成の軸方向 / 負z / 非有限値 / rangeとzの相違 / layout・dtype・grid・距離不整合・要求出力拒否、
+  lifecycleと実checkpointを開かないguard。fakeのdepth-only / points出力、失敗時cleanup、再collectのhash / mtime不変。
+  数値importは子process内に隔離しcontrol境界を保持。fake workerは既存test環境を使用し、第3実環境と数えない。
+- Risk / rollback: sourceコード・weightsの複製や依存追加なし。既存core / UI / backend / schema / rawは変更しない。
+  native API bridge・camera / metric精度・CPU動作は合成testで証明できず保留。追加plugin / testsを修正commitで戻せる。
+- Gate: 03.4は部分実装で実モデルE2E未達、03.5 / 03.6未着手、Phase 03はCOMPLETEではない。
+  実checkpoint条件の根拠確認→採用判断→独立環境 / digest確認→実depth-only E2E→必要optionalの実出力照合が残る。
+- Results: 最終suiteは121 tests / 114成功 / opt-in browser 7 skip（305.103秒）。追加UniK3D合成5 testsを含み、
+  default load / checkpoint guard、数値geometry、fake workerのdepth-only / Points、missing distance / 全無効の失敗とcleanup、
+  production非登録・unsupported拒否が成功。ログ: `.local/validation/phase-03-4-regression.log`。
+  初回fixture実行では一時registryがproject外のためsource fingerprintで拒否された。project内のGit除外領域に隔離して修正し、最終suite成功。
+  旧Run4件を各2回CLI collectし全file hash / mtime不変。旧01B Run `f4a2052f-71da-4664-9c9f-281cca95fb41`は
+  local directory不在で未検証（捏造せず記録）。ログ: `.local/validation/phase-03-4-compatibility.json`。
+  固定source HEADと取得済config / cardのSHA-256も再照合し一致。実checkpoint本体は取得・利用・再配布していない。
+  静的検証: Markdown32件 / links・anchors251件 / Python AST46件、errors 0、`git diff --check`成功。
+  今回未実行: 実UniK3D / 実モデル推論 / browser opt-in / GPU。既存環境へのinstall・変更なし。
+  今回は03.4完了commitではなく、停止条件見直しと独立部分の検証済進捗をcommit / 通常pushする。
 
 ## Phase 03 investigation and staged design — 2026-11-09
 

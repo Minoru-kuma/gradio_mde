@@ -275,6 +275,10 @@ ModelAdapter still owns native conversion and digest verification, while Environ
 CLI legacy flags and existing Run readers remain compatible. See [target configuration](target-configuration.md)
 and [Gradio contract](gradio-inference.md#phase-033-model--variant-switching).
 03.1 / 03.2 / 03.3 acceptance passed. The instruction to stop at 03.3 is historical;
-work resumed for 03.4, then stopped at the UniK3D license-evidence adoption gate.
+work resumed for 03.4, initially stopped at the UniK3D license-evidence adoption gate, then resumed
+independent adapter / synthetic geometry work under the revised stop conditions.
 See [investigation and resume conditions](unik3d-investigation.md).
-03.4–03.6 remain unimplemented and Phase 03 is not COMPLETE.
+03.4 is partially implemented using an injected synthetic runtime, with no production manifest or real runtime bridge.
+Real checkpoint acquisition / use / redistribution remain on hold; source labels and checkpoint terms are unresolved.
+Depth / native points reuse existing profiles; core / UI / backend and schema are unchanged.
+03.4 real-model E2E is unmet, 03.5–03.6 remain unimplemented, and Phase 03 is not COMPLETE.

@@ -1,8 +1,9 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: **実装中 / 03.1〜03.3受入完了、再開後の03.4採用前調査で停止（license根拠不足）**。Exit未達、COMPLETEではない。
+Status: **実装中 / 03.1〜03.3受入完了、03.4独立adapter・合成検証を継続、実checkpoint保留**。Exit未達、COMPLETEではない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
-最新の再開指示により03.4から継続。ただしUniK3D採用license gate未達のため実装には進んでいない。
+最新の停止条件見直し指示により03.4の独立実装・合成検証を継続。実checkpointの取得・利用・再配布は
+適用条件の根拠確認まで保留し、03.4実モデルE2E未達のまま03.5には進まない。
 直前の03.3で停止する指示と当時の受入結果は下記の履歴として保持する。
 PR作成・main統合・Phase 04以降には進まない。
 履歴: 2026-11-09は調査・計画・設計のみ承認、production実装・環境構築は未承認だった。
@@ -107,10 +108,41 @@ stale callback拒否、未準備表示とlegacy CLI / UI互換を確認。
 詳細: [03.3 evidence](../../PLANS.md#033-acceptance-evidence--pass--requested-stop-point)。
 03.4〜03.6は未着手。最新ユーザー指示に従い03.3のcommit / 通常push後に停止し、Phase 03 COMPLETEとはしない。
 
-## Resume evidence — 03.4 adoption gate
+## Historical resume evidence — initial 03.4 adoption stop
 
 再開時のfetch / clean tree / branch一致を確認。03.4のUniK3D採用前調査でsourceのlicense表記差異と
 checkpointへの適用条件の根拠不足を確認したため、元の指示に従い停止した。
 環境構築・weights本体取得・adapter / optional実装・03.5 / 03.6には進んでいない。
 03.1〜03.3の受入結果を維持し、Phase 03全体をCOMPLETEとはしない。
 確認資料と再開条件: [UniK3D investigation](../unik3d-investigation.md)。
+
+## 03.4 revised stop conditions and independent implementation
+
+上記のlicense調査と当時の一律停止は履歴として保持する。最新指示により独立adapter / fake / 幾何検証は継続し、
+明確な禁止条件と衝突する作業のみ停止する。sourceのCC BY-NC / CC BY-NC-SA表記差異と
+checkpointへの適用条件未確認は未解決。実checkpointの取得・利用・再配布は引き続き保留する。
+
+実装範囲は [UniK3D adapter contract](../../models/unik3d/README.md)。native形式の合成distanceを
+ray_distanceに、native PointsをHWCに変換し、負z / z=0を保持。range / z / pointsの整合性と
+無効値を検証し、scale / unitはunknown。モデル固有処理はmodels/unik3d内のみ。
+実runtime bridge / production manifest / 実環境 / real checkpointは追加していない。
+既存profileでdepth-only / pointsを保存するfake検証であり、実モデル成功と数えない。
+core / UI / backend / schemaへの変更なし。rays / confidence / pose保存・新profile・runtime能力照合は未実装。
+
+Verification results（今回実施）:
+
+- 最終suite: **121 tests / 114成功 / browser opt-in 7 skip、305.103秒**。
+  UniK3D合成5 testsを含む。checkpointを開かないguard / lifecycle / geometry / worker保存・読戻し、
+  missing distance / 全無効出力の失敗とcleanup、unsupported要求拒否が成功。
+- 旧Run4件を各2回CLI collectし、全file hash / mtime不変。旧01B Run1件はlocal directory不在で未検証。
+  fakeの新instance collectも再推論なし / hash・mtime不変。
+- 固定source HEAD、config / model cardのSHA-256一致。調査結果を変更・推定補完していない。
+- Markdown32件 / links・anchors251件 / Python AST46件、errors 0。diff whitespace検査も成功。
+- 未実施: 実UniK3D checkpoint取得 / 使用 / 再配布、実runtime / 独立環境、実モデル推論、今回のbrowser opt-in / GPU。
+  実施ログは`.local/validation/phase-03-4-regression.log` / `phase-03-4-compatibility.json` / `phase-03-4-static.json`。
+  これは独立部分の検証済進捗であり、03.4受入成功ではない。
+
+03.4の残条件: 作者の根拠による適用条件確認、採用判断、独立環境構築、実runtime接続、
+checkpoint実file digest検証、実モデルdepth-only E2Eと必要optionalの実出力照合。
+[作者への確認事項](../unik3d-investigation.md#checkpoint-resume-gate-and-next-steps)は整理済み、送信していない。
+**03.4受入未達 / 03.5・03.6未着手 / Phase 03はCOMPLETEではない。**

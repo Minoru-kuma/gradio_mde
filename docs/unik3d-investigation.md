@@ -1,7 +1,9 @@
 # UniK3D adoption investigation — Phase 03.4
 
-Status: **candidate only / adoption gate unmet**. Work resumed after 03.3, then stopped before
-installation, weight download or implementation because the applicable license evidence is unresolved.
+Status: **independent contract implemented and synthetically verified / real-model adoption gate unmet**.
+History: work resumed after 03.3, then initially stopped before installation, weight download or
+implementation because the applicable license evidence was unresolved. The subsequent user instruction
+revises that blanket stop: independent adapter / synthetic tests / geometry validation may proceed.
 This records conflicting labels and missing information, not a conclusion that use is prohibited.
 
 ## Scope and source identity
@@ -38,9 +40,21 @@ Large `008aa54308b8bc142f74c9c7b098833aaede06bd`. These metadata checks do not e
 A proposed license edit on a Hub PR ref was not treated as terms applying to the fixed released checkpoint.
 Public availability / ungated download does not resolve the missing applicability evidence.
 
-The user's implementation instruction requires stopping when important adoption evidence or licensing
-conditions cannot be established. Consequently, no `weights_license` value has been guessed, no variant
-has been registered as supported, and the third-model E2E gate has not been marked successful.
+No `weights_license` value has been guessed, no real variant has been registered as supported, and the
+third-model E2E gate has not been marked successful. The uncertainty remains unresolved.
+
+## Work-specific stop conditions — revised user instruction
+
+| Work | Current treatment |
+| --- | --- |
+| Independently authored adapter lifecycle, native-layout array conversion, synthetic fixtures, geometry and existing-reader tests | Continue without importing or copying upstream implementation or loading weights |
+| Real checkpoint acquisition, use or redistribution (including inference from an existing local copy) | On hold until authoritative evidence establishes the applicable terms |
+| Production registration, real runtime bridge and independent UniK3D environment | Deferred in this change; synthetic execution is not evidence for these adoption steps |
+| Work conflicting with an explicit prohibition | Stop the affected work and report the specific conflict; do not assume missing information is a prohibition |
+| 03.5 / 03.6 | Gate remains closed pending all 03.4 acceptance conditions, including real-model E2E |
+
+Public accessibility and a source-license label do not by themselves resolve checkpoint applicability.
+This is a record of missing evidence, not a legal determination or permission to use the checkpoint.
 
 ## Technical observations — source only, no execution claim
 
@@ -49,23 +63,51 @@ distance. Its source defines depth from points' z coordinate and distance from t
 rays are normalized after native postprocessing. These are distinct quantities, especially for wide-angle
 or non-pinhole cameras. A future adapter must select and document the canonical depth meaning without
 inventing pinhole K, reconstructing native Points from depth, or discarding directions by assuming positive z.
-No geometry-conversion policy has been adopted or validated on real tensors in this investigation.
+The independent synthetic contract now chooses native **distance** as canonical `ray_distance` and
+transposes native points `[1,3,H,W]` to `[H,W,3]`, preserving negative or zero z directions.
+It validates distance against norm(points), and native z-depth against points.z if present.
+It neither invents K nor reconstructs points, changes scale, resamples, or converts range to z.
+Nonfinite / nonpositive distances or nonfinite points become invalid depth / vectors; computed validity
+is not exposed as a native model mask. Real tensors, camera frame, scale and precision remain unverified.
 
 The package requires Python >=3.11 and declares NumPy >=2, torch >=2.4, torchvision >=0.19, and other
 training / visualization / extension dependencies. The README includes an explicit CPU example alongside
 CUDA installation requirements. This is source evidence only: no CPU import, memory, runtime, package
 subset or independent environment has been validated. Existing MoGe / DA3 / UI environments are unchanged.
 
-## Resume gate and next steps
+## Independent implementation boundary
+
+See [adapter scope](../models/unik3d/README.md). Default `load()` reports the checkpoint hold before
+path access or framework import. Only an explicitly injected, independently authored fixture runtime
+with no checkpoint can exercise the load / predict / unload contract. No production manifest is
+installed, so Gradio and CLI discovery do not advertise a runnable UniK3D variant.
+The synthetic runtime runs in an existing test environment; it is not a third independent model environment.
+Depth and points reuse `01A-depth-only` / `02A-geometry-v1`. Schema, core, UI and backend are unchanged.
+Rays / confidence / pose serialization, new profiles and generic runtime-capability checks remain outstanding.
+
+## Checkpoint resume gate and next steps
 
 Resume adoption when authoritative author-provided terms or permission establish the license applicable
 to the selected checkpoint and clarify the differing source labels for the intended research integration.
 No external message or permission request has been sent to the authors.
 
-Then record the adoption decision and verified terms, establish an independent environment, verify local
-weights / config digests, and complete the depth-only CLI → Runner → Backend → worker E2E. Only after that
-success, add required optional outputs one contract at a time with numeric fixtures, serialization profiles,
-stdlib-reader validation and actual native-output evidence. 03.5 remains gated on 03.4 acceptance.
+Then record the adoption decision and verified terms, establish an independent environment and runtime
+bridge, verify local weights / config digests, and complete the depth-only CLI → Runner → Backend → worker
+E2E. Required optional outputs must also be verified against actual native outputs before their acceptance.
+Independent fixture preparation may precede these steps; it does not satisfy the real-model E2E.
+03.4 remains incomplete and 03.5 remains gated on 03.4 acceptance.
 
-Local evidence is under `.local/validation/phase-03-4-unik3d-*`; it is excluded from Git. This task changes
-only repository documentation. No new implementation tests, real inference or browser tests were run.
+Questions prepared for the authors (not sent):
+
+1. For source revision `29f7862...`, should integration follow CC BY-NC or CC BY-NC-SA 4.0?
+   Which files / components have different terms, if any, and where is the authoritative clarification?
+2. What license applies to `unik3d-vits` checkpoint revision `80a99bf...` and its config, and does it
+   differ for Base / Large? Please identify a model card / license document or explicit permission covering them.
+3. Under those terms, what attribution / notices and redistribution conditions apply to a research
+   integration, local checkpoint cache, shared lab environment and any distributed checkpoint copy?
+4. Are inference outputs or a hosted research demo subject to additional conditions, and how should
+   noncommercial scope and any share-alike obligations be documented for this intended use?
+
+Local investigation evidence is under `.local/validation/phase-03-4-unik3d-*`; it is excluded from Git.
+The earlier investigation commit changed documentation only and ran no new implementation / inference tests.
+The current independent implementation has separate verification results in [Phase 03](phases/phase-03.md).
