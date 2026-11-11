@@ -1,8 +1,9 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: **実装中 / 03.1〜03.3受入完了、最新指示により03.3で停止（2026-11-11実装承認）**。Exit未達、COMPLETEではない。
+Status: **実装中 / 03.1〜03.3受入完了、再開後の03.4採用前調査で停止（license根拠不足）**。Exit未達、COMPLETEではない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
-最新の追加指示により今回の終了点は03.3受入・commit / 通常push。03.4以降には進まない。
+最新の再開指示により03.4から継続。ただしUniK3D採用license gate未達のため実装には進んでいない。
+直前の03.3で停止する指示と当時の受入結果は下記の履歴として保持する。
 PR作成・main統合・Phase 04以降には進まない。
 履歴: 2026-11-09は調査・計画・設計のみ承認、production実装・環境構築は未承認だった。
 管理: [PLANS.md](../../PLANS.md)。段階計画と実装記録は
@@ -99,9 +100,17 @@ multi-view sequence の高度な UI、3D / pose / normal benchmark、全 variant
 03.3〜03.6は未着手であり、UniK3D / optional拡張 / multi-view契約 / Phase全体Exitは未達。
 詳細: [03.2 evidence](../../PLANS.md#032-acceptance-evidence--pass)。
 
-03.3 PASS（今回の終了点）。model / variantのsession別切替、target環境 / weights map、
+03.3完了時点の履歴: PASS（当時の終了点）。model / variantのsession別切替、target環境 / weights map、
 stale callback拒否、未準備表示とlegacy CLI / UI互換を確認。
 全suite 116件中109成功・browser 7 skip（264.524秒）、別browser 7件成功（234.417秒）。
 同一BackendからMoGe / DA3を独立環境で実CPU実行し、再collectでhash / mtime不変。
 詳細: [03.3 evidence](../../PLANS.md#033-acceptance-evidence--pass--requested-stop-point)。
 03.4〜03.6は未着手。最新ユーザー指示に従い03.3のcommit / 通常push後に停止し、Phase 03 COMPLETEとはしない。
+
+## Resume evidence — 03.4 adoption gate
+
+再開時のfetch / clean tree / branch一致を確認。03.4のUniK3D採用前調査でsourceのlicense表記差異と
+checkpointへの適用条件の根拠不足を確認したため、元の指示に従い停止した。
+環境構築・weights本体取得・adapter / optional実装・03.5 / 03.6には進んでいない。
+03.1〜03.3の受入結果を維持し、Phase 03全体をCOMPLETEとはしない。
+確認資料と再開条件: [UniK3D investigation](../unik3d-investigation.md)。

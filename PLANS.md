@@ -2,11 +2,12 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03 — 03.1〜03.3受入完了、最新指示により03.3で停止（2026-11-11）**。COMPLETEではない。
+- Current work: **Phase 03 — 再開、03.4採用前調査で停止（license根拠不足、2026-11-11）**。COMPLETEではない。
 - Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
-  最新の追加指示: 今回は03.3を受入・commit / 通常pushまで完了して停止。03.4以降には進まない。
+  最新の追加指示「再開して」により03.4から再開。03.3まで完了して停止する指示は当時の履歴として保持する。
+  ただし採用根拠不足・重大な互換性問題・外部環境 / license障害では推測せず停止・報告する。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
 - PR作成・main統合・Phase 04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
 - Start evidence: fetch成功。最新origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`
@@ -217,6 +218,37 @@ Trade-off: plain state_dict読込は使用しない。Future extension: 他varia
   Phase 03全体はExit未達、COMPLETEとしない。PR作成・main統合・Phase 04以降なし。
   未検証: UniK3D、追加optional / multi-view、実GPU、他OS/browser、DA3 lock再作成・process_res=504。
   commit / pushの確定結果はGit履歴と同名remote refで確認する。
+
+### 03.4 resume and adoption gate — license evidence unresolved
+
+- Scope / authorization: 最新の再開指示により03.4〜03.6を同じブランチで順次進める。
+  03.3の受入 / commit / pushは完了済み。03.4の成功前に03.5へ進まず、PR / main統合・Phase 04以降なし。
+- Start evidence: clean tree / HEAD / 同名remoteは `d3fa6ef20c08f4ae16fff7a7ea6f24e86bc87414`。
+  最初のfetchは自動承認審査timeoutで未実行、許可された1回の再試行で成功。
+  origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま。remote更新・競合・範囲外差分なし。
+- Purpose / planned order: UniK3D代表variantのsource / weights / license / CPU依存・出力根拠確認 →
+  採用gateを通過後に独立環境・depth-only E2E → 必要optionalを数値fixture / 新profile / reader / 実出力の順に追加 →
+  互換回帰・docs → 段階成功時commit / 通常push。現時点では最初の採用gateを通過していない。
+- Candidate evidence: 公式source `29f7862f3c3ee79c53ef0153dfc901ce511df575`、
+  `lpiccinelli/unik3d-vits` revision `80a99bfeb8d983ca6af27125fd83c88b891e75ad`。
+  safetensorsのHub宣言は141,789,264 bytes / SHA-256
+  `9f977d058961146582931c136cf2ce44964cff3153dae7823dd1209223489bc6`。
+  weights本体は取得しておらず、実fileのdigest照合や採用決定ではない。
+- Gate failure: source LICENSE / model source headerはCC BY-NC-SA 4.0、README / pyprojectはCC BY-NC 4.0。
+  固定Small model cardにはlicenseの明記がなく、公式Small / Base / LargeのHub metadataとfile一覧も
+  license未記載。checkpointへの適用条件とsource表記差異を確認できる作者の根拠が必要。
+  異なる条件を同一視したり、公開download可否から利用許諾を推定したりしない。
+- 実施: 公式source・固定model card / config・Hub metadata・公式project pageのread-only調査とdocs更新。
+  詳細・immutable links・config digest・候補APIと再開条件は [UniK3D adoption investigation](docs/unik3d-investigation.md)。
+- 未実施: UniK3D環境構築 / weights本体取得 / adapter追加 / 実推論、optional契約実装、新しいtests、03.5 / 03.6。
+  MoGe / DA3 / CLI / UI / raw / 保存schema / 既存環境は変更していない。既存の実行成功は03.3時点の履歴。
+- Verification / risk / rollback: 今回のtracked変更はdocsのみ。local links / anchors / fences、候補metadataと
+  固定sourceの照合、diff / file setを検証し、実装suiteやCPU / browserを再実行したとは記載しない。
+  不明なlicenseをmanifestへ確定値で記録するリスクを避け、既存Run・環境・実装への変更なし。
+  静的検証: Markdown 31件 / local links・anchors 246件 / Python AST 43件、errors 0。
+  候補metadata / 固定sourceの記述一致、`git diff --check`とdocs-only file set確認も成功。
+- Result: **03.4は未達で停止**。調査記録を作業ブランチへcommit / 通常pushし、採用条件の確認後に再開する。
+  Phase 03はCOMPLETEではない。作者の明確なlicense文書・許諾等を待ち、外部連絡は行わない。
 
 ## Phase 03 investigation and staged design — 2026-11-09
 
