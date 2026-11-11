@@ -216,3 +216,15 @@ logical環境IDを先頭候補で推測せず、対象profileがなければwork
 03.1の追加fake pluginは2 logical IDを既存の同じtest環境へ割り当てる契約テストであり、
 実モデルの独立した2環境を検証した証拠ではない。実モデル追加は03.2以降で行う。
 複数モデルのtarget環境 / checkpoint mapとUIの未準備表示は03.3で追加予定。
+
+
+## Phase 03.2 DA3 CPU environment
+
+DA3 uses its own logical `mde-da3` and dedicated Conda prefix. Its environment.yml pins Python 3.11.14,
+torch 2.6.0+cpu / torchvision 0.21.0+cpu and native inference dependencies; a platform-specific
+[resolved lock](../models/da3/requirements.lock) records the installed transitive versions and immutable source.
+The pinned source is installed --no-deps; native network / processors avoid upstream API export extras.
+No changes to MoGe / Gradio environments. Model discovery works without preparing the new prefix.
+Checkpoint preparation explicitly downloads fixed weights / config; worker inference reads verified local files only.
+CPU CLI and offline-boundary execution succeed. GPU and lock-based recreation remain unverified.
+Details: [DA3 preparation and evidence](../models/da3/README.md).

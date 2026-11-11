@@ -25,7 +25,7 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 
 **Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。**
 Phase 02Dは `codex/phase-02d-run-management` で実装・検証を完了し、PR経由でmain統合済みです。
-02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1の受入検証を完了し、03.2以降は未着手です。Phase 04以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
+02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1 / 03.2の受入検証を完了し、03.3以降は未着手です。Phase 04以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -49,7 +49,7 @@ checkpoint / wheels / runs は Git 管理外です。固定版と実測証拠は
 report / artifact 検証、区間計測、環境 fingerprint、保存済み terminal result の再 collect を追加しました。
 固定環境を再作成し MoGe CPU regression smoke が成功。Run ID は
 `f4a2052f-71da-4664-9c9f-281cca95fb41`。GPU / 精度評価は未検証です。
-GradioのInference / Resultsを02Bで実装しました。02Cの3D viewerも全Exit達成でCOMPLETEです。Slurm、MLflow、Benchmark、他モデルは未着手です。
+GradioのInference / Resultsを02Bで実装しました。02Cの3D viewerも全Exit達成でCOMPLETEです。DA3-SMALLのCPU depth-onlyは03.2で確認しました。UniK3D、Slurm、MLflow、Benchmarkは未着手です。
 初回調査の根拠と clean-start 決定は [architecture](docs/architecture.md#repository-investigation) を参照してください。
 
 ## 対応予定モデル
@@ -58,7 +58,7 @@ GradioのInference / Resultsを02Bで実装しました。02Cの3D viewerも全E
 | --- | --- | --- |
 | MoGe | 01A CPU の single-image E2E を確認 | 固定した MoGe-2 ViT-S Normal。GPU / 他 variant は未検証。詳細・環境手順は [plugin README](models/moge/README.md) |
 | UniK3D | 計画のみ | Phase 03。非 pinhole camera と rays の扱いを含む |
-| Depth Anything V3 / Depth Anything 3（DA3） | 計画のみ | Phase 03。variant と single / multi-view の能力を分ける |
+| Depth Anything V3 / Depth Anything 3（DA3） | DA3-SMALLのsingle-view CPU E2E確認 | relative z-depth、独立CPU環境。optional / multi-view / GPUは未検証。[plugin README](models/da3/README.md) |
 
 上記モデルをユーザーが過去に動作させたことと、この基盤が対応済みであることは別です。
 upstream の公式情報と、このリポジトリ内の実測結果は分けて記録します。
@@ -141,7 +141,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
 | [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | COMPLETE。01A / 01B COMPLETE（CPU E2E / Local robustness） |
 | [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | COMPLETE（02A〜02D全Exit達成） |
-| [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 実装中（03.1受入完了、Phase全体Exit未達） |
+| [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | 実装中（03.1 / 03.2受入完了、Phase全体Exit未達） |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |
 | [05](docs/phases/phase-05.md) | Benchmark Mode | 未着手 |
 | [06](docs/phases/phase-06.md) | Execution Backend Expansion / MockSlurm | 未着手 |
@@ -231,7 +231,7 @@ Three.js r180を同梱し、準備済み環境ではCDNなしのoffline操作を
 明示CPUのnative MoGeとfake / contract / browser / offlineの全Exitを達成し、02C COMPLETE。
 固定Chrome / Linuxで262,144 output pixelsまで検証。GPU / 他OS/browser / 学会実演は未検証。
 操作・保存schema・制限は [Results Viewer](docs/results-viewer.md)、実測結果は
-[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1の受入検証を完了し、03.2以降は未着手です。Phase 04以降は未承認です。
+[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1 / 03.2の受入検証を完了し、03.3以降は未着手です。Phase 04以降は未承認です。
 
 ## Phase 02D Run Management
 

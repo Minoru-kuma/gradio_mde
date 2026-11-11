@@ -276,3 +276,15 @@ Runner / CLI / controllerは実効metadataでdevice / dtype / parameters / reque
 Gradioの動的なmodel / variant切替とcontrols更新は03.3、追加出力とmulti-viewは03.4 / 03.5。
 JobSpec.model_ref.variantへ実効snapshotを保存し、元manifestもそのまま保持する。
 adapter signature、schema major、既存serialization profiles、旧Run readerは変更しない。
+
+
+## Phase 03.2 DA3 native depth-only plugin
+
+`models/da3/` adds DA3-SMALL in an independent CPU environment. Registry / Runner / UI / Backend
+contain no DA3-specific branch or imports. CLI explicitly selects cpu / float32 and a local checkpoint
+**directory**; interpretation of that location belongs entirely to the plugin.
+The adapter verifies both fixed config and weights, source revision, config equality and strict shared-tensor loading.
+Native float32 z-depth is serialized as relative / arbitrary with `01A-depth-only`, without K / points synthesis.
+Optional outputs and multi-view remain unsupported in this integration until later gates.
+See [DA3 plugin](../models/da3/README.md) for source / weights / license / precision / native geometry evidence.
+No adapter signature, output schema, serialization profile or legacy Run reader changed in 03.2.

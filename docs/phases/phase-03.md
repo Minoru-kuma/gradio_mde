@@ -1,6 +1,6 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: **実装中 / 03.1受入完了、03.2以降未着手（2026-11-11実装承認）**。Exit未達、COMPLETEではない。
+Status: **実装中 / 03.1 / 03.2受入完了、03.3以降未着手（2026-11-11実装承認）**。Exit未達、COMPLETEではない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
 PR作成・main統合・Phase 04以降には進まない。
 履歴: 2026-11-09は調査・計画・設計のみ承認、production実装・環境構築は未承認だった。
@@ -91,3 +91,9 @@ multi-view sequence の高度な UI、3D / pose / normal benchmark、全 variant
 最終suiteは100件中95成功・opt-in browser 5 skip（206.751秒）、別browser 5件全成功（231.693秒）。
 03.2〜03.6は未着手、Phase 03全体のExitは未達。GPU / 新モデル / 新規独立環境は未検証。
 詳細・baseline失敗と修正・Run IDは [03.1 evidence](../../PLANS.md#031-acceptance-evidence--pass)。
+
+03.2 PASS。DA3-SMALL single-view depth-only CPU E2Eと独立環境・固定weights / source / license・
+共有parameterの厳密読込を確認。105件中100成功・browser 5 skip（154.074秒）。
+新Backend / CLIで各2回collectして全hash / mtime不変。relative z-depth / arbitraryを保持。
+03.3〜03.6は未着手であり、UniK3D / optional拡張 / multi-view契約 / Phase全体Exitは未達。
+詳細: [03.2 evidence](../../PLANS.md#032-acceptance-evidence--pass)。

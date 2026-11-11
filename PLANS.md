@@ -2,7 +2,7 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03 — 03.1受入完了 / 03.2以降未着手（2026-11-11）**。COMPLETEではない。
+- Current work: **Phase 03 — 03.1 / 03.2受入完了、03.3以降未着手（2026-11-11）**。COMPLETEではない。
 - Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
@@ -75,6 +75,85 @@
 - 03.1受入条件達成。commit / 通常push後に03.2の代表variant・依存・checkpoint / license根拠確認へ進む。
   終了前fetchでorigin/mainは開始時の`e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま。
   ローカル証拠は`.local/validation/phase-03*`、生成Runと同様Git管理外。
+
+### 03.2 implementation plan and adoption investigation
+
+- 03.1 commit / push: `9e87189bb15ca09d6a627fae617b7e9499ddf4e7`、同名remoteと一致、clean tree。
+- 候補: DA3-SMALL、公式source `3d835ec1a5802d64a8b8b15f817a1ab54809bfe4`をGit管理外へ取得。
+  checkpoint `depth-anything/DA3-SMALL` revision `e08cab65ca0ec38e7826075418411ab90cab4da3`。
+  model.safetensors 137,248,940 bytes、Hub LFS SHA-256
+  `364492e38a3a06d221ac75da7f6621ada3f2361cd24fde11ba79091e9f40efcf`。
+  config.json SHA-256 `a486e29e82b7ab4a7d4cefc1ea4526cfe2ae438a572c8ca98917cfbcde7447d2`。
+  source / model cardはApache-2.0表記。現時点では採用候補、CPU実動作は未確認。
+- 根拠: 固定sourceのapi.pyは入力processor → native network → output processorを使用。
+  上位forwardはautocastを強制し、API importはexport / pose alignment依存も読み込む。
+  float32 / depth-only専用経路として公式のconfig constructor・InputProcessor・native networkを
+  直接使用する案を確認する。upstreamをpatchせず、モデル固有処理はmodels/da3内だけに置く。
+  固定GLB exporterのinverse-K ray × depthはz-depthの根拠。SMALLのscaleはrelativeとして扱い、mを付けない。
+- 手順: import graph / checkpoint構造確認 → 依存・native呼出し採用決定をdocsへ記録 →
+  独立Conda prefix `.local/envs/mde-da3`へ固定依存を構築 → plugin / manifest / checkpoint準備script →
+  GPU不要契約・CPU正式CLI E2E・新instance再collect・hash / mtime不変 → 既存回帰 → commit / 通常push。
+- 検証: 1 PNG / 明示CPU / float32 / depth-only。native depthのshape / scale / frameと保存値を照合。
+  source revision / checkpoint hash・logs / unload / runtime / source_digestを記録。
+  optional出力は03.4まで宣言を限定。multi-view実行・新UIは03.3以降。旧Run / MoGeを保持する。
+- Risks / rollback: CPU未対応、依存のimport時必須化、checkpoint key対応、preprocess grid、resource不足。
+  根拠不足や外部障害では停止・報告する。base / system / MoGe / UI環境を変更しない。
+  新pluginとGit管理外の専用prefix / weightsだけを追加し、既存rawを変更しない。
+- 未実施: 新環境構築、weights本体取得、production plugin、新実モデル推論。03.3〜03.6未着手。
+
+### 03.2 selected native integration (before implementation)
+
+| Decision | Reason / evidence | Trade-off | Future extension |
+| --- | --- | --- | --- |
+| DA3-SMALLの上記固定source / weightsを代表variantとして採用 | 公式source / Hub Apache-2.0、weights 137 MB、native SDPA実装、model cardにCPU選択例。CPU実動作はこれから確認 | metric scaleなし、GPU保証なし | 他variantは別検証 |
+| 公式InputProcessor + config constructor + DepthAnything3Netのfloat32経路 | 固定api.pyの呼出し順・model/da3.py・dinov2/layers/attention.pyで確認。上位APIはexport群もimportしautocastを強制する | 上位API全機能は利用せずnative構成・state keysを厳密照合 | confidence / pose等は03.4 |
+| checkpoint directoryにmodel.safetensorsとconfig.jsonを事前配置 | 両方の固定digestをworker load前に検証、Hub configと採用source configも照合する | local checkpoint引数はこのpluginではdirectory | model別path mapは03.3 |
+| 独立CPU環境 Python 3.11.14 / torch 2.6.0+cpu / torchvision 0.21.0+cpu | upstream Python範囲内・torch>=2、SDPAはPyTorch実装。MoGeの環境は変更しない | GPU実行はこの環境では非対応、他OS未検証 | GPU環境は別検証 |
+| process_res既定252・upper_bound_resize、depth-only / relative / arbitrary | native patch size14に整合するCPU smoke設定。公式GLB exporterは整数pixelのinvK ray×depthを使用 | 元RGBのidentity対応を主張せずK / pointsを補わない | grid / optional拡張を03.4で検証 |
+
+環境は上記案の依存解決・import・実CPU検証が必要。成功するまで03.2 PASSにしない。
+
+### 03.2 shared tensor checkpoint finding
+
+最初のCPU Run `aae4f709-fdaa-47de-892e-978c68e5ed51`はloadでFAILED。
+`load_file` → prefix除去 → PyTorch strict state_dictではaux head LayerNormの6別名をmissingと判定した。
+推論 / depth保存には進んでいない。固定sourceのdualdpt.py L132–148は同一LayerNorm objectを
+4箇所へ登録し、実際の`is`比較でも同じparameter objectであることを確認。
+checkpointのSafetensors metadataも6 alias → 保存されたindex 0の対応を持つ。
+[公式Safetensors仕様](https://huggingface.co/docs/safetensors/torch_shared_tensors)と
+導入済み0.5.3のload_model sourceで共有storage検証・真正な欠落拒否を確認した。
+
+Decision: prefixを除去せずnative modelを`model` childに持つ薄いnn.Moduleで包み、
+公式`load_model(strict=True, device=cpu)`で読込。Reason: native共有parameterとcheckpointの構造を保持。
+Trade-off: plain state_dict読込は使用しない。Future extension: 他variantも同じ厳密読込と個別検証を行う。
+ランダム補完・alias tensor複製・missingの無条件無視・upstream source変更は行わない。
+この確認は互換性調査であり、CPU E2E成功はまだ未確認。
+
+### 03.2 acceptance evidence — PASS
+
+- 代表variant: DA3-SMALL、上記source / weights pin、Apache-2.0、native float32 / 明示CPU。
+  追加はmodels/da3だけでproduction registryに発見。core / UI / backendの変更なし。
+- 独立Conda prefixをenvironment.ymlから新規構築し、固定sourceを--no-deps install。
+  native configとHub config一致、34,299,463 unique parameters。不要なAPI / exporter / MoGe / UI importなし。
+  Python 3.11.14 / torch 2.6.0+cpu / torchvision 0.21.0+cpu / CUDA runtimeなし。
+  requirements.lockに今回の推移依存とsourceを記録。lockによる再作成は未検証。
+- 正式CLI → Runner → LocalBackend → 専用workerのCPU Run
+  `541dcd67-8153-48b1-a1d4-9063b79e1435` COMPLETED。
+  float32 [252,252]、z_depth / relative / arbitrary、63,504 pixel有限・正。
+  source_digest `6f24fb9f3f5f613a5ba94ebb660e38c57ad5561ed57c9a1bbe765645bb8b0073`一致。
+  native autocast無効、depth-only既存profile、stderr空・exit 0・predict 1回・unload完了。
+- Python非loopback socket / DNS遮断下の正式推論成功。OS全体・native独自通信遮断を保証するものではない。
+  新Backendと新CLIで各2回collect、全file hash / mtime不変。Condaなしの保存結果読込も確認。
+- 共通ResultsServiceのDepth / RawDepth表示、Point Cloud / Meshの理由付きunavailableを確認。
+  K / Pointsを補完せず、表示後もraw / 確定result含む全fileのhash / mtime不変。
+  旧4Runの各2回CLI collectとhash / mtime不変も再確認（01B履歴Runのdirectory不在は継続）。
+- plugin契約5件成功（1.289秒）、共有aliasを正しく読込し真正な欠落は拒否する数値fixtureを含む。
+  最終既存全回帰は**105件中100成功 / opt-in browser 5 skip（154.074秒）**。
+  core / UI / backendは03.1以降不変のため、browserは03.1の別実行5成功を証拠とし03.2では未再実行。
+  新モデルのbrowser操作・切替は03.3の受入対象。静的リンク / AST / JSON / diff検証も実施。
+- 未検証: process_res=504、GPU / 他OS、lock再作成、native optional、multi-view、UniK3D。
+  03.2受入条件達成、commit / 通常push後に03.3へ進む。Phase 03全体はExit未達。
+  初回のshared alias読込失敗と解決根拠は前節に保持する。
 
 ## Phase 03 investigation and staged design — 2026-11-09
 
