@@ -79,7 +79,8 @@ worker / RegistryはGradioに依存しない。
   cancel callbackは要求flagを記録し、Backend receipt / terminal確認までcancel_requestedを表示する。
   successが先ならCOMPLETED、timeoutはFAILED / TIMEOUT、cancelはCANCELLEDを維持する。
   stop / status観測失敗はUNKNOWNまたはaction_errorとし、成功・slot解放を捏造しない。
-- 全イベントに **queue=False / concurrency_limit=None / trigger_mode=once**。
+- 全イベントに **queue=False**。submit / cancel / polling等はconcurrency_limit=None / trigger_mode=once。
+  03.3の選択・render eventだけalways_lastで最後の選択を直列反映し、推論queueは作らない。
   submit / cancel / openへの応答はnoticeだけを更新する。
   status / Results / tab選択のwriterは一つのTimerのみ。Timerの重複発火を禁止する。
   operation generationをcancelと完了通知で検証し、古いcancelは次jobを止めない。
@@ -172,3 +173,24 @@ controllerのsubmit検証も共通ModelInfo解決を使用する。
 複数target環境 / weights map・未準備表示は03.3の受入対象。
 Inference / Resultsの2タブ、共有Backend、sessionごとのhandle / generation、
 busy即拒否・cancel / timeout・旧Run読込の契約を維持する。
+
+
+## Phase 03.3 model / variant switching
+
+Registry discovery provides the Model dropdown; invalid manifests are shown separately as diagnostics.
+`--model` selects the initial model. Each browser owns its model / variant / upload / parameter values.
+Repeated identical notifications preserve the current ticket. Changing model resets the variant to its default; changing either rebuilds device / dtype / parameters /
+requested outputs from effective metadata. Device returns to unselected and must be chosen explicitly.
+Missing target preparation disables submission with a reason. See [target configuration](target-configuration.md).
+
+The server session stores a fresh configuration ticket for every changed selection. Rendered callbacks capture
+model / variant / ticket; submit checks the ticket before and after owning the upload snapshot.
+A switch away and back invalidates old callbacks. Accepted jobs retain their captured options while the
+browser edits its next configuration, and cancel continues to address the active session's job.
+The shared controller's initial model_id is never overwritten. All sessions retain one Backend / admission slot.
+
+Gradio 6.30.0's installed render API is used with queue=False. Browser verification showed that nonqueued
+State output changes did not start render, so an invisible JSON component carries the frontend notification.
+The authoritative ticket stays in the server session. Selection/render events use always_last; inference
+and Timer events remain once. Dynamic input components explicitly enable editing. Only the Timer writes
+status / Results / tab selection. Inference / Results remain the two tabs; saved Runs do not require inference.

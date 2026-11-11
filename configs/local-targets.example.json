@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "environments": {
+    "mde-moge": {"name": "mde-moge"},
+    "mde-da3": {"prefix": "../.local/envs/mde-da3"}
+  },
+  "checkpoints": {
+    "moge/moge-2-vits-normal": "../.local/weights/moge-2-vits-normal.pt",
+    "da3/da3-small": "../.local/weights/da3-small"
+  }
+}

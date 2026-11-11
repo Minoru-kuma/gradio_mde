@@ -37,6 +37,7 @@ def main(argv=None) -> int:
     env.add_argument("--conda-prefix")
     run.add_argument("--conda-exe")
     run.add_argument("--checkpoint", type=Path, help="Optional pre-downloaded checkpoint; hash is verified")
+    run.add_argument("--target-config", type=Path, help="Local environment and per-variant checkpoint map")
     run.add_argument("--timeout-seconds", type=int, help="Execution timeout including Conda startup; positive seconds")
     collect = commands.add_parser("collect", help="Read a saved terminal result without starting a worker")
     collect.add_argument("--run-id", required=True)
@@ -63,10 +64,20 @@ def main(argv=None) -> int:
         registry = ModelRegistry(root / "models")
         info = registry.get_model(args.model)
         environment_id = info.environment(args.variant, args.environment_id)["environment_id"]
-        profile = EnvironmentProfile(environment_id, None if args.conda_prefix else args.conda_env or environment_id,
-                                     args.conda_prefix)
-        resolver = EnvironmentResolver({environment_id: profile})
-        manager = WorkerManager(root, resolver, CondaLauncher(args.conda_exe), args.checkpoint)
+        from .targets import TargetConfiguration
+        targets = TargetConfiguration.read(args.target_config) if args.target_config else TargetConfiguration()
+        if args.conda_env or args.conda_prefix or not args.target_config:
+            targets.profiles[environment_id] = EnvironmentProfile(environment_id,
+                None if args.conda_prefix else args.conda_env or environment_id, args.conda_prefix)
+        if args.checkpoint:
+            targets.checkpoints[f'{args.model}/{info.variant(args.variant)["variant_id"]}'] = args.checkpoint.resolve()
+        if args.target_config:
+            preparation = targets.preparation(info, info.variant(args.variant)['variant_id'], environment_id)
+            if not preparation['available']:
+                raise ValueError(preparation['message'])
+        resolver = EnvironmentResolver(targets.profiles)
+        manager = WorkerManager(root, resolver, CondaLauncher(args.conda_exe), args.checkpoint if not args.target_config else None,
+                                checkpoints=targets.checkpoints if args.target_config else None)
         backend = LocalBackend(store.root, manager)
         runner = ExperimentRunner(registry, backend, store, root)
         parameters = json.loads(args.params)

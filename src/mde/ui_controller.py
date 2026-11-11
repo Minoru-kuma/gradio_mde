@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import threading
 import time
+import uuid
 
 from .contracts import ATTEMPT_ID, BackendBusy, JobHandle
 from .registry import validate_parameters
@@ -80,16 +81,18 @@ class _Session:
     active: bool = False
     cancel_pending: bool = False
     handle: JobHandle | None = None
+    configuration: dict | None = None
     view: dict = field(default_factory=lambda: {
         "generation": 0, "status": "IDLE", "run_id": "", "cancel_requested": False,
         "progress": "unavailable (indeterminate while running)", "result": None})
 
 
 class InferenceController:
-    def __init__(self, runner, model_id, *, poll_interval=0.2):
+    def __init__(self, runner, model_id, *, poll_interval=0.2, targets=None):
         self.runner = runner
         self.model_id = model_id
         self.info = runner.registry.get_model(model_id)
+        self.targets = targets
         self.poll_interval = poll_interval
         self._lock = threading.RLock()
         self._admission = threading.Lock()
@@ -109,6 +112,28 @@ class InferenceController:
         with self._lock:
             return deepcopy(self._session(token).view)
 
+    def configure(self, token, model_id, variant_id=None):
+        info = self.runner.registry.get_model(model_id)
+        variant = info.effective_variant(variant_id)
+        preparation = self.targets.preparation(info, variant['variant_id']) if self.targets else {
+            'available': True, 'message': 'Target preparation is checked when starting the worker.'}
+        with self._lock:
+            current = self._session(token).configuration
+            if (current and current['model_id'] == model_id and current['variant_id'] == variant['variant_id']
+                    and current['variant'] == variant and current['preparation'] == preparation):
+                return deepcopy(current)
+            selected = {'model_id': model_id, 'variant_id': variant['variant_id'],
+                        'ticket': uuid.uuid4().hex, 'variant': variant, 'preparation': preparation}
+            self._session(token).configuration = selected
+            return deepcopy(selected)
+
+    @staticmethod
+    def _check_configuration(session, model_id, variant_id, ticket):
+        selected = session.configuration
+        if ticket is not None and (not selected or selected['ticket'] != ticket or
+                (selected['model_id'], selected['variant_id']) != (model_id, variant_id)):
+            raise ValueError('Stale model selection; use the currently displayed controls')
+
     def _select(self, session, status):
         session.generation += 1
         session.view = {"generation": session.generation, "status": status,
@@ -121,12 +146,22 @@ class InferenceController:
             if self._sessions.get(token) is session and session.generation == generation:
                 session.view.update(values)
 
-    def submit(self, token, image, variant_id, device, dtype, parameters, timeout, outputs):
+    def submit(self, token, image, variant_id, device, dtype, parameters, timeout, outputs,
+               *, model_id=None, configuration_ticket=None):
         if not self._admission.acquire(blocking=False):
             raise BackendBusy("Local backend is busy; retry after the current job finishes. No job was queued.")
         staged = None
         try:
-            variant = self.info.effective_variant(variant_id)
+            selected_model = self.model_id if model_id is None else model_id
+            info = self.runner.registry.get_model(selected_model)
+            variant = info.effective_variant(variant_id)
+            variant_id = variant['variant_id']
+            with self._lock:
+                self._check_configuration(self._session(token), selected_model, variant_id, configuration_ticket)
+            if self.targets:
+                preparation = self.targets.preparation(info, variant_id)
+                if not preparation['available']:
+                    raise ValueError(preparation['message'])
             if device not in variant["supported_devices"] or dtype not in variant["supported_dtypes"]:
                 raise ValueError("Unsupported device or dtype")
             if not isinstance(parameters, dict):
@@ -143,12 +178,13 @@ class InferenceController:
             provenance = stage_upload(image, staged.name)
             with self._lock:
                 session = self._session(token)
+                self._check_configuration(session, selected_model, variant_id, configuration_ticket)
                 if session.active:
                     raise BackendBusy("This session already has an active job")
                 generation = self._select(session, "SUBMITTING")
                 session.active, session.cancel_pending, session.handle = True, False, None
             thread = threading.Thread(target=self._run, args=(token, session, generation, staged,
-                dict(**({"input_provenance": provenance} if provenance else {}), variant_id=variant_id, device=device, dtype=dtype, parameters=parameters,
+                dict(model_id=selected_model, **({"input_provenance": provenance} if provenance else {}), variant_id=variant_id, device=device, dtype=dtype, parameters=parameters,
                      walltime_seconds=timeout, requested_outputs=tuple(outputs))), daemon=True)
             thread.start()
             return "Submission accepted; status will update automatically."
@@ -160,7 +196,8 @@ class InferenceController:
 
     def _run(self, token, session, generation, staged, options):
         try:
-            handle = self.runner.submit(self.model_id, Path(staged.name) / "image.png", **options)
+            selected_model = options.pop('model_id')
+            handle = self.runner.submit(selected_model, Path(staged.name) / "image.png", **options)
             with self._lock:
                 session.handle = handle
             self._publish(token, session, generation, run_id=handle.run_id)

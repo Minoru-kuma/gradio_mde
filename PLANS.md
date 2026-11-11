@@ -2,10 +2,11 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03 — 03.1 / 03.2受入完了、03.3以降未着手（2026-11-11）**。COMPLETEではない。
+- Current work: **Phase 03 — 03.1〜03.3受入完了、最新指示により03.3で停止（2026-11-11）**。COMPLETEではない。
 - Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
+  最新の追加指示: 今回は03.3を受入・commit / 通常pushまで完了して停止。03.4以降には進まない。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
 - PR作成・main統合・Phase 04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
 - Start evidence: fetch成功。最新origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`
@@ -154,6 +155,68 @@ Trade-off: plain state_dict読込は使用しない。Future extension: 他varia
 - 未検証: process_res=504、GPU / 他OS、lock再作成、native optional、multi-view、UniK3D。
   03.2受入条件達成、commit / 通常push後に03.3へ進む。Phase 03全体はExit未達。
   初回のshared alias読込失敗と解決根拠は前節に保持する。
+
+### 03.3 implementation plan — session model selection and target map
+
+- 前提: 03.2受入成功、commit `db525e5e67b43ae248894cc1b8ee74bd63fbfa25` / 同名remoteへ通常push済み、clean。
+- Scope / order: target JSON契約とモデル別checkpoint解決 → session別configuration ticketとsubmit snapshot →
+  metadata駆動のmodel / variant選択・controls再生成 → controller / worker / browser / 実2モデル受入 → commit / 通常push。
+- Target契約: schema 1.0、environmentsはlogical ID→nameまたはprefix、checkpointsはmodel_id/variant_id→local path。
+  相対pathは設定file directory基準。Jobへhost prefix / checkpoint pathを入れず、WorkerManagerがjob snapshotでlookup。
+  CLIの明示profile / checkpointは当該jobだけ優先。UIのlegacy flagsは初期model / variantだけに適用し、他モデルへ漏らさない。
+- UI決定: 固定Gradio 6.30.0のinstalled render APIを確認。モデル・variant選択はsession別configuration State、
+  controllerにticketを保持し、renderされたcallbackはそのmodel / variant / ticketをcaptureする。
+  検証で非queueのState変更がrenderを起動しないことを確認したため、通知はhidden JSON componentを使い、
+  正本ticketはserver sessionに保持する。
+  切替前callbackはsubmit前とupload snapshot後に拒否。共有controllerのdefault model_idを書換えない。
+  selection eventだけqueue=False / always_lastで最後の入力を直列反映。推論 / polling / cancelは従来once。
+  controls / device / dtype / outputsは実効variantから再生成し切替時に値を初期化。CPUの明示選択を維持。
+- 検証: 2browserで別model / parameters、1受理1busy、未準備表示、stale callback / checkpoint / parameter交差拒否。
+  実MoGe / DA3を同じ共有Backendで順次UI実行し別環境・出力意味を確認。cancel / timeout / 2tabs / 保存Run・全既存回帰。
+  raw / result hash・mtime不変、offline保存Run / inference、model / torch非importを確認する。
+- Risks / rollback: selection応答の順序、古いcallbackの値混入、global checkpoint漏れ、未準備の誤表示。
+  準備表示はmetadata / path可用性までとし、依存・digest・native runtime検証はworkerに残す。
+  map / UIは独立して修正可能、既存Runのmigrationなし。03.4以降は本gateの成功後に進む。
+
+### 03.3 acceptance evidence — PASS / requested stop point
+
+- 実装: metadata駆動model / variant切替・controls再生成、session別ticket、未準備表示、
+  target環境 / model_id/variant_id別weights map。CLIの単一job override・initial UIのlegacy設定を保持。
+  モデル名分岐・UI / Registryのadapter / torch import・workerのUI依存を追加していない。
+  Job / result schema、serialization profiles、raw / 確定result不変は維持。
+- schema / interface: target JSON schema 1.0、相対pathはfile directory基準。
+  Manager mapはinherited checkpointを消してexact model / variant keyで解決し、global overrideとの併用は拒否。
+  CLIの明示overrideは選択keyにだけ反映。詳細は [target configuration](docs/target-configuration.md)。
+- session契約: model変更はdefault variantへ戻し、deviceを未選択にしてschema・parameters・outputsを再生成。
+  変更ごとにserver ticketを発行し、同一通知は冪等。古いcallbackはupload保存前後で拒否。
+  受理済みjobはsnapshotで実行し、編集後もcancelは実行中の自session jobを対象とする。
+- GPU不要契約: target JSON / relative path / 未準備・不正profile / inherited checkpoint消去 / variant隔離、
+  legacy override、2session / busy / 切替中stale / 同一通知冪等・UI import境界 / event構造を確認。
+- 最終固定production sourceの全suiteは**116件中109成功 / opt-in browser 7 skip（264.524秒）**。
+  別実行browser **7件全成功（234.417秒）**: 既存5件 + 別モデル2session + 実2モデルCPU UI。
+  両検証はOMP_NUM_THREADS=2で実行。browser側はPython非loopback socket / DNSと外部HTTPを遮断。
+  Linux / Chrome 154.0.8037.92 / SwiftShader、page errors / 外部requestsなし、inference queueなし。
+- 別モデル同時clickは1受理1busyを確認。未準備variantは理由付きdisabled、切替後の値は初期化。
+  初期検証のState-change render不発・dynamic input readonlyを修正し、既存busy / cancel / timeout /
+  2tabs / native Points・4表示・管理操作・再起動保存Run読込を回帰した。
+  初期のbrowser fixture upload不足と同一選択ticket更新も修正し、最終7件を成功させた。
+- 同じshared Runner / BackendでMoGe / DA3を別browserから順次CPU実行:
+  - moge: `83f570fc-5c7f-475d-b2a0-34938bfec188`、source_digest `3db81e03ae05bbb92ec5f94dd36ec95e039a2ed7298ed6418f158e8657a61e31`一致。
+  - da3: `f109f2f0-3571-4fcb-9d0e-8ad9f9c52da3`、source_digest `84eadbb6dcfcc7387e782a3183d6a0da2d5fbd4f52e8a39c8e314d11b084f296`一致。
+
+  MoGeは専用mde-moge / torch 2.6.0+cu124、float32 [256,256] / z_depth / metric / m。
+  DA3は専用prefix / torch 2.6.0+cpu、float32 [252,252] / z_depth / relative / arbitrary。
+  既存の各環境・checkpoint pinは不変。predictは各1回、browser再読込後もhash / mtime不変。
+  さらに新Backend / 新CLIで各2回collect、全fileのhash / mtime不変・最終source一致を確認。
+- target JSONを使うDA3正式CLIもCOMPLETED。旧4Runも各2回CLI collectして全fileのhash / mtime不変。
+  01Bの履歴Run directory不在は従来どおり未検証、01B形式はfixtureで回帰。
+- docs / static: target契約・設定example・UI event / ticket・Environment / Execution / Model仕様を同期。
+  local links / anchors、AST / JSON / diff・import境界を検証。設定exampleは相対pathのみ。
+  `.local` / weights / environments / runsはGitへ追加しない。
+- 最新ユーザー指示により**03.3のcommit / 通常pushを今回の終了点とし、03.4〜03.6は未着手で停止**。
+  Phase 03全体はExit未達、COMPLETEとしない。PR作成・main統合・Phase 04以降なし。
+  未検証: UniK3D、追加optional / multi-view、実GPU、他OS/browser、DA3 lock再作成・process_res=504。
+  commit / pushの確定結果はGit履歴と同名remote refで確認する。
 
 ## Phase 03 investigation and staged design — 2026-11-09
 

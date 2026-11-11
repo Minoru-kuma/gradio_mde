@@ -263,3 +263,16 @@ Environment / Backend / workerの責務は維持し、core / UI / backendにモ�
 source checkoutのdirectory追加だけでfake pluginを発見・実行できる。
 model別target設定と動的UIは03.3、geometry拡張とmulti-viewは03.4 / 03.5で追加予定。
 詳細は [Model adapter](model-adapter-spec.md#phase-031-discovery-and-effective-variant-metadata)。
+
+
+## Phase 03.3 implemented application boundary
+
+Gradio now selects model / variant metadata per session and rebuilds schema controls without model imports.
+Server configuration tickets and accepted-job snapshots keep model / parameters / checkpoint selections separate.
+A single Runner / Backend / admission slot serves every browser; selection events do not queue inference.
+`mde.targets` reads local target configuration; WorkerManager resolves per-variant checkpoint locations from JobSpec.
+ModelAdapter still owns native conversion and digest verification, while Environment / Backend own execution.
+CLI legacy flags and existing Run readers remain compatible. See [target configuration](target-configuration.md)
+and [Gradio contract](gradio-inference.md#phase-033-model--variant-switching).
+03.1 / 03.2 / 03.3 acceptance passed; work stops at 03.3 by the latest user instruction.
+03.4–03.6 remain unimplemented and Phase 03 is not COMPLETE.

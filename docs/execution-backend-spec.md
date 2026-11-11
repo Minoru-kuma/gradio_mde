@@ -291,3 +291,11 @@ single-view PNG / RGB制約を検査してJobSpecへsnapshotする。
 optionalな`environment_id`指定をvariantの候補と照合し、1候補のみ従来fallbackを許す。
 CLIは同じ解決結果でtarget profileを構成する。Backendにモデル名分岐は追加しない。
 Job schema / attempt制約 / status / busy / cancel / timeout / 保存済みcollect契約は維持する。
+
+## Phase 03.3 per-job target resolution
+
+WorkerManager accepts an optional model_id/variant_id checkpoint map and resolves it using the saved
+job snapshot. Target configuration remains outside JobSpec; Backend still receives model-independent
+contracts and does not branch on model names. CLI and Gradio composition roots share the same mapping
+contract. Explicit CLI overrides affect only the selected job. Local busy / cancel / timeout / collect
+and raw / terminal result immutability remain unchanged. See [target configuration](target-configuration.md).

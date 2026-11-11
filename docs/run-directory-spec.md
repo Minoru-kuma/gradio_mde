@@ -271,3 +271,12 @@ JobSpecのmodel_ref.variantに実効metadata snapshotを加算し、元manifest�
 旧schema 1.0 Runに実効snapshotを要求するreader変更やmigrationは行わない。
 01A-depth-only / 02A-geometry-v1のwire format、raw / 確定result不変を維持する。
 複数pluginの新instance collectも再推論せず、hash / mtime不変で検証する。
+
+
+## Phase 03.3 target configuration boundary
+
+Target names / prefixes and local checkpoint paths are configured outside the immutable JobSpec.
+Jobs retain logical environment / model / variant and content identities; runtime fingerprint continues to
+record the actual selected Python environment. No layout, profile, required output or raw/result semantics change.
+Model switching creates a fresh Run, while opening / collecting saved Runs performs no inference or migration.
+The two real CPU UI Runs and old saved Runs are checked for hash / mtime immutability after repeated reads.

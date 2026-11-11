@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .storage import contained_path, sha256_file
+from .storage import read_json
 
 
 @dataclass(frozen=True)
@@ -99,11 +100,14 @@ class WorkerProcess:
 
 class WorkerManager:
     def __init__(self, project_root: Path, resolver: EnvironmentResolver, launcher=None,
-                 checkpoint: Path | None = None):
+                 checkpoint: Path | None = None, *, checkpoints: dict[str, Path] | None = None):
         self.project_root = Path(project_root).resolve()
         self.resolver = resolver
         self.launcher = launcher or CondaLauncher()
+        if checkpoint is not None and checkpoints is not None:
+            raise ValueError('Use a per-variant checkpoint map or a single-job checkpoint override')
         self.checkpoint = checkpoint
+        self.checkpoints = checkpoints
 
     def start(self, reference: dict, job_path: Path, run: Path) -> WorkerProcess:
         if os.name != "posix":
@@ -121,6 +125,14 @@ class WorkerManager:
         environment["PYTHONUNBUFFERED"] = "1"
         environment["PYTHONDONTWRITEBYTECODE"] = "1"
         environment["MDE_CONTROL_PREFIX"] = sys.prefix
+        if self.checkpoints is not None:
+            # Resolve against the immutable selected job, never shared UI state or
+            # a process-global checkpoint left over from another model.
+            environment.pop("MDE_CHECKPOINT_PATH", None)
+            model = read_json(job_path)["model_ref"]
+            key = f'{model["model_id"]}/{model["variant"]["variant_id"]}'
+            if key in self.checkpoints:
+                environment["MDE_CHECKPOINT_PATH"] = str(Path(self.checkpoints[key]).resolve())
         if self.checkpoint:
             environment["MDE_CHECKPOINT_PATH"] = str(Path(self.checkpoint).resolve())
         logs = run / "logs" / "attempt-0001"

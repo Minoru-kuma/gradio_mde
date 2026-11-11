@@ -288,3 +288,12 @@ Native float32 z-depth is serialized as relative / arbitrary with `01A-depth-onl
 Optional outputs and multi-view remain unsupported in this integration until later gates.
 See [DA3 plugin](../models/da3/README.md) for source / weights / license / precision / native geometry evidence.
 No adapter signature, output schema, serialization profile or legacy Run reader changed in 03.2.
+
+## Phase 03.3 application selection
+
+Model / variant controls now consume Registry effective metadata per browser session. The selected
+adapter still loads only inside its worker; no adapter signature, manifest major, output profile or
+legacy Run reader changes. Local checkpoint paths are selected by model_id/variant_id in the
+[target configuration](target-configuration.md), never by model name branches in core / UI / Backend.
+Parameter names, defaults and optional-output choices are rebuilt on model / variant changes.
+Server session tickets reject callbacks from replaced controls, including a switch away and back.

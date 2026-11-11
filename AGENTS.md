@@ -9,6 +9,7 @@
    Multi-model Support の実装・独立環境構築・検証・関連docs更新を承認。
    `codex/phase-03-implementation` をPhase 03完了まで継続使用し、PLANS.mdの03.1〜03.6を
    順番に実施する。先行段階の受入条件を満たした後に次へ進み、成功した段階ごとにcommit / 通常push。
+   最新の追加指示により、今回の作業は03.3の受入・commit / 通常push完了で停止し、03.4以降へ進まない。
    PR作成・main反映・Phase 04以降は未承認。Phase 02DはPR経由でmain統合済み。
    開始時にlatest origin/mainを確認する。remote更新・競合・範囲外変更は上書きせず停止・報告。
    履歴: 2026-11-09はPhase 03調査・計画・設計と作業ブランチcommit / 通常pushのみ承認。

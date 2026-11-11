@@ -1,7 +1,8 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: **実装中 / 03.1 / 03.2受入完了、03.3以降未着手（2026-11-11実装承認）**。Exit未達、COMPLETEではない。
+Status: **実装中 / 03.1〜03.3受入完了、最新指示により03.3で停止（2026-11-11実装承認）**。Exit未達、COMPLETEではない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
+最新の追加指示により今回の終了点は03.3受入・commit / 通常push。03.4以降には進まない。
 PR作成・main統合・Phase 04以降には進まない。
 履歴: 2026-11-09は調査・計画・設計のみ承認、production実装・環境構築は未承認だった。
 管理: [PLANS.md](../../PLANS.md)。段階計画と実装記録は
@@ -86,14 +87,21 @@ multi-view sequence の高度な UI、3D / pose / normal benchmark、全 variant
 
 ## Stage acceptance status — 2026-11-11
 
-03.1 PASS。metadata-only discovery / manifest検証・実効variant解決、directory追加fakeの
+03.1完了時点の履歴: PASS。metadata-only discovery / manifest検証・実効variant解決、directory追加fakeの
 同一Runner / Backend実行、MoGe CPU CLI数値回帰（01Aとの差0）、旧4Runの再読込不変を確認。
 最終suiteは100件中95成功・opt-in browser 5 skip（206.751秒）、別browser 5件全成功（231.693秒）。
 03.2〜03.6は未着手、Phase 03全体のExitは未達。GPU / 新モデル / 新規独立環境は未検証。
 詳細・baseline失敗と修正・Run IDは [03.1 evidence](../../PLANS.md#031-acceptance-evidence--pass)。
 
-03.2 PASS。DA3-SMALL single-view depth-only CPU E2Eと独立環境・固定weights / source / license・
+03.2完了時点の履歴: PASS。DA3-SMALL single-view depth-only CPU E2Eと独立環境・固定weights / source / license・
 共有parameterの厳密読込を確認。105件中100成功・browser 5 skip（154.074秒）。
 新Backend / CLIで各2回collectして全hash / mtime不変。relative z-depth / arbitraryを保持。
 03.3〜03.6は未着手であり、UniK3D / optional拡張 / multi-view契約 / Phase全体Exitは未達。
 詳細: [03.2 evidence](../../PLANS.md#032-acceptance-evidence--pass)。
+
+03.3 PASS（今回の終了点）。model / variantのsession別切替、target環境 / weights map、
+stale callback拒否、未準備表示とlegacy CLI / UI互換を確認。
+全suite 116件中109成功・browser 7 skip（264.524秒）、別browser 7件成功（234.417秒）。
+同一BackendからMoGe / DA3を独立環境で実CPU実行し、再collectでhash / mtime不変。
+詳細: [03.3 evidence](../../PLANS.md#033-acceptance-evidence--pass--requested-stop-point)。
+03.4〜03.6は未着手。最新ユーザー指示に従い03.3のcommit / 通常push後に停止し、Phase 03 COMPLETEとはしない。

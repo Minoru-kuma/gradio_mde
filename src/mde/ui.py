@@ -33,7 +33,8 @@ def build_app(controller):
             return {"error": str(error)}
 
     info = controller.info.data
-    initial_variant = controller.info.effective_variant()
+    catalog = controller.runner.registry.discover()
+    models = {item.model_id: item for item in catalog.models}
     event = dict(queue=False, concurrency_limit=None, trigger_mode="once",
                  api_visibility="private", show_progress="hidden")
 
@@ -49,51 +50,26 @@ def build_app(controller):
 
     with gr.Blocks(title="MGE Experiment Platform", analytics_enabled=False) as app:
         token = gr.State(value=None, delete_callback=controller.forget)
+        # A JSON component emits frontend change events for nonqueued responses;
+        # the authoritative ticket / selection remains in the server session.
+        configuration = gr.JSON(value=None, visible=False)
         last_view = gr.State(value=None)
         operation_generation = gr.State(value=0)
         gr.Markdown("# MGE Experiment Platform\nLocal inference · one shared worker · no job queue")
         with gr.Tabs(selected="inference") as tabs:
             with gr.Tab("Inference", id="inference"):
                 with gr.Row():
-                    model = gr.Textbox(value=info["display_name"], label="Model", interactive=False)
+                    model = gr.Dropdown([(item.data["display_name"], item.model_id) for item in catalog.models],
+                        value=controller.model_id, label="Model", interactive=False, elem_id="model-choice")
                     variant = gr.Dropdown([v["variant_id"] for v in info["variants"]],
-                                          value=info["default_variant"], label="Variant", elem_id="variant-choice")
+                                          value=info["default_variant"], label="Variant", interactive=False, elem_id="variant-choice")
                     gr.Textbox(value="local", label="Backend", interactive=False)
                 upload = gr.File(label="Input PNG / JPEG (10 MiB; 4,194,304 pixels; edge ≤ 4096)",
                                  file_types=[".png", ".jpg", ".jpeg"], type="filepath", elem_id="input-png")
-                with gr.Row():
-                    device = gr.Dropdown(initial_variant["supported_devices"], value=None, label="Device (choose explicitly)",
-                                         elem_id="device-choice")
-                    dtype = gr.Dropdown(initial_variant["supported_dtypes"], value=initial_variant["supported_dtypes"][0], label="Dtype")
-                    timeout = gr.Number(value=300, precision=0, minimum=1, label="Timeout (seconds, includes worker startup)",
-                                        elem_id="timeout-seconds")
-                controls, names = [], []
-                gr.Markdown("### Model parameters")
-                for name, rule in initial_variant["parameter_schema"].get("properties", {}).items():
-                    options = dict(label=name, value=rule.get("default"), elem_id=f"parameter-{name}")
-                    if "enum" in rule:
-                        control = gr.Dropdown(rule["enum"], **options)
-                    elif rule["type"] in ("integer", "number"):
-                        control = gr.Number(precision=0 if rule["type"] == "integer" else None,
-                                            minimum=rule.get("minimum"), maximum=rule.get("maximum"), **options)
-                    elif rule["type"] == "boolean":
-                        control = gr.Checkbox(**options)
-                    else:
-                        control = gr.Textbox(**options)
-                    names.append(name)
-                    controls.append(control)
-                capabilities = initial_variant["capabilities"]
-                from .contracts import OUTPUT_NAMES
-                outputs = gr.CheckboxGroup([key for key in OUTPUT_NAMES if
-                    capabilities.get(key, {}).get("status") in ("supported", "conditional")],
-                    value=["depth"], label="Requested artifacts (depth required)", elem_id="requested-artifacts")
-                with gr.Accordion("Declared capabilities and parameter schema", open=False):
-                    gr.JSON({"variants": [{"variant_id": v["variant_id"], "capabilities":
-                        v.get("capabilities", info["capabilities"])} for v in info["variants"]],
-                        "parameter_schema": info.get("parameter_schema", {})})
-                with gr.Row():
-                    submit = gr.Button("Run inference", variant="primary", elem_id="submit-run", interactive=False)
-                    cancel = gr.Button("Cancel this session's job", elem_id="cancel-run", interactive=False)
+                if catalog.diagnostics:
+                    gr.JSON(catalog.diagnostics, label="Unavailable plugin manifests")
+                parameter_area = gr.Column()
+                cancel = gr.Button("Cancel this session's job", elem_id="cancel-run", interactive=False)
                 notice = gr.Textbox(label="Action", interactive=False, elem_id="action-notice")
                 run_id = gr.Textbox(label="Run ID", interactive=False, elem_id="active-run-id")
                 status = gr.Textbox(value="IDLE", label="Status", interactive=False, elem_id="job-status")
@@ -144,11 +120,6 @@ def build_app(controller):
                     management_notice = gr.Textbox(label="Management action", interactive=False)
 
         timer = gr.Timer(0.5)
-
-        def submit_job(session, image, selected_variant, selected_device, selected_dtype, seconds, requested, *values):
-            message = guard(controller.submit, session, image, selected_variant, selected_device, selected_dtype,
-                            dict(zip(names, values)), seconds, requested)
-            return message, controller.snapshot(session)["generation"]
 
         def poll(session, previous):
             if session is None:
@@ -249,22 +220,85 @@ def build_app(controller):
             selection, selected, "delete", confirmation, typed, target),
             [management_selection, saved_id, deletion, typed_id, generation], management_notice, **event)
 
-        submit.click(submit_job, [token, upload, variant, device, dtype, timeout, outputs, *controls],
-                     [notice, operation_generation],
-                     **event)
+        def select_configuration(session, selected_model, selected_variant, previous):
+            selected_info = models[selected_model]
+            valid = {v["variant_id"] for v in selected_info.data["variants"]}
+            if (not previous or previous['model_id'] != selected_model or selected_variant not in valid):
+                selected_variant = selected_info.data["default_variant"]
+            selected = controller.configure(session, selected_model, selected_variant)
+            return gr.Dropdown(choices=sorted(valid), value=selected_variant), selected
+
+        # A single nonqueued event serializes selection responses per browser and
+        # keeps its final input. It never submits or waits for an inference slot.
+        gr.on([model.input, variant.input], select_configuration, [token, model, variant, configuration],
+            [variant, configuration], **{**event, "trigger_mode": "always_last"})
+
+        with parameter_area:
+            @gr.render(inputs=[token, configuration], triggers=[configuration.change],
+                       queue=False, trigger_mode="always_last", show_progress="hidden")
+            def render_parameters(session, selected):
+                if session is None or selected is None:
+                    return
+                metadata = selected["variant"]
+                readiness = selected["preparation"]
+                gr.Markdown(readiness["message"], elem_id="model-preparation")
+                with gr.Row():
+                    device = gr.Dropdown(metadata["supported_devices"], value=None, label="Device (choose explicitly)",
+                                         elem_id="device-choice", interactive=True)
+                    dtype = gr.Dropdown(metadata["supported_dtypes"], value=metadata["supported_dtypes"][0], label="Dtype", interactive=True)
+                    timeout = gr.Number(value=300, precision=0, minimum=1,
+                        label="Timeout (seconds, includes worker startup)", elem_id="timeout-seconds", interactive=True)
+                controls, names = [], []
+                gr.Markdown("### Model parameters")
+                for name, rule in metadata["parameter_schema"].get("properties", {}).items():
+                    options = dict(label=name, value=rule.get("default"), elem_id=f"parameter-{name}", interactive=True)
+                    if "enum" in rule:
+                        control = gr.Dropdown(rule["enum"], **options)
+                    elif rule["type"] in ("integer", "number"):
+                        control = gr.Number(precision=0 if rule["type"] == "integer" else None,
+                            minimum=rule.get("minimum"), maximum=rule.get("maximum"), **options)
+                    elif rule["type"] == "boolean":
+                        control = gr.Checkbox(**options)
+                    else:
+                        control = gr.Textbox(**options)
+                    names.append(name); controls.append(control)
+                from .contracts import OUTPUT_NAMES
+                outputs = gr.CheckboxGroup([name for name in OUTPUT_NAMES if
+                    metadata["capabilities"].get(name, {}).get("status") in ("supported", "conditional")],
+                    value=["depth"], label="Requested artifacts (depth required)", elem_id="requested-artifacts", interactive=True)
+                with gr.Accordion("Declared capabilities and parameter schema", open=False):
+                    gr.JSON({"capabilities": metadata["capabilities"], "parameter_schema": metadata["parameter_schema"]})
+                submit = gr.Button("Run inference", variant="primary", elem_id="submit-run", interactive=readiness["available"])
+
+                def submit_job(session, image, selected_device, selected_dtype, seconds, requested, *values):
+                    try:
+                        message = controller.submit(session, image, selected["variant_id"], selected_device,
+                            selected_dtype, dict(zip(names, values)), seconds, requested,
+                            model_id=selected["model_id"], configuration_ticket=selected["ticket"])
+                    except Exception as error:
+                        message = f"{type(error).__name__}: {error}"
+                    return message, controller.snapshot(session)["generation"]
+
+                submit.click(submit_job, [token, upload, device, dtype, timeout, outputs, *controls],
+                             [notice, operation_generation], **event)
+
         cancel.click(controller.cancel, [token, operation_generation], notice, **event)
         open_saved.click(open_run, [token, saved_id], **event)
         # This is the sole writer for status, Results, and tab selection. Timer
         # trigger_mode=once prevents overlapping/stale poll responses in a browser.
         timer.tick(poll, [token, last_view], [run_id, status, result_id, result, tabs, last_view, viewer, open_notice], **event)
-        app.load(lambda: (uuid.uuid4().hex, gr.Button(interactive=True), gr.Button(interactive=True)),
-                 outputs=[token, submit, cancel], **event)
+        def initialize():
+            session = uuid.uuid4().hex
+            selected = controller.configure(session, controller.model_id)
+            return (session, selected, gr.Dropdown(interactive=True), gr.Dropdown(interactive=True),
+                    gr.Button(interactive=True))
+        app.load(initialize, outputs=[token, configuration, model, variant, cancel], **event)
     return app
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="MGE local Gradio application (single process)")
-    parser.add_argument("--model", required=True, help="One prepared model ID from Registry metadata")
+    parser.add_argument("--model", required=True, help="Initial model ID from Registry metadata")
     parser.add_argument("--project-root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--run-root", type=Path)
     env = parser.add_mutually_exclusive_group()
@@ -272,6 +306,7 @@ def main(argv=None):
     env.add_argument("--conda-prefix")
     parser.add_argument("--conda-exe")
     parser.add_argument("--checkpoint", type=Path)
+    parser.add_argument("--target-config", type=Path, help="Local environment and per-variant checkpoint map")
     parser.add_argument("--read-only", action="store_true", help="Read terminal Runs without a model environment")
     parser.add_argument("--port", type=int, default=7860)
     args = parser.parse_args(argv)
@@ -280,20 +315,32 @@ def main(argv=None):
     from .registry import ModelRegistry
     from .runner import ExperimentRunner
     from .storage import RunStore
+    from .targets import TargetConfiguration
 
     root = args.project_root.resolve()
     store = RunStore(root, args.run_root)
     registry = ModelRegistry(root / "models")
     info = registry.get_model(args.model)
+    targets = TargetConfiguration.read(args.target_config) if args.target_config else TargetConfiguration()
     manager = None
     if not args.read_only:
         environment_id = info.environment()["environment_id"]
-        resolver = EnvironmentResolver({environment_id: EnvironmentProfile(
-            environment_id, name=None if args.conda_prefix else args.conda_env or environment_id,
-            prefix=args.conda_prefix)})
-        manager = WorkerManager(root, resolver, CondaLauncher(args.conda_exe), args.checkpoint)
+        if args.conda_env or args.conda_prefix or not args.target_config:
+            targets.profiles[environment_id] = EnvironmentProfile(environment_id,
+                name=None if args.conda_prefix else args.conda_env or environment_id, prefix=args.conda_prefix)
+        initial_key = f'{args.model}/{info.variant()["variant_id"]}'
+        initial_checkpoint = args.checkpoint or (os.environ.get('MDE_CHECKPOINT_PATH') if not args.target_config else None)
+        if initial_checkpoint:
+            targets.checkpoints[initial_key] = Path(initial_checkpoint).resolve()
+        elif not args.target_config:
+            # Preserve the initial model's pre-existing offline cache behavior.
+            targets.cached_checkpoints.add(initial_key)
+        manager = WorkerManager(root, EnvironmentResolver(targets.profiles), CondaLauncher(args.conda_exe),
+                                checkpoints=targets.checkpoints)
+    if args.read_only:
+        targets = TargetConfiguration()
     backend = LocalBackend(store.root, manager)
-    controller = InferenceController(ExperimentRunner(registry, backend, store, root), args.model)
+    controller = InferenceController(ExperimentRunner(registry, backend, store, root), args.model, targets=targets)
     app = build_app(controller)
     app.launch(server_name="127.0.0.1", server_port=args.port, share=False, inbrowser=False,
                max_file_size=MAX_UPLOAD_BYTES, enable_monitoring=False, ssr_mode=False,

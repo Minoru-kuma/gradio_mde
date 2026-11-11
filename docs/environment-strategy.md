@@ -228,3 +228,13 @@ No changes to MoGe / Gradio environments. Model discovery works without preparin
 Checkpoint preparation explicitly downloads fixed weights / config; worker inference reads verified local files only.
 CPU CLI and offline-boundary execution succeed. GPU and lock-based recreation remain unverified.
 Details: [DA3 preparation and evidence](../models/da3/README.md).
+
+## Phase 03.3 target maps and per-job checkpoint isolation
+
+The optional [target file](target-configuration.md) binds logical IDs to names / prefixes and
+model_id/variant_id to local checkpoint paths. WorkerManager resolves against the selected JobSpec.
+In map mode it removes inherited MDE_CHECKPOINT_PATH before applying the exact key; no previous model's
+path is retained. Legacy single-job CLI checkpoint / environment overrides remain available.
+UI legacy flags and offline-cache fallback are scoped to its initial model / default variant.
+Preparation metadata is checked without adapter imports; runtime / digest validation stays in the worker.
+The two real models continue using independent environments and their original pinned dependencies.
