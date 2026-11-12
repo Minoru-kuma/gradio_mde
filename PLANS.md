@@ -11,7 +11,7 @@
   2026-11-12の最新指示で03.4実装・検証を再開。直前の文書更新限定指示は履歴として保持する。
   license判断は[AGENTS共通方針](AGENTS.md#license-review-and-decisions)に従う。
   ユーザーが固定Small checkpointの取得・非商用local CPU研究利用を個別承認。不確実性は維持し、
-  再配布・公開同梱・商用利用は含めない。03.4実E2E未達で03.5へ進まない。
+  UniK3Dの再配布・公開同梱・商用利用は含めない。03.4実E2E未達で03.5へ進まない。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
 - PR作成・main統合・Phase 04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
 - Start evidence: fetch成功。最新origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`
@@ -20,6 +20,44 @@
 - 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、関連仕様。
   以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
 - main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
+
+## Demo edition specification update — 2026-11-12
+
+- Purpose / decision: 通常版は本体・自作Adapterを配布し外部モデルsource / weightsを非同梱とする方針を維持。
+  デモ版は**MoGe-2 ViT-S Normalの固定1種類のみを同梱する構成**を正式決定し、
+  [公開・配布仕様](docs/distribution-policy.md#demo-edition--moge-2-vit-s-normal)へ実装・weights・依存環境の提供方法を整理する。
+- Scope / order: Phase 03進行中の仕様更新のみ。最新AGENTS / README / 配布仕様 / MoGe README・manifestを確認 →
+  本計画 → 通常版・デモ版と過去判断を分離して文書整合 → 内容 / links・anchors・fences / 差分・履歴保持を検証 →
+  既存`codex/phase-03-implementation`へcommit / 通常push → 元のPhase 03作業へ戻る。
+  今回デモpackage生成・weightsの実同梱・実配布・PR作成・main反映・Phase 04以降は行わない。
+- Fixed model: `models/moge/manifest.json`の`moge` / `moge-2-vits-normal`を採用。sourceは
+  `07444410f1e33f402353b99d6ccd26bd31e469e8`、weightsはHub revision `26b477f41595707c5db6770294c0d1721e8ed4ed`の
+  `model.pt`、SHA-256 `79a16621928c2bf0ed04659218c55c01075e950507f40bb3332fb4c873d3e1dc`。
+  2026-11-12の公式read-only確認でMoGe LICENSEはMicrosoft MIT＋Apache-2.0全文、DINOv2由来headerもMeta / Apache-2.0、
+  固定Hub card / APIはMIT、utils3d固定LICENSEはMIT。記録は`.local/validation/demo-policy-license-review.json`。
+  専用weights LICENSE / NOTICE fileの不在は観測として記録し、禁止条件と同一視しない。必要な帰属表示を配布物へ対応付ける。
+- Packaging design: 通常版から分離したbuild profile / 外部recipeのデータで対象model・variant・source pin・checkpoint・依存環境・
+  帰属表示一覧を指定する。MoGe実装とweightsをbuild時に公式配布元から準備し、デモ専用の独立環境・resourceとして収める構成。
+  既存Registry / target設定 / ModelAdapter / ExecutionBackendを利用し、core / UI / backendへモデル名分岐を追加しない。
+  対象OS / arch、runtimeの提供媒体、CPU / CUDA build等の具体的なpacking方法は未検証の設計事項として残す。
+  現在のConda prefix丸コピーの可搬性や、全依存の再配布可否・NOTICE確認を検証済みと扱わない。
+  MoGeAdapterのdirect_url.jsonによるsource revision検査を維持できる配布provenanceの提供・読戻しも未確認。
+  local wheel導入でVCS情報が残るとは推定せず、既存検査の削除・緩和を前提にしない。
+- History / boundaries: 従来の通常版非同梱方針と、当時モデル同梱デモを決定・配布していなかった履歴を保持。
+  今回はMoGeデモの構成決定という差分のみで、既存実装・検証実績・Phase承認を維持する。
+  UniK3D Smallの個別承認は非商用local CPU研究利用のまま。UniK3D / DA3 / 他MoGe variant・checkpointをデモへ追加しない。
+- Verification / risk / rollback: 文書7件のみを変更し、model code / manifest / environment定義 / tests / rawを変更しない。
+  版・digestと公式条件の参照、通常版とデモ版の境界、必要なLICENSE / NOTICE / 帰属表示と未確認事項を検証する。
+  依存全体の配布条件や可搬性をsource / weightsのlicenseだけで保証しない。不確実性は該当行為で判断し、開発全体を停止しない。
+  文書変更は通常の修正commitで戻せる。Git操作は親側で直列化する。
+- Results: 変更は既存Markdown7文書のみ。Markdown33件 / local links・anchors294件 / fences検証はerrors 0、
+  `git diff --check`成功。AGENTS規則2〜13、PLANSの既存公開方針・Phase実装 / 調査履歴、READMEの実装状況・モデル実績、
+  Architectureの既存調査・Phase履歴、ModelAdapter / Environmentの技術契約とUniK3Dの配布制限は変更前commit `f337bf5`と比較して一致。
+  デモのsource / variant / checkpoint revision・SHA-256はMoGe manifestと照合し一致。
+  記録: `.local/validation/demo-policy-2026-11-12-static.json` / `demo-policy-license-review.json`。
+  モデルcode / manifest / tests / 環境定義・rawの変更、デモpackage生成・実同梱・配布、実装suite・モデル推論は今回未実施。
+  対象OS / packing形式、全依存の再配布・NOTICE、source provenanceの配布後検証は未確認事項として記録した。
+  commit / 通常pushは親側で直列化し、結果をGit履歴・同名remote refで確認した後、元のPhase 03作業へ戻る。
 
 ## Parallel publication policy documentation — 2026-11-12
 

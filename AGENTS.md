@@ -15,7 +15,9 @@
    履歴: 直前の2026-11-12指示はハーネス・関連文書更新のみで、モデル作業は開始していなかった。
    今後のlicense判断は下記13の全Phase共通方針に従う。UniK3Dのlicense表記差異・checkpoint適用条件未確認は維持。
    2026-11-12の個別判断で固定Small checkpointの取得・非商用local CPU研究利用を承認。不確実性を記録して進める。
-   再配布・公開同梱・商用利用は未承認。履歴: 一般的な再開指示だけでは個別保留を解除せず、用途・リスクを提示して判断を求めた。
+   UniK3Dの重みの再配布・公開同梱・商用利用は未承認。履歴: 一般的な再開指示だけでは個別保留を解除せず、用途・リスクを提示して判断を求めた。
+   2026-11-12の追加指示で下記15のMoGeデモ構成を仕様として正式決定。今回の文書commit / 通常push後に元のPhase 03作業へ戻る。
+   今回デモpackage生成・weights実同梱・実配布は行わず、実装状況・Phaseの受入条件を変更しない。
    独立adapter / fake / 幾何検証はlicense不確実性だけで止めないが、実作業は各回の承認範囲内で行う。
    重大な互換性問題等を推測で解消しない。03.4実モデルE2E未達のまま03.5へ進まない。
    履歴: 採用前調査時はlicense根拠不足により実装を含め一旦停止していた。
@@ -90,12 +92,20 @@
 
 ## Publication and distribution
 
-14. 公開・配布するのは実験プラットフォーム本体と自作Adapterとし、外部モデルのソースコード・
+14. 通常版として公開・配布するのは実験プラットフォーム本体と自作Adapterとし、外部モデルのソースコード・
     学習済みcheckpointは原則同梱・再配布しない。利用者が必要なモデル・重みを公式配布元から別途準備し、
     モデルごとのライセンス・利用条件に従う構成とする。環境定義・準備script・出典metadataの提供と、外部モデル実体の同梱を区別する。
     local研究用のGit除外領域への準備は配布とは別行為であり、既存の個別承認範囲を維持する。
     不明確さだけで開発全体を停止せず上記13に従って影響範囲を限定し、禁止条件・権利上の問題と未確認事項を記録する。
     詳細は[公開・配布仕様](docs/distribution-policy.md)。この方針更新自体は実公開・再配布や次Phase開始の承認ではない。
+
+15. デモ版は**MoGe-2 ViT-S Normalの固定1種類のみを同梱する構成**とする。通常版とは分離したbuild profile / 外部recipeの
+    データでモデル実装・checkpoint・独立依存環境と必要なLICENSE / NOTICE / 帰属表示を指定し、既存Plugin境界を維持する。
+    core / UI / backendへデモ用のモデル名分岐を追加しない。対象の固定版・提供方法・未確認事項は
+    [デモ版仕様](docs/distribution-policy.md#demo-edition--moge-2-vit-s-normal)に記録する。
+    全依存の再配布条件、対象OS / archのpacking・可搬性、Conda prefixの丸コピーを検証済みと扱わない。
+    過去にモデル同梱デモを決定・配布していなかった履歴を保持し、今回のMoGeデモ構成決定と区別する。
+    UniK3D / DA3 / 他のMoGe variant・checkpointをこの決定だけで追加しない。実package生成・実同梱・配布は今回の文書更新には含めない。
 
 詳細: [Architecture](docs/architecture.md) / [Model contracts](docs/model-adapter-spec.md) /
 [Environment](docs/environment-strategy.md) / [Execution](docs/execution-backend-spec.md) /

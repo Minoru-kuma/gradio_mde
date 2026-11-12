@@ -21,10 +21,16 @@ upstream package のコード全体をコピーするより、検証した revis
 
 ### Publication boundary
 
-公開・配布の対象はプラットフォーム本体と自作Adapterであり、外部モデルのソースコード・checkpointは原則同梱・再配布しない。
+通常版の公開・配布の対象はプラットフォーム本体と自作Adapterであり、外部モデルのソースコード・checkpointは原則同梱・再配布しない。
 利用者が公式配布元から別途準備したモデルをAdapterが呼び出す。manifestや環境定義には公式参照・固定版・digestを記録する。
 参考コードの再利用を外部モデル実装の公開物への取り込みと同一視せず、第三者コードの取込みは出典と条件を個別に扱う。
 各配布元の利用条件・未確認事項は下記の共通方針で記録・判断する。詳細は[公開・配布仕様](distribution-policy.md)。
+
+デモ版は固定MoGe-2 ViT-S Normal 1種類の実装・weights・独立依存環境を提供する構成とする。
+同梱対象は通常版と分けたbuild profile / 外部recipeのデータで指定し、実行時は同じPlugin契約とtarget設定を用いる。
+core / UI / backendへデモ用モデル名分岐を追加せず、既存のsource revision / checkpoint digest検査を緩和しない。
+配布形式を通したsource provenanceの保持、全依存の配布条件と対象OSでの環境可搬性は未検証事項として記録する。
+今回の仕様決定はAdapter signature / schema / 実装や、他モデルの同梱範囲を変更しない。
 
 ## ModelInfo and manifest
 

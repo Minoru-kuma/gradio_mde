@@ -17,11 +17,17 @@ Phase承認、技術的受入、重大な安全性・互換性問題の停止条
 
 ## Publication and model provisioning
 
-公開・配布対象はプラットフォーム本体と自作Adapter。外部モデルsource / checkpointは原則同梱・再配布せず、
+通常版の公開・配布対象はプラットフォーム本体と自作Adapter。外部モデルsource / checkpointは原則同梱・再配布せず、
 利用者が公式配布元から必要なモデルを別途準備し、各配布元の条件に従う構成とする。
 自作のmanifest / environment定義 / 準備scriptで取得先と固定版・digest・条件の出典を案内する。
 local研究用の準備と配布物への同梱は分け、license不確実性は上記の共通方針で影響範囲を限定して判断する。
 詳細は[公開・配布仕様](distribution-policy.md)。既存の責務分離・実装実績・Phaseの承認やExit条件は維持する。
+
+デモ版は固定MoGe-2 ViT-S Normal 1種類の実装・weights・独立依存環境を提供する構成とする。
+通常版とは分離したbuild profile / 外部recipeのデータで同梱対象・版・配置・帰属表示を指定し、既存Pluginを利用する。
+デモ用のモデル名分岐をcore / UI / backendへ追加しない。依存環境の提供形式・source provenance保持・OS別packingと
+全依存の配布条件は検証待ちであり、現在のConda prefixコピーをportableと扱わない。
+この構成決定では他モデルをデモへ追加せず、今回の仕様更新でpackageを生成・同梱・配布していない。
 
 ## Repository investigation
 

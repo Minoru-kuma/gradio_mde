@@ -33,9 +33,16 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 
 ## 公開・配布方針
 
-公開・配布するのはプラットフォーム本体と自作Adapterです。外部モデルのソースコード・学習済みcheckpointは
+通常版として公開・配布するのはプラットフォーム本体と自作Adapterです。外部モデルのソースコード・学習済みcheckpointは
 原則同梱・再配布せず、利用者が必要なものを各公式配布元から別途準備する構成とします。
 利用条件はモデルごとの配布元に従い、環境定義・準備script・固定版や出典のmetadataを利用案内とともに提供します。
+
+デモ版は**MoGe-2 ViT-S Normalの固定1種類のみを同梱する構成**を正式決定しました。
+通常版とは分離したbuild profile / 外部recipeで、固定MoGe実装・weights・独立依存環境と帰属表示を提供する設計です。
+core / UI / backendへデモ用のモデル名分岐を加えず、既存Pluginを利用します。UniK3D・DA3や他MoGe variantを同梱する決定ではありません。
+全依存の再配布条件・NOTICE、対象OSと環境bundleの可搬性・source provenance保持は未検証事項として記録しています。
+今回は仕様更新だけであり、package生成・weights実同梱・配布は行っていません。
+
 研究用のlocal準備と配布物への同梱を分け、不明点は記録して影響を受けない開発を継続します。
 明確な禁止条件や権利上の問題は該当作業で判断します。詳細と今回の文書化の範囲は[公開・配布仕様](docs/distribution-policy.md)を参照してください。
 
@@ -270,7 +277,7 @@ derived pathが空ならrawを含む全Run削除です。入力を変えた場�
 - [PLANS.md](PLANS.md): phase の承認範囲・計画・進捗管理
 - [Architecture](docs/architecture.md): 調査結果、責務、依存関係、設計判断
 - [ModelAdapter spec](docs/model-adapter-spec.md): ModelInfo / Capabilities / MDEOutput
-- [Publication and distribution](docs/distribution-policy.md): 本体・自作Adapterの配布境界と外部モデルの別途準備
+- [Publication and distribution](docs/distribution-policy.md): 通常版の非同梱原則と固定MoGe 1種類を同梱するデモ版の構成・未確認事項
 - [Results Viewer](docs/results-viewer.md): 02Cの4表示モード・mesh永続保存・固定版renderer・制限
 - [Gradio Inference](docs/gradio-inference.md): 02B application環境・session / dispatch・offline起動
 - [Environment strategy](docs/environment-strategy.md): Conda、CUDA、subprocess、micromamba

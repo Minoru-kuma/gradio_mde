@@ -81,10 +81,17 @@ checkpoint は設定した cache または local path から読む。研究室 n
 必要に応じユーザー判断を求める。local研究用cacheの準備と、重み再配布・公開package同梱は別に判断する。
 この判断方針は自動取得の承認や既存個別保留の解除を意味せず、環境分離・digest・runtimeの技術的検証を代替しない。
 
-公開・配布時は本体・自作Adapterと環境定義 / 準備手順を提供し、外部モデルsource / checkpointは原則同梱・再配布しない。
+通常版の公開・配布時は本体・自作Adapterと環境定義 / 準備手順を提供し、外部モデルsource / checkpointは原則同梱・再配布しない。
 利用者が各公式配布元の条件に従って必要なモデルを別途準備する。Git除外領域にある取得済source / weights / cacheや
 構築済モデル環境を配布物へ混ぜず、local研究用の準備と配布を区別する。
 公式配布元からの明示的な準備scriptはこの構成で利用できる。詳細は[公開・配布仕様](distribution-policy.md)。
+
+デモ版は固定MoGe-2 ViT-S Normal 1種類の実装・weightsと必要な依存環境を提供する構成を例外として正式決定した。
+通常版から分離したbuild profile / 外部recipeのデータで対象OS / arch、版、runtime・resource配置、LICENSE / NOTICEを管理する設計とする。
+本体applicationとMoGe workerの環境分離を維持し、対象platformで再構成・検証する。現在のConda prefix丸コピーの可搬性は未検証。
+MoGeAdapterのinstalled source revision検査を保持できるprovenance提供方式も未確認であり、local wheel導入だけでVCS情報が残るとはしない。
+CPU-only buildの採用やCUDA / NVIDIA依存を含むpacking方式、全依存の再配布条件・NOTICE確認は今回実施していない。
+この設計方針の文書化は、実環境bundle・package生成・配布や、他モデルの同梱を開始するものではない。
 
 ## Conda and pip responsibilities
 
