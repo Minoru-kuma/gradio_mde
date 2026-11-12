@@ -296,12 +296,12 @@ and [Gradio contract](gradio-inference.md#phase-033-model--variant-switching).
 work resumed for 03.4, initially stopped at the UniK3D license-evidence adoption gate, then resumed
 independent adapter / synthetic geometry work under the revised stop conditions.
 See [investigation and resume conditions](unik3d-investigation.md).
-03.4 is partially implemented using an injected synthetic runtime, with no production manifest or real runtime bridge.
-Real checkpoint acquisition / use / redistribution remain on hold; source labels and checkpoint terms are unresolved.
-The 2026-11-12 documentation update keeps that case-specific hold while adopting the common policy above;
-direct author contact is not a universal adoption prerequisite. No new model work starts in this update.
+Historically 03.4 had only an injected synthetic runtime and no production manifest / real bridge.
+A later scoped user decision allowed fixed Small acquisition and noncommercial local CPU research, while source / checkpoint terms remain unresolved.
+The documentation-only update itself did not release the hold. The subsequent action-specific decision is recorded
+in the investigation; redistribution / public bundling / commercial use remain outside that decision.
 Depth / native points reuse existing profiles; core / UI / backend and schema are unchanged.
-03.4 real-model E2E is unmet, 03.5–03.6 remain unimplemented, and Phase 03 is not COMPLETE.
+03.4 native Small CPU E2E and native Points validation now pass. 03.5–03.6 remain unimplemented; Phase 03 is not COMPLETE.
 
 ## Phase 03.4 runtime capability preflight
 
@@ -310,4 +310,13 @@ A nonempty runtime map must explicitly permit every requested output; malformed,
 declarations fail before prediction. Empty maps retain legacy behavior with a warning. Conditional
 declarations still require actual output validation. The optional execution.runtime_capability_check
 records a validated JSON snapshot. Existing profiles, schema major and old Run readers remain compatible.
-The UniK3D checkpoint decision is scoped separately from this independent work; 03.4 real-model E2E is unmet.
+The UniK3D checkpoint decision is scoped separately from this independent work; subsequent native CPU E2E passed.
+
+## Phase 03.4 native Small integration
+
+The self-authored UniK3D plugin wraps a separately installed, pinned official source and prepared local
+checkpoint. CPU-only torch / float32, source revision and two file digests are checked before native inference.
+Native distance and Points use existing profiles with unknown units / scale; no pinhole K or Points are synthesized.
+Unsupported native rays / confidence / pose are not exported. Their absence does not require a new profile
+for this accepted depth / Points integration. Existing UI / Registry / Runner / Backend remain model-independent.
+See the [plugin](../models/unik3d/README.md) and [03.4 acceptance](phases/phase-03.md#034-acceptance-evidence--pass).

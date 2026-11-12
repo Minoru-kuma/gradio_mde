@@ -1,6 +1,6 @@
 # UniK3D adoption investigation — Phase 03.4
 
-Status: **independent contract implemented and synthetically verified / real-model adoption gate unmet**.
+Status: **03.4 acceptance PASS — native Small CPU depth / Points E2E and regression verified**.
 History: work resumed after 03.3, then initially stopped before installation, weight download or
 implementation because the applicable license evidence was unresolved. The subsequent user instruction
 revises that blanket stop: independent adapter / synthetic tests / geometry validation may proceed.
@@ -11,9 +11,9 @@ historical stop decisions below; it does not acquire weights, implement a runtim
 
 ## Scope and source identity
 
-The candidate is UniK3D Small (`unik3d-vits`), following the Phase 03 plan to establish the third
-model's depth-only CPU E2E before extending optional artifacts. The official source was inspected in
-Git-ignored investigation storage. It was not copied into production code or installed in an environment.
+The selected candidate is UniK3D Small (`unik3d-vits`), following the Phase 03 plan to establish the third
+model's depth-only CPU E2E before extending optional artifacts. During the initial investigation official source was inspected only in
+Git-ignored storage, not copied into production or installed. Later scoped local installation is recorded below.
 
 | Item | Verified reference / declaration |
 | --- | --- |
@@ -23,8 +23,10 @@ Git-ignored investigation storage. It was not copied into production code or ins
 | Config | `config.json`, retrieved from that checkpoint revision, 3,672 bytes, measured SHA-256 `5b5b7d5c6884fdb1c5f2fbf58dfaa6beb81d5ccff3dbcead4632f81eb32ad131` |
 | Model card | `README.md`, retrieved from that checkpoint revision, 390 bytes, measured SHA-256 `0d65739e516d91cd2eb8252f8833ab2b9a1e9b6a1e09a9cacd4e79e68f74848d` |
 
-The safetensors body was **not downloaded**, so its digest is a published declaration, not a measured
-local verification. The config and model card are read-only research artifacts, not an adopted plugin.
+At the initial investigation the safetensors body was **not downloaded**, so its digest was then only
+a published declaration. After the scoped user decision below, the actual body and config were acquired
+into Git-ignored local research storage and both measured digests matched the recorded declarations.
+This changes the acquisition / verification state, not the unresolved license applicability findings.
 
 ## License evidence and unresolved applicability
 
@@ -43,13 +45,14 @@ Large `008aa54308b8bc142f74c9c7b098833aaede06bd`. These metadata checks do not e
 A proposed license edit on a Hub PR ref was not treated as terms applying to the fixed released checkpoint.
 Public availability / ungated download does not resolve the missing applicability evidence.
 
-No `weights_license` value has been guessed, no real variant has been registered as supported, and the
-third-model E2E gate has not been marked successful. The uncertainty remains unresolved.
+No `weights_license` value has been guessed. Initially no real variant was registered and the E2E gate
+was unmet; the native connection below records the later implementation separately. The licensing uncertainty remains unresolved.
 
 ## Work-specific stop conditions — revised user instruction
 
-The following is the current UniK3D case status, not a blanket rule for all models. Independent technical
-work remains subject to Phase / task authorization; the 2026-11-12 task authorizes documentation only.
+This table preserves the case status during the documentation-only task, before the scoped user decision
+and native connection below. It is not a blanket rule for all models; those later records supersede its
+acquisition / runtime hold entries. Independent work remains subject to Phase / task authorization.
 
 | Work | Current treatment |
 | --- | --- |
@@ -63,6 +66,8 @@ Public accessibility and a source-license label do not by themselves resolve che
 This is a record of missing evidence, not a legal determination or permission to use the checkpoint.
 
 ## Technical observations — source only, no execution claim
+
+These paragraphs retain the initial source-only investigation, before the later native connection below.
 
 The fixed `UniK3D.infer` performs native preprocessing and returns points, rays, confidence, depth and
 distance. Its source defines depth from points' z coordinate and distance from the points' norm;
@@ -83,7 +88,8 @@ subset or independent environment has been validated. Existing MoGe / DA3 / UI e
 
 ## Independent implementation boundary
 
-See [adapter scope](../models/unik3d/README.md). Default `load()` reports the checkpoint hold before
+Historical scope before native connection (see the current [adapter README](../models/unik3d/README.md)):
+at that stage default `load()` reported the checkpoint hold before
 path access or framework import. Only an explicitly injected, independently authored fixture runtime
 with no checkpoint can exercise the load / predict / unload contract. No production manifest is
 installed, so Gradio and CLI discovery do not advertise a runnable UniK3D variant.
@@ -163,4 +169,36 @@ a finding that the rights holder granted a license. Redistribution, public-packa
 and commercial use are outside this decision. No author inquiry has been sent.
 
 The earlier hold descriptions and review questions above are preserved as the decision history.
-The synthetic-only adapter guard remains until the native runtime is implemented and verified.
+At the time of this decision the synthetic-only guard still existed. It was subsequently replaced with
+the verified local-checkpoint loader in the native connection below; fixture injection remains checkpoint-free.
+
+## Native connection evidence — 2026-11-12
+
+The scoped user decision was acted on using a dedicated `.local/envs/mde-unik3d` CPU environment.
+Official source revision identity and local weights / config size / SHA-256 were verified. Strict native
+safetensors loading succeeded. torch 2.6.0+cpu, torchvision 0.21.0+cpu and NumPy 2.2.2 are separate from
+MoGe / DA3 / UI environments. Full dependency / reproduction scope is in the plugin README.
+
+A local pip clone of the earlier partial investigation repository failed because of unavailable promisor
+blobs; installing the same fixed commit from the official remote succeeded. The first native import then
+exposed mandatory wandb / matplotlib imports through utils/__init__.py; real packages were added to the
+dedicated environment, with no upstream stubs or source edits. Official KNN-evaluation and disabled-CUDA-autocast
+warnings are retained in logs. No xformers / triton / Gradio is installed or required for the tested CPU path.
+
+Depth-only CLI Run `2f40b740-11d1-4bdb-9b7a-e287bbeed832` and depth + Points Run
+`87615672-90ef-44cb-9f3c-9b4239372223` completed through the shared worker / backend contracts.
+Canonical range and native Points matched a separate official native invocation exactly, without K
+synthesis or backprojection. Range is float32 [256,256], all 65,536 pixels valid, unknown scale / units.
+No negative-z pixels occurred in this sample; those directions are covered by synthetic fixtures.
+Each saved Run collected twice with all hashes / mtimes unchanged; Python socket egress guards were
+active with no external connection attempts. These runs do not establish metric accuracy or GPU behavior.
+
+Evidence is under `.local/validation/phase-03-4-unik3d-*`. Final regression / acceptance results are in
+the Phase 03 record. Redistribution / public bundling / commercial use remain outside the research decision.
+
+The final supported manifest Run is `04826895-b67d-42fa-8314-02751be35d1c`, source_digest
+`23e50c71c8d69733a85d44cba08b3d2b599af8a8fa6e19acb532b6e4a4c18abe`. Values matched the verified
+native outputs, and two new CLI collects preserved every file hash / mtime. Targeted25 tests and the
+full129-test suite (122 passed, 7 browser skips) succeeded. The existing depth / Points profiles suffice
+for this stage; unsupported unrequested rays / confidence / pose need no new profile.
+03.4 acceptance is PASS; 03.5 / 03.6 and overall Phase 03 completion remain pending.

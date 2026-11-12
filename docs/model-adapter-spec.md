@@ -334,3 +334,15 @@ legacy Run reader changes. Local checkpoint paths are selected by model_id/varia
 [target configuration](target-configuration.md), never by model name branches in core / UI / Backend.
 Parameter names, defaults and optional-output choices are rebuilt on model / variant changes.
 Server session tickets reject callbacks from replaced controls, including a switch away and back.
+
+## Phase 03.4 native UniK3D CPU plugin
+
+The pinned Small adapter now verifies prepared local checkpoint/config files, official source revision and
+strict state loading in a separate CPU environment. Native distance is canonical ray_distance; native
+Points are transposed without K synthesis or backprojection. Scale / units are preserved as unknown.
+Existing 01A / 02A profiles support these outputs; no new output type or numeric profile is introduced.
+Rays / confidence / pose / intrinsics / normals / model mask remain unsupported in this integration, so
+requests are rejected and unrequested outputs are not serialized. Native keys are provenance, not promises
+that every native tensor is exported. The checkpoint-free synthetic seam remains for numeric tests.
+Source / weight license facts and the scoped research decision remain in the
+[investigation](unik3d-investigation.md); operational approval is not a rights-holder license grant.

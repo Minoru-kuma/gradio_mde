@@ -1,5 +1,6 @@
-"""Synthetic contracts only. Never acquire, open or execute a real checkpoint."""
+"""Synthetic contracts and local preparation checks; no acquisition or model inference."""
 import json
+import hashlib
 from pathlib import Path
 import struct
 import subprocess
@@ -18,7 +19,25 @@ PROJECT = local_contract.PROJECT
 
 
 class UniK3DNumericTests(unittest.TestCase):
-    def test_default_load_and_injected_checkpoint_are_held_before_import_or_path_access(self):
+    def test_checkpoint_verifies_both_files_and_rejects_same_size_tampering(self):
+        from models.unik3d.checkpoint import verify_checkpoint
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            weights, config = b'synthetic weights', b'{"fixture":true}'
+            (directory / 'model.safetensors').write_bytes(weights)
+            (directory / 'config.json').write_bytes(config)
+            reference = {'filename': 'model.safetensors', 'sha256': hashlib.sha256(weights).hexdigest(),
+                'size_bytes': len(weights), 'config': {'filename': 'config.json',
+                'sha256': hashlib.sha256(config).hexdigest(), 'size_bytes': len(config)}}
+            self.assertEqual(verify_checkpoint(directory, reference)[1], {'fixture': True})
+            with self.assertRaisesRegex(ValueError, 'prepared local'): verify_checkpoint(None, reference)
+            (directory / 'model.safetensors').write_bytes(b'X' * len(weights))
+            with self.assertRaisesRegex(ValueError, 'SHA-256 mismatch'): verify_checkpoint(directory, reference)
+            (directory / 'model.safetensors').write_bytes(weights)
+            (directory / 'config.json').unlink()
+            with self.assertRaisesRegex(ValueError, 'missing or wrong size'): verify_checkpoint(directory, reference)
+
+    def test_missing_preparation_and_fixture_checkpoint_fail_before_framework_or_path_access(self):
         script = '''
 import sys
 from types import SimpleNamespace
@@ -27,16 +46,45 @@ class PathMustNotBeUsed:
  def __str__(self): raise AssertionError('checkpoint inspected')
  def __fspath__(self): raise AssertionError('checkpoint opened')
 def forbidden(context): raise AssertionError('runtime factory called')
-for adapter, checkpoint in [(UniK3DAdapter(),None),
- (UniK3DAdapter(),PathMustNotBeUsed()),
- (UniK3DAdapter(fixture_runtime_factory=forbidden),PathMustNotBeUsed())]:
- try: adapter.load(SimpleNamespace(checkpoint=checkpoint))
- except RuntimeError as error: assert 'on hold' in str(error)
- else: raise AssertionError('real runtime gate bypassed')
+for adapter, context in [(UniK3DAdapter(),SimpleNamespace(checkpoint=None)),
+ (UniK3DAdapter(),SimpleNamespace(checkpoint=PathMustNotBeUsed(),device='cuda:0',dtype='float32')),
+ (UniK3DAdapter(fixture_runtime_factory=forbidden),SimpleNamespace(checkpoint=PathMustNotBeUsed()))]:
+ try: adapter.load(context)
+ except ValueError: pass
+ else: raise AssertionError('invalid native preparation or fixture checkpoint accepted')
  adapter.unload(); adapter.unload()
 assert not set(sys.modules).intersection({'numpy','torch','unik3d','PIL'})
 '''
         self.run_script(sys.executable, script)
+
+    def test_native_tensor_bridge_with_fake_model_has_no_download_or_upstream_import(self):
+        worker = PROJECT / '.local/envs/mde-unik3d/bin/python'
+        if not worker.exists(): self.skipTest('Independent torch CPU environment required')
+        script = '''
+import sys
+import numpy as np
+import torch
+from models.unik3d.adapter import NativeRuntime,map_prediction
+class Model:
+ def infer(self,rgb):
+  assert rgb.shape==(3,2,4) and rgb.dtype==torch.uint8 and rgb.device.type=='cpu'
+  assert torch.is_inference_mode_enabled() and not torch.is_grad_enabled()
+  points=torch.zeros((1,3,2,4));points[:,0]=3;points[:,2]=-4
+  return {'points':points,'depth':points[:,2:3],'distance':points.norm(dim=1,keepdim=True),
+          'rays':points/5,'confidence':torch.ones((1,1,2,4))}
+runtime=NativeRuntime(Model())
+native=runtime.infer(np.zeros((2,4,3),dtype='uint8'))
+assert set(native)=={'distance','points','depth'}
+assert runtime.native_keys==['confidence','depth','distance','points','rays']
+assert all(value.dtype==np.dtype('float32') for value in native.values())
+output=map_prediction(native,'v',(2,4),('depth','points'),synthetic=False)
+assert output.metadata['synthetic_contract_only'] is False
+assert (output.depth==5).all() and (output.points[...,2]==-4).all()
+assert output.intrinsics is None and output.mask is None and output.rays is None
+runtime.close();assert runtime.model is None
+assert 'unik3d' not in sys.modules
+'''
+        self.run_script(worker, script)
 
     def run_script(self, executable, script):
         call = subprocess.run([str(executable), '-c', script], cwd=PROJECT,
@@ -194,8 +242,11 @@ class UniK3DSyntheticWorkerTests(unittest.TestCase):
                 self.assertIn(message, result.error['message'])
                 self.assertIn('unik3d synthetic closed', (run / 'logs/attempt-0001/stdout.log').read_text())
 
-    def test_production_registry_keeps_real_unik3d_unavailable(self):
-        self.assertNotIn('unik3d', [model.model_id for model in ModelRegistry(PROJECT / 'models').list_models()])
+    def test_production_registry_exposes_metadata_and_fixture_rejects_unsupported(self):
+        info = ModelRegistry(PROJECT / 'models').get_model('unik3d')
+        self.assertEqual(info.environment()['environment_id'], 'mde-unik3d')
+        self.assertEqual(info.effective_variant()['supported_devices'], ['cpu'])
+        self.assertIsNone(info.data['weights_license'])
         with self.assertRaises(ValueError):
             self.runner.submit('unik3d-synthetic', PROJECT / 'tests/assets/sample.png', device='cpu',
                                requested_outputs=('depth','intrinsics'))

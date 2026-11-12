@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0",
+  "model_id": "unik3d",
+  "display_name": "UniK3D Small (CPU)",
+  "adapter_entrypoint": "models.unik3d.adapter:UniK3DAdapter",
+  "adapter_version": "0.1.0",
+  "upstream_url": "https://github.com/lpiccinelli-eth/UniK3D",
+  "upstream_revision": "29f7862f3c3ee79c53ef0153dfc901ce511df575",
+  "default_variant": "unik3d-small",
+  "variants": [
+    {
+      "variant_id": "unik3d-small",
+      "model_version": "unik3d-vits",
+      "checkpoint": {
+        "repo_id": "lpiccinelli/unik3d-vits",
+        "revision": "80a99bfeb8d983ca6af27125fd83c88b891e75ad",
+        "filename": "model.safetensors",
+        "sha256": "9f977d058961146582931c136cf2ce44964cff3153dae7823dd1209223489bc6",
+        "size_bytes": 141789264,
+        "config": {
+          "filename": "config.json",
+          "sha256": "5b5b7d5c6884fdb1c5f2fbf58dfaa6beb81d5ccff3dbcead4632f81eb32ad131",
+          "size_bytes": 3672
+        }
+      }
+    }
+  ],
+  "capabilities": {
+    "depth": {
+      "status": "supported"
+    },
+    "points": {
+      "status": "supported"
+    },
+    "intrinsics": {
+      "status": "unsupported"
+    },
+    "normals": {
+      "status": "unsupported"
+    },
+    "mask": {
+      "status": "unsupported",
+      "condition": "computed finite-positive validity is not a native model mask"
+    },
+    "rays": {
+      "status": "unsupported",
+      "condition": "native rays not serialized in existing profiles"
+    },
+    "confidence": {
+      "status": "unsupported"
+    },
+    "camera_pose": {
+      "status": "unsupported"
+    },
+    "multi_view": {
+      "status": "unsupported"
+    },
+    "metric_depth": {
+      "status": "unsupported",
+      "condition": "native scale is not assigned verified metric units by this integration"
+    }
+  },
+  "environment_refs": [
+    {
+      "environment_id": "mde-unik3d",
+      "definition_ref": "models/unik3d/environment.yml",
+      "worker_protocol_version": "1.0"
+    }
+  ],
+  "supported_devices": [
+    "cpu"
+  ],
+  "supported_dtypes": [
+    "float32"
+  ],
+  "input_constraints": {
+    "min_views": 1,
+    "max_views": 1,
+    "format": "PNG",
+    "worker_mode": "RGB"
+  },
+  "parameter_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "resolution_level": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9,
+        "default": 0,
+        "description": "Native pixel budget interval [0,10); CPU smoke uses the lowest interval"
+      }
+    }
+  },
+  "license": "Unresolved source labels: LICENSE/header CC BY-NC-SA 4.0; README/metadata CC BY-NC 4.0",
+  "weights_license": null,
+  "license_review": {
+    "checked_at": "2026-11-12",
+    "checkpoint_terms": "undocumented at pinned revision",
+    "operational_decision": "user authorized fixed Small acquisition and noncommercial local CPU research with uncertainty recorded; not a grant of rights",
+    "excluded": [
+      "weight redistribution",
+      "public-package bundling",
+      "commercial use",
+      "public demo"
+    ],
+    "record": "docs/unik3d-investigation.md"
+  }
+}

@@ -1,11 +1,11 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: **実装中 / 03.1〜03.3受入完了、03.4独立adapter・合成検証を継続、実checkpoint保留**。Exit未達、COMPLETEではない。
+Status: **実装中 / 03.1〜03.4受入完了、03.5 / 03.6未着手**。Phase全体Exit未達、COMPLETEではない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
 2026-11-11の停止条件見直しで03.4の独立実装・合成検証を継続し、実checkpointの個別保留は維持した。
 履歴: 2026-11-12の直前作業は[AGENTSの全Phase共通方針](../../AGENTS.md#license-review-and-decisions)と関連文書の更新のみだった。
-最新の再開指示で03.4実装・検証を継続する。UniK3Dの既存個別保留は一般的な再開指示だけでは解除せず、
-対象行為の用途・リスクを整理して必要な判断を求める。03.4実モデルE2E未達のまま03.5には進まない。
+最新の再開後、用途・リスクを提示し、固定Smallの取得・非商用local CPU研究利用について個別回答を得た。
+不確実性と当時の保留履歴を保持してUniK3D実E2Eを検証した。03.4のcommit / 通常push後に03.5へ進む。
 直前の03.3で停止する指示と当時の受入結果は下記の履歴として保持する。
 PR作成・main統合・Phase 04以降には進まない。
 履歴: 2026-11-09は調査・計画・設計のみ承認、production実装・環境構築は未承認だった。
@@ -177,3 +177,30 @@ UniK3Dの[行為別評価と選択肢](../unik3d-investigation.md#scoped-decisio
 その後ユーザーが不確実性を記録したうえで固定Smallの取得・local研究利用を進めると回答。
 この限定範囲で独立環境・実runtime接続へ進む。再配布・商用・公開同梱は含めず、許諾の確定とは記載しない。
 03.4実E2E未達 / 03.5未着手 / Phase 03はCOMPLETEではない。
+
+## 03.4 acceptance evidence — PASS
+
+個別判断を受けたfixed Smallのlocal研究取得・使用を実施。適用条件の不確実性は未解決のまま記録し、
+再配布・公開同梱・商用利用は未承認。source / weightsをGitへ含めていない。
+
+- 独立環境: Python3.11.14 / torch2.6.0+cpu / torchvision0.21.0+cpu / NumPy2.2.2。
+  公式source pin・weights / configの実size / SHA一致、strict native state読込・CPU float32を確認。
+  native utils importに必要なwandb / matplotlibは専用環境だけに導入し、Trackingは初期化しない。
+- depth-only Run `2f40b740-11d1-4bdb-9b7a-e287bbeed832`、native Points Run `87615672-90ef-44cb-9f3c-9b4239372223`、
+  最終source / manifest Run `04826895-b67d-42fa-8314-02751be35d1c`。全てCLI→Runner→Backend→独立workerでCOMPLETED。
+  最終source_digest `23e50c71c8d69733a85d44cba08b3d2b599af8a8fa6e19acb532b6e4a4c18abe`。
+- 保存range / native Pointsは別の公式API直接実行と配列完全一致。float32 [256,256] / [256,256,3]、65,536 valid。
+  `ray_distance / unknown / unknown`でnative値を維持し、仮K・逆投影なし。サンプルの負zは0、fakeは負z / z=0を検証。
+- 01A depth-only / 02A geometry profileを再利用。必要optionalはnative Pointsで充足し、新profileは不要。
+  rays / confidence / pose等はunsupportedを明記し、要求を拒否・不要求は保存しない。
+  正本の「unsupported / 不要求の欠如は正常」に沿い、並行read-only reviewでも追加profile必須の根拠やblockerなし。
+- 全3Runを新CLIで各2回collectしhash / mtime不変、再推論なし・unload完了。Python socket外部通信遮断下で実E2E成功。
+  旧4Runも各2collect不変、旧01Bの1件はlocal不在で未検証。
+- 対象25 tests成功（31.094秒）、全suite129件 / 122成功 / browser opt-in7 skip（248.243秒）。
+  UniK3D browser / GPU / 他variant・resolution / metric accuracy・unit確定 / camera入力 / full training・evaluation /
+  full upstream pip check・lock別prefix再作成は未検証。既存環境は変更していない。
+
+詳細: [native plugin](../../models/unik3d/README.md)、[調査と履歴](../unik3d-investigation.md)。
+03.4のcommit / 通常push後に03.5へ進む。**Phase 03全体はCOMPLETEではない。**
+
+Final static validation: Markdown33件 / local links・anchors289件 / Python AST51件、errors 0。diff whitespace検査成功。

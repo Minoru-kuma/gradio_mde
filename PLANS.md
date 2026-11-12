@@ -2,8 +2,8 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03.4再開 / 独立実装・検証とcheckpointの行為別判断（2026-11-12）**。
-  03.4実E2E未達 / Phase 03はCOMPLETEではない。03.5のgateを維持する。
+- Current work: **Phase 03.4受入PASS / commit・通常push後に03.5へ（2026-11-12）**。
+  Phase 03全体はCOMPLETEではない。03.5 / 03.6は未着手。
 - Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
@@ -109,7 +109,31 @@
 - Validation / risk: constructorのimport時依存・shared state keys・CPU資源・native dtypeを実測。根拠なく依存互換・精度を主張しない。
   明確な禁止との衝突、重大なCPU / schema / geometry互換障害は該当作業を停止・報告する。
   新prefix / pluginを独立して修正でき、旧Run移行やraw書換えなし。03.4実E2E未達では03.5に進まない。
-- Results: 実施後に記録する。
+- Results / 03.4 acceptance: **PASS**。source pin / independent CPU environment / measured weight+config digests / strict load確認。
+  torch2.6.0+cpu / torchvision0.21.0+cpu / NumPy2.2.2、native model35,436,684 parameters。
+  sourceのutils/__init__がwandb / matplotlibを必須importするため実依存を追加（tracking初期化なし）。
+  partial local cloneからのpip導入はpromisor blob不足で失敗し、同じ固定commitの公式remote installで成功。
+  初回import不足をstub / source改変で回避せず、専用prefixにwandb0.19.6 / matplotlib3.10.0を追加してnative構築・推論成功。
+  upstreamのKNN評価extension未導入 / CUDA autocast無効のwarningを記録。実推論はcpu / float32、Gradio / xformers / tritonなし。
+- Actual E2E: depth-only Run `2f40b740-11d1-4bdb-9b7a-e287bbeed832`、depth+Points Run
+  `87615672-90ef-44cb-9f3c-9b4239372223`、最終manifestのdepth+Points Run `04826895-b67d-42fa-8314-02751be35d1c`。
+  range / Points float32 [256,256] / [256,256,3]、65,536 valid、native scale / unitはunknownで保存。
+  別の公式native直接実行とdistance / Pointsが配列完全一致。最終Runも同値で、source_digestは
+  `23e50c71c8d69733a85d44cba08b3d2b599af8a8fa6e19acb532b6e4a4c18abe`。
+  全3Runを新CLIで各2回collectしraw全file hash / mtime不変、predict各1回 / unload確認。
+  Python非loopback socket guard有効、外部接続試行なし。サンプルのnegative-zは0 pixel、負z / z=0はfake数値検証。
+- Contracts: 対象25 tests成功（31.094秒）、全suite129件 / 122成功 / opt-in browser7 skip（248.243秒）。
+  最終metadataのsupported宣言は実E2E再確認。旧Run4件各2collect不変、旧01Bの1件はlocal不在で未検証。
+  source / weightsはGit除外確認済み。静的links / AST・diff検査も成功（最終件数はphase文書）。
+- Review / optional decision: 03.4の「必要optional」は今回既存depth / native Pointsのみで成立。
+  既存02A profileがray_distanceとPoints norm整合性を検証するため新profileは追加しない。
+  rays / confidence / pose等はunsupported・不要求を保存せず要求を拒否し、仮K / 逆投影 / identity poseを補わない。
+  正本の「unsupported / 不要求の欠如は正常」と一致し、並行read-only reviewでもblockerなし。
+- Unverified / next: 新UniK3Dのbrowser、GPU、他variant / resolution、metric accuracy・units、camera入力、
+  full upstream training / evaluation / pip check、新lock別prefix再作成は未検証。
+  次は03.4 commit / 通常push完了後に03.5のmulti-view契約を順番どおり進める。Phase 03 COMPLETEではない。
+  証拠: `.local/validation/phase-03-4-unik3d-{native-compare,final-check}.json`、`phase-03-4-native-{regression.log,compatibility.json,static.json}`。
+
 
 ## License policy harness update — 2026-11-12
 

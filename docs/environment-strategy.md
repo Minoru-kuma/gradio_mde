@@ -249,3 +249,13 @@ path is retained. Legacy single-job CLI checkpoint / environment overrides remai
 UI legacy flags and offline-cache fallback are scoped to its initial model / default variant.
 Preparation metadata is checked without adapter imports; runtime / digest validation stays in the worker.
 The two real models continue using independent environments and their original pinned dependencies.
+
+## Phase 03.4 third independent CPU environment
+
+UniK3D Small uses a separate `mde-unik3d` environment definition and native inference lock in its
+[plugin directory](../models/unik3d/README.md). Python3.11.14 / torch2.6.0+cpu / NumPy2.2.2 were tested
+without changing MoGe / DA3 / UI environments. Official utils imports require wandb / matplotlib even
+for native inference; they are installed in this model environment only and no tracking is initialized.
+Full upstream training / evaluation extras and a clean recreation of this new lock are not claimed.
+The fixed source and checkpoint are prepared separately from official distributors, never bundled in the
+platform. Source / checkpoint terms remain uncertain and the local research action has a recorded user decision.
