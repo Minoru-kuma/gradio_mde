@@ -2,14 +2,16 @@
 
 ## Current authorization and status
 
-- Current work: **ライセンス確認・判断の全Phase共通方針とハーネス文書の更新のみ（2026-11-12）**。
-  Phase 03は03.4部分実装 / 実E2E未達、COMPLETEではない。今回モデル取得・実装・実推論は開始しない。
+- Current work: **Phase 03.4再開 / 独立実装・検証とcheckpointの行為別判断（2026-11-12）**。
+  03.4実E2E未達 / Phase 03はCOMPLETEではない。03.5のgateを維持する。
 - Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
   最新の追加指示「再開して」により03.4から再開。03.3まで完了して停止する指示は当時の履歴として保持する。
-  2026-11-12の今回指示は文書更新のみ。今後のlicense判断は[AGENTS共通方針](AGENTS.md#license-review-and-decisions)に従う。
-  UniK3Dの既存checkpoint個別保留は今回解除しない。03.4実E2E未達で03.5へ進まない。
+  2026-11-12の最新指示で03.4実装・検証を再開。直前の文書更新限定指示は履歴として保持する。
+  license判断は[AGENTS共通方針](AGENTS.md#license-review-and-decisions)に従う。
+  ユーザーが固定Small checkpointの取得・非商用local CPU研究利用を個別承認。不確実性は維持し、
+  再配布・公開同梱・商用利用は含めない。03.4実E2E未達で03.5へ進まない。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
 - PR作成・main統合・Phase 04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
 - Start evidence: fetch成功。最新origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`
@@ -18,6 +20,71 @@
 - 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、関連仕様。
   以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
 - main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
+
+## Phase 03.4 resumed implementation — 2026-11-12
+
+- Start / authorization: latest fetch成功、cleanな既存ブランチを継続。HEAD / remoteは
+  `770be8caeaff993280492e952d383fb0837198a2`、origin/mainは`e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま。
+  最新のPhase 03再開指示により、直前の文書のみという今回作業制限を履歴に移す。PR / main反映・Phase 04以降なし。
+- Scope / order: 未実装だった03.4の共通runtime capability照合を先行。既存仕様確認 → 契約・計画更新 →
+  workerのload後 / predict前の汎用preflight → 単体 / fake subprocess / 既存回帰・旧Run不変 → docs → commit / 通常push。
+  並行してUniK3Dの行為別用途・リスクを文書化し、個別checkpoint保留に必要なユーザー判断を求める。
+  判断前に実checkpointへ触れず、回答待ちでも技術的に独立した作業は継続する。
+- Runtime contract: LoadedModelInfo.capabilitiesの非空mapはload時点の明示宣言として扱う。
+  要求出力の欠落 / unsupported / 不正な型・statusはpredict前に失敗。supported / conditionalは進め、
+  conditionalの文章は実行せず、要求出力のpresence / shape等は従来どおりserialize時に検証する。
+  既存adapterの空mapはlegacy未宣言としてwarning付きで受け入れ、従来の出力検証を維持する。
+  このfallbackはmap全体が空の場合のみで、部分宣言の欠落をmanifestから補完しない。
+  検証済みsnapshotとlegacy / declaredの区別をoptionalなexecution.runtime_capability_checkへ保存する。
+  旧Runはfield欠如を受容し、必須field / schema major / serialization profile / adapter signatureを変更しない。
+- Verification: 同一fake manifestをruntimeでunsupported / missing / malformedに変更してpredict未実行・unload実行を確認。
+  conditionalの成功と要求欠落失敗、非要求unsupportedの許容、空mapの旧adapter互換、未知のJSON metadata保持を検証。
+  同一Backendの再利用・旧Run collect・raw hash / mtime不変、controlのtorch / adapter非importを維持する。
+- UniK3D scoped decision: 固定Small checkpoint約142MBのlocal取得・非商用研究推論と、再配布 / 公開同梱を分ける。
+  sourceのNC / NC-SA表記差異とcheckpoint条件未確認を維持。現行の公式model cardでも追加の明示条件は見当たらない。
+  [行為別評価](docs/unik3d-investigation.md#scoped-decision-on-resume--2026-11-12)に根拠・不確実性・選択肢を記録。
+  作者へ連絡しない。個別保留の変更は具体的なユーザー判断なしに推定しない。
+- Risks / rollback: runtime宣言の強制でlegacy adapterを壊さないよう空map互換を維持。
+  壊れたruntime宣言をwireへ漏らさず、predict前失敗でもfinallyでunloadする。モデル名のcore分岐なし。
+  optionalな診断fieldのみ追加し、旧rawを移行・上書きしない。通常の修正commitで戻せる。
+- Gate: 実checkpoint未使用、03.4実モデルE2E未達。03.5 / 03.6は開始しない。
+- Scoped user decision: 提示した用途 / リスクに対し「不確実性を記録し、上記の取得・ローカル研究利用を進める」と回答。
+  この判断で固定Small checkpointのlocal取得・CPU研究推論を進める。権利者の許諾が確認されたという意味ではない。
+  再配布・公開同梱・商用利用は依然範囲外。作者への連絡は行わない。
+- Results (independent preflight): 対象11 tests成功（26.571秒）。全suite127件 / 120成功 / browser opt-in 7 skip（175.067秒）。
+  既存ログにもあるUI event-loop ResourceWarningを今回も観測、テスト失敗なし。
+  旧Run4件を各2回CLI collectし全hash / mtime不変。旧01B Run1件はlocal directory不在で未検証。
+  実CPU: MoGe `1cad5ed8-488d-457e-9847-8d8069f4c686`、DA3 `07b9015e-3f1a-425a-8d98-f03354852ab8`成功。
+  いずれもruntime宣言照合済み / 2回collect hash・mtime不変 / unload済み。Python socket egress guard有効・外部接続試行なし。
+  過去保存値との差はMoGe max abs 1.9073486328125e-6、DA3 1.5497207641601562e-6で、過去値とbitwise一致とはしない。
+  同一条件（OMP_NUM_THREADS=2）の変更前commit `770be8c`をGit除外領域へ隔離して比較したところ、両モデルとも配列完全一致 / max abs 0。
+  隔離baseline RunはMoGe `fc34480e-1590-44b6-9c23-5450c47d730c`、DA3 `07269a6f-3298-4f30-8248-71d8e4f6d22f`。
+  ログ / 集計: `.local/validation/phase-03-4-resume-{targeted,regression}.log`、`phase-03-4-resume-{compatibility,cpu,static}.json`。
+  静的検証はMarkdown32件 / links・anchors267件 / Python AST49件、errors 0、diff whitespace検査成功。
+  未検証: この時点のUniK3D実checkpoint・独立環境・実E2E、今回browser / GPU。独立部分の進捗commit後に下記の実モデル接続へ進む。
+
+### 03.4 UniK3D Small native connection — scoped research decision
+
+- Authorization: 上記の個別回答に基づき、固定Small checkpointの取得・非商用local CPU研究検証を行う。
+  sourceのNC / NC-SA表記差異とcheckpoint適用条件の未確認は維持。再配布・公開同梱・商用利用は未承認。
+- Candidate / evidence: source / checkpoint revision・宣言SHAは既存調査を継承し、実fileのsize / SHAを取得後に測定する。
+  固定inferはRGB uint8 CHWとresolution_level [0,10)を受け、original gridにpostprocessしたdistance / points / depthを返す。
+  Small + resolution_level=0をCPU smokeの既定とする（公式の最小resolution区間、config pixels_min=200000 / max=600000）。
+  依存import graphにはtorch / torchvision / NumPy / timm / scipy / cv2 / einops / Hubが必要。
+  Small encoderはxformersをoptional importし、未導入 / CPUでは公式PyTorch SDPA経路を選ぶ。tritonはnative inferの必須importではない。
+  CPU専用torchを採用し、UI / training extrasを省いたimport経路を実環境で検証する。
+- Order: 専用Conda prefix `.local/envs/mde-unik3d`を新設 → pin済CPU依存 / source --no-deps install → import・native constructor →
+  明示準備scriptで固定weights / config取得・hash検証 → adapterのoffline native runtime・scalar parameters・manifest →
+  fake / 数値 / strict checkpointテスト → depth-only CLI E2E → native Points照合・既存profile保存 → 回帰・docs・03.4 gate。
+  既存base / MoGe / DA3 / UI環境は変更せず、weights / wheels / sourceはGitへ追加しない。
+- Runtime / storage: cpu / float32のみを明示しCUDA fallbackなし。nativeからCPU float32配列を受け、
+  distance→ray_distance / Points CHW→HWCを維持。native frame / grid / scaleは根拠と実tensorの照合結果を記録し、未確認のmを補わない。
+  checkpoint IOはlocal prepared directoryのみ、実推論でdownloadしない。source revisionと2file digests、strict state keysを照合する。
+  synthetic fixture seamを保持し、production runtimeとsynthetic metadataを区別する。rays等は不要求なら保存せず仮K・Points生成なし。
+- Validation / risk: constructorのimport時依存・shared state keys・CPU資源・native dtypeを実測。根拠なく依存互換・精度を主張しない。
+  明確な禁止との衝突、重大なCPU / schema / geometry互換障害は該当作業を停止・報告する。
+  新prefix / pluginを独立して修正でき、旧Run移行やraw書換えなし。03.4実E2E未達では03.5に進まない。
+- Results: 実施後に記録する。
 
 ## License policy harness update — 2026-11-12
 

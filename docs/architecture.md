@@ -294,3 +294,12 @@ The 2026-11-12 documentation update keeps that case-specific hold while adopting
 direct author contact is not a universal adoption prerequisite. No new model work starts in this update.
 Depth / native points reuse existing profiles; core / UI / backend and schema are unchanged.
 03.4 real-model E2E is unmet, 03.5–03.6 remain unimplemented, and Phase 03 is not COMPLETE.
+
+## Phase 03.4 runtime capability preflight
+
+The resumed implementation adds model-independent capability checks after load and before predict.
+A nonempty runtime map must explicitly permit every requested output; malformed, missing or unsupported
+declarations fail before prediction. Empty maps retain legacy behavior with a warning. Conditional
+declarations still require actual output validation. The optional execution.runtime_capability_check
+records a validated JSON snapshot. Existing profiles, schema major and old Run readers remain compatible.
+The UniK3D checkpoint decision is scoped separately from this independent work; 03.4 real-model E2E is unmet.

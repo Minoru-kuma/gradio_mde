@@ -6,6 +6,12 @@ MoGe CPU の実推論成果物も保存・読み戻し確認済み。証拠は [
 関連: [Job contracts](execution-backend-spec.md)、[MDEOutput](model-adapter-spec.md)、
 [MLflow](mlflow-design.md)、[Slurm](slurm-integration.md)。
 
+03.4の追加診断: `execution.runtime_capability_check`はload後の能力照合が成功した場合のoptional JSON。
+`declaration: declared / legacy_undeclared`、`requested_outputs`、`capabilities` snapshotを持つ。
+旧Runのfield欠如は正常。照合失敗時は未検証snapshotを保存せず、既存のpreflight errorで報告する。
+意味は[ModelAdapter契約](model-adapter-spec.md#phase-034-runtime-capability-preflight)を参照。
+schema 1.0・既存numeric profileとraw不変の契約は変更しない。
+
 ## Identity
 
 - `run_id`: application が採番する logical inference / benchmark experiment の安定 ID。

@@ -115,6 +115,22 @@ adapter は upstream の eval / inference mode、model preprocessing / postproce
 初期の predict timing は adapter の predict 全体（固有の前後処理と CPU 出力への変換を含む）とし、
 pure network forward time と区別する。比較時は処理 scope を同じ key の metadata に記録する。
 
+### Phase 03.4 runtime capability preflight
+
+workerはload成功後・入力読込 / predict前に`LoadedModelInfo.capabilities`を照合する。
+非空mapでは、要求した各出力の明示宣言が必要。欠落・unsupportedは失敗としpredictを呼ばない。
+map / entry / status / conditionの型不正、非有限値やJSON非互換metadataもpreflight失敗にする。
+非要求出力のunsupportedは実行を妨げない。supported / conditionalは許容し、conditionalはwarningを残す。
+conditionの文字列を実行したり、load時に未確定の入力条件を満たしたと推定したりしない。
+predict後の要求出力presence、shape / dtype / units / geometry検証は従来どおり必須である。
+
+map全体が空の場合は旧adapterの未宣言と区別し、warning付きで従来の推論・出力検証を続ける。
+部分mapの要求欠落をmanifestから補完しない。新adapterはload時点で分かる能力を明示する。
+正常な照合結果をoptionalな`execution.runtime_capability_check`へ保存する。
+`declaration`は`declared`または`legacy_undeclared`、`requested_outputs`は要求一覧、`capabilities`は
+独立したJSON snapshot。旧Runのfield欠如を拒否せず、schema major / profile / signatureは変更しない。
+照合失敗は通常のworker preflight失敗として記録し、finallyでunloadする。
+
 ## MDEOutput
 
 **各 view の depth は必須、それ以外のモデル出力は optional。**
@@ -283,7 +299,7 @@ integer / number / boolean / string、enum、minimum / maximum、default、title
 従来fixtureのobject type / additionalProperties省略は許容し、未知parameterは常に拒否する。
 未対応schema keyword、型違いdefault / enum、非有限数、逆転bounds、未知requiredを拒否する。
 conditionalの`condition`は説明文として保持し実行しない。03.1はstatusの事前判定と
-既存workerの要求出力presence検証を使用。LoadedModelInfoのruntime能力照合は後段で追加予定。
+既存workerの要求出力presence検証を使用。03.4で上記のload後runtime能力照合を追加した。
 
 Runner / CLI / controllerは実効metadataでdevice / dtype / parameters / requested outputsを検証する。
 現在の入力契約は1view PNG / RGB、実行契約はcpu / cuda:0・float32のまま。

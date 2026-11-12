@@ -89,7 +89,9 @@ with no checkpoint can exercise the load / predict / unload contract. No product
 installed, so Gradio and CLI discovery do not advertise a runnable UniK3D variant.
 The synthetic runtime runs in an existing test environment; it is not a third independent model environment.
 Depth and points reuse `01A-depth-only` / `02A-geometry-v1`. Schema, core, UI and backend are unchanged.
-Rays / confidence / pose serialization, new profiles and generic runtime-capability checks remain outstanding.
+Rays / confidence / pose serialization and new profiles remain outstanding. Generic runtime-capability
+checks are now implemented independently in the resumed 03.4 work; see the
+[preflight contract](model-adapter-spec.md#phase-034-runtime-capability-preflight).
 
 ## Checkpoint resume gate and next steps
 
@@ -132,3 +134,33 @@ Questions prepared for the authors (not sent; optional clarification proposals, 
 Local investigation evidence is under `.local/validation/phase-03-4-unik3d-*`; it is excluded from Git.
 The earlier investigation commit changed documentation only and ran no new implementation / inference tests.
 The current independent implementation has separate verification results in [Phase 03](phases/phase-03.md).
+
+## Scoped decision on resume — 2026-11-12
+
+Phase 03.4 implementation has resumed after the documentation-only task. The general resume instruction
+does not itself release the existing checkpoint hold. The following assessment is prepared for a scoped
+user decision under AGENTS rule 13.4; it does not assert permission or a prohibition.
+
+| Action | Intended use / evidence / remaining uncertainty | Current treatment |
+| --- | --- | --- |
+| Independent adapter / generic worker preflight / synthetic tests | No real weights or copied upstream implementation needed; existing contracts apply | Continue within resumed Phase 03.4 |
+| Acquire fixed Small checkpoint into Git-ignored local cache and use for explicit CPU research E2E | Noncommercial local research only; fixed revision and published size / digest are recorded above. Source has NC versus NC-SA labels; applicability to the checkpoint is not established. The current official [model card](https://huggingface.co/lpiccinelli/unik3d-vits) was rechecked on 2026-11-12 and supplied no additional explicit terms. Public download is not evidence of unlimited permission. The remaining risk is uncertain authorization / obligations for this exact checkpoint | Pending a specific user decision: retain the hold, or authorize this narrow research action with the uncertainty recorded. No body download or inference before that decision |
+| Redistribute weights, bundle them in a public package, publish a demo or use commercially | Changes purpose / audience and may introduce different obligations; not required for current CPU validation | Not authorized by a local research decision; assess separately |
+
+No explicit checkpoint prohibition was established by this investigation; absence of such evidence does
+not establish a license. If a clear restriction conflicting with an action is found, stop that action and report it.
+A user decision would authorize our work scope, not grant rights on behalf of the rights holder.
+Direct author contact remains an optional proposal; no inquiry has been sent.
+
+### Scoped user decision — acquisition and local research use
+
+The user answered: 「不確実性を記録し、上記の取得・ローカル研究利用を進める」.
+This is a specific operational decision to acquire the pinned Small checkpoint and use it for
+noncommercial, local CPU research validation. The prior general-resume hold was maintained until this
+answer; that acquisition / local-use hold is now superseded for the specified action only.
+The conflicting source labels and unresolved checkpoint applicability remain unchanged. This is not
+a finding that the rights holder granted a license. Redistribution, public-package bundling, public demos
+and commercial use are outside this decision. No author inquiry has been sent.
+
+The earlier hold descriptions and review questions above are preserved as the decision history.
+The synthetic-only adapter guard remains until the native runtime is implemented and verified.

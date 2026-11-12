@@ -12,6 +12,7 @@ from .contracts import (JobSpec, ModelInfo, ModelLoadContext, PredictionRequest,
                         SCHEMA_VERSION, GEOMETRY_PROFILE, normalize_outputs, check_schema, utc_now)
 from .storage import artifact_ref, contained_path, read_json, sha256_file, write_json
 from .runtime import environment_fingerprint, timed, reset_allocator, observe_allocator
+from .runtime_capabilities import check_runtime_capabilities
 
 
 def framework_runtime(device: str) -> dict:
@@ -74,6 +75,10 @@ def execute(job_path: Path, run: Path) -> int:
         report["execution"]["model"] = loaded.identity
         report["warnings"].extend(loaded.warnings)
         stage = "preflight"
+        capability_check, capability_warnings = check_runtime_capabilities(
+            loaded.capabilities, spec.inference["requested_outputs"])
+        report["execution"]["runtime_capability_check"] = capability_check
+        report["warnings"].extend(capability_warnings)
         input_spec = spec.inputs[0]
         path = contained_path(run, input_spec["path"])
         if sha256_file(path) != input_spec["sha256"]:

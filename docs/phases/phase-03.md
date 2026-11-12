@@ -3,8 +3,9 @@
 Status: **実装中 / 03.1〜03.3受入完了、03.4独立adapter・合成検証を継続、実checkpoint保留**。Exit未達、COMPLETEではない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
 2026-11-11の停止条件見直しで03.4の独立実装・合成検証を継続し、実checkpointの個別保留は維持した。
-2026-11-12の今回作業は[AGENTSの全Phase共通方針](../../AGENTS.md#license-review-and-decisions)と関連文書の更新のみ。
-モデル取得・実装・実推論は開始せず、UniK3Dの既存個別保留を解除しない。03.4実モデルE2E未達のまま03.5には進まない。
+履歴: 2026-11-12の直前作業は[AGENTSの全Phase共通方針](../../AGENTS.md#license-review-and-decisions)と関連文書の更新のみだった。
+最新の再開指示で03.4実装・検証を継続する。UniK3Dの既存個別保留は一般的な再開指示だけでは解除せず、
+対象行為の用途・リスクを整理して必要な判断を求める。03.4実モデルE2E未達のまま03.5には進まない。
 直前の03.3で停止する指示と当時の受入結果は下記の履歴として保持する。
 PR作成・main統合・Phase 04以降には進まない。
 履歴: 2026-11-09は調査・計画・設計のみ承認、production実装・環境構築は未承認だった。
@@ -128,7 +129,7 @@ ray_distanceに、native PointsをHWCに変換し、負z / z=0を保持。range 
 無効値を検証し、scale / unitはunknown。モデル固有処理はmodels/unik3d内のみ。
 実runtime bridge / production manifest / 実環境 / real checkpointは追加していない。
 既存profileでdepth-only / pointsを保存するfake検証であり、実モデル成功と数えない。
-core / UI / backend / schemaへの変更なし。rays / confidence / pose保存・新profile・runtime能力照合は未実装。
+当時core / UI / backend / schemaへの変更なし。rays / confidence / pose保存・新profile・runtime能力照合は当時未実装。
 
 Verification results（今回実施）:
 
@@ -155,3 +156,24 @@ checkpoint実file digest検証、実モデルdepth-only E2Eと必要optionalの�
 license不確実性を記録して非影響作業を継続し、直接影響する行為を個別判断する。
 今回の更新は実装・実推論の再開、既存checkpoint保留の解除、03.4受入や次段階への移行を意味しない。
 文書検証とGit結果は[今回の計画・記録](../../PLANS.md#license-policy-harness-update--2026-11-12)を参照。
+
+## Resumed runtime capability work — 2026-11-12
+
+文書限定作業の後、最新指示により03.4実装・検証を再開。load後 / predict前の汎用runtime capability照合を追加。
+非空mapの要求欠落・unsupported・不正宣言は推論前に失敗しunloadする。空mapは旧adapter未宣言として
+warning付きで従来検証を継続。conditionalは実出力presence検証を代替しない。正常なsnapshotを
+optionalなexecution.runtime_capability_checkへ保存する。モデル名分岐・新profile・schema major変更なし。
+詳細: [runtime preflight契約](../model-adapter-spec.md#phase-034-runtime-capability-preflight)。
+
+対象テストはruntime / UniK3D合成あわせて11件成功（26.571秒）。全回帰127件 / 120成功 / browser opt-in 7 skip（175.067秒）。
+旧Run4件を各2回collectしhash / mtime不変、旧01Bの1件はlocal不在で未検証。
+MoGe `1cad5ed8-488d-457e-9847-8d8069f4c686`、DA3 `07b9015e-3f1a-425a-8d98-f03354852ab8`の
+実CPU CLI成功、runtime宣言照合済み / 再collect不変。Python socket guardで外部接続試行なし。
+過去保存値とは約1.9e-6 / 1.55e-6の差を観測し完全一致とは記載しない。
+同じCPU条件の変更前commit隔離実行との比較では両モデルとも配列完全一致・差0。
+静的検証はMarkdown32件 / links・anchors267件 / Python AST49件、errors 0。詳細はPLANSの再開記録を参照。
+UniK3Dの[行為別評価と選択肢](../unik3d-investigation.md#scoped-decision-on-resume--2026-11-12)を作成し、
+固定Small checkpointの非商用local研究利用に限定した取得・使用の判断をユーザーへ依頼した。
+その後ユーザーが不確実性を記録したうえで固定Smallの取得・local研究利用を進めると回答。
+この限定範囲で独立環境・実runtime接続へ進む。再配布・商用・公開同梱は含めず、許諾の確定とは記載しない。
+03.4実E2E未達 / 03.5未着手 / Phase 03はCOMPLETEではない。

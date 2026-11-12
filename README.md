@@ -59,7 +59,7 @@ checkpoint / wheels / runs は Git 管理外です。固定版と実測証拠は
 report / artifact 検証、区間計測、環境 fingerprint、保存済み terminal result の再 collect を追加しました。
 固定環境を再作成し MoGe CPU regression smoke が成功。Run ID は
 `f4a2052f-71da-4664-9c9f-281cca95fb41`。GPU / 精度評価は未検証です。
-GradioのInference / Resultsを02Bで実装しました。02Cの3D viewerも全Exit達成でCOMPLETEです。DA3-SMALLのCPU depth-onlyは03.2で確認しました。UniK3D、Slurm、MLflow、Benchmarkは未着手です。
+GradioのInference / Resultsを02Bで実装しました。02Cの3D viewerも全Exit達成でCOMPLETEです。DA3-SMALLのCPU depth-onlyは03.2で確認しました。UniK3Dは独立contractの合成検証済み・実E2E未達です。Slurm、MLflow、Benchmarkは未着手です。
 初回調査の根拠と clean-start 決定は [architecture](docs/architecture.md#repository-investigation) を参照してください。
 
 ## 対応予定モデル
@@ -67,7 +67,7 @@ GradioのInference / Resultsを02Bで実装しました。02Cの3D viewerも全E
 | モデル | このプロジェクトでの対応状況 | 備考 |
 | --- | --- | --- |
 | MoGe | 01A CPU の single-image E2E を確認 | 固定した MoGe-2 ViT-S Normal。GPU / 他 variant は未検証。詳細・環境手順は [plugin README](models/moge/README.md) |
-| UniK3D | 計画のみ | Phase 03。非 pinhole camera と rays の扱いを含む |
+| UniK3D | 独立contractの合成検証済み・実E2E未達 | checkpointは個別保留。native distance / Pointsの変換を合成検証。[調査・行為別判断](docs/unik3d-investigation.md) |
 | Depth Anything V3 / Depth Anything 3（DA3） | DA3-SMALLのsingle-view CPU E2E確認 | relative z-depth、独立CPU環境。optional / multi-view / GPUは未検証。[plugin README](models/da3/README.md) |
 
 上記モデルをユーザーが過去に動作させたことと、この基盤が対応済みであることは別です。
