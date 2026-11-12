@@ -81,6 +81,11 @@ checkpoint は設定した cache または local path から読む。研究室 n
 必要に応じユーザー判断を求める。local研究用cacheの準備と、重み再配布・公開package同梱は別に判断する。
 この判断方針は自動取得の承認や既存個別保留の解除を意味せず、環境分離・digest・runtimeの技術的検証を代替しない。
 
+公開・配布時は本体・自作Adapterと環境定義 / 準備手順を提供し、外部モデルsource / checkpointは原則同梱・再配布しない。
+利用者が各公式配布元の条件に従って必要なモデルを別途準備する。Git除外領域にある取得済source / weights / cacheや
+構築済モデル環境を配布物へ混ぜず、local研究用の準備と配布を区別する。
+公式配布元からの明示的な準備scriptはこの構成で利用できる。詳細は[公開・配布仕様](distribution-policy.md)。
+
 ## Conda and pip responsibilities
 
 Conda は Python と環境基盤、採用した native library を管理する。Conda にない upstream package や

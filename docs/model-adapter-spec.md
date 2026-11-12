@@ -19,6 +19,13 @@ worker は選択された entrypoint だけを import する。モデル追加�
 upstream package のコード全体をコピーするより、検証した revision の既存 API を薄く包む。
 既存の独立スクリプトが得られた場合は、その load / infer / export 部分を優先して再利用する。
 
+### Publication boundary
+
+公開・配布の対象はプラットフォーム本体と自作Adapterであり、外部モデルのソースコード・checkpointは原則同梱・再配布しない。
+利用者が公式配布元から別途準備したモデルをAdapterが呼び出す。manifestや環境定義には公式参照・固定版・digestを記録する。
+参考コードの再利用を外部モデル実装の公開物への取り込みと同一視せず、第三者コードの取込みは出典と条件を個別に扱う。
+各配布元の利用条件・未確認事項は下記の共通方針で記録・判断する。詳細は[公開・配布仕様](distribution-policy.md)。
+
 ## ModelInfo and manifest
 
 ModelInfo は JSON で表現可能な metadata。schema の検証と adapter import は分離する。

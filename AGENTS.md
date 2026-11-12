@@ -88,6 +88,15 @@
     ライセンス以外の重大な安全性・互換性問題の停止条件を緩和しない。
     個別の保留・未達gateは、この共通方針だけで自動解除しない。
 
+## Publication and distribution
+
+14. 公開・配布するのは実験プラットフォーム本体と自作Adapterとし、外部モデルのソースコード・
+    学習済みcheckpointは原則同梱・再配布しない。利用者が必要なモデル・重みを公式配布元から別途準備し、
+    モデルごとのライセンス・利用条件に従う構成とする。環境定義・準備script・出典metadataの提供と、外部モデル実体の同梱を区別する。
+    local研究用のGit除外領域への準備は配布とは別行為であり、既存の個別承認範囲を維持する。
+    不明確さだけで開発全体を停止せず上記13に従って影響範囲を限定し、禁止条件・権利上の問題と未確認事項を記録する。
+    詳細は[公開・配布仕様](docs/distribution-policy.md)。この方針更新自体は実公開・再配布や次Phase開始の承認ではない。
+
 詳細: [Architecture](docs/architecture.md) / [Model contracts](docs/model-adapter-spec.md) /
 [Environment](docs/environment-strategy.md) / [Execution](docs/execution-backend-spec.md) /
 [Run Directory](docs/run-directory-spec.md) / [MLflow](docs/mlflow-design.md)。

@@ -31,6 +31,14 @@ Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slur
 公開を無制限の許諾、不明確さを禁止と断定せず、作者への照会も全モデル共通の必須条件にはしません。
 この方針だけでUniK3Dの既存checkpoint保留を解除せず、Phaseの承認・検証条件も変更しません。
 
+## 公開・配布方針
+
+公開・配布するのはプラットフォーム本体と自作Adapterです。外部モデルのソースコード・学習済みcheckpointは
+原則同梱・再配布せず、利用者が必要なものを各公式配布元から別途準備する構成とします。
+利用条件はモデルごとの配布元に従い、環境定義・準備script・固定版や出典のmetadataを利用案内とともに提供します。
+研究用のlocal準備と配布物への同梱を分け、不明点は記録して影響を受けない開発を継続します。
+明確な禁止条件や権利上の問題は該当作業で判断します。詳細と今回の文書化の範囲は[公開・配布仕様](docs/distribution-policy.md)を参照してください。
+
 ## 現在の開発状況
 
 **Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。**
@@ -262,6 +270,7 @@ derived pathが空ならrawを含む全Run削除です。入力を変えた場�
 - [PLANS.md](PLANS.md): phase の承認範囲・計画・進捗管理
 - [Architecture](docs/architecture.md): 調査結果、責務、依存関係、設計判断
 - [ModelAdapter spec](docs/model-adapter-spec.md): ModelInfo / Capabilities / MDEOutput
+- [Publication and distribution](docs/distribution-policy.md): 本体・自作Adapterの配布境界と外部モデルの別途準備
 - [Results Viewer](docs/results-viewer.md): 02Cの4表示モード・mesh永続保存・固定版renderer・制限
 - [Gradio Inference](docs/gradio-inference.md): 02B application環境・session / dispatch・offline起動
 - [Environment strategy](docs/environment-strategy.md): Conda、CUDA、subprocess、micromamba

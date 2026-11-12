@@ -21,6 +21,31 @@
   以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
 - main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
 
+## Parallel publication policy documentation — 2026-11-12
+
+- Purpose / scope: Phase 03.4実装・検証とは並行する文書作業として、MGE Experiment Platformの公開・配布対象を
+  プラットフォーム本体と自作Adapterに整理する。外部モデルのソースコード・学習済みcheckpointは原則同梱・再配布せず、
+  利用者が各公式配布元の条件に従って別途準備する構成を[公開・配布仕様](docs/distribution-policy.md)に記録する。
+- Authorization / boundaries: 今回の公開・配布方針タスクは文書更新のみ。既存のPhase 03.4再開、
+  固定UniK3D Small checkpointの取得・非商用local CPU研究利用の個別承認、過去の調査・停止判断・実績を維持する。
+  研究用のGit除外領域への準備と、配布物への同梱は別行為として扱う。公開方針の記述は実公開・配布作業の開始ではない。
+- Order: 最新AGENTS / PLANS / READMEと関連仕様を確認 → 本計画を追記 → 共通方針 / 配布仕様 / 利用案内を整合 →
+  内容・links / anchors / fences・差分・履歴保持を検証 → 親の実装差分と区別してcommit / 同名remoteへ通常push。
+  既存の`codex/phase-03-implementation`を継続し、Git操作は並行せず親側で直列化する。
+- Decisions: 配布物は本体・自作Adapter・準備定義 / 出典metadataを基本とし、外部モデル実体は公式配布元から利用者が準備。
+  利用条件はモデル / source / checkpointごとに各配布元へ従う。不明確さだけで開発全体を停止せず、影響する行為を限定して判断する。
+  明確な禁止条件・権利上の問題は無視せず、未確認事項を記録する。外部モデルを同梱しないことだけで利用条件が不要とは扱わない。
+- Validation / risk / rollback: 変更はAGENTS / PLANS / README / Architecture / ModelAdapter / Environmentと新しい配布仕様のみ。
+  既存Three.js等の非モデル依存asset、コード / tests / manifests、raw / 保存schemaは変更しない。
+  root配布licenseの選定や実release artifactの作成・同梱検査を実施済みとは記載しない。文書差分は通常の修正commitで戻せる。
+  PR作成・main反映・Phase 04以降への移行なし。
+- Results: 文書担当の変更はMarkdown7件のみ。Markdown33件 / local links・anchors278件 / fences検証はerrors 0、
+  対象差分の`git diff --check`成功。AGENTS規則1〜13、PLANSのcurrent authorizationと既存Phase実装・調査履歴を
+  変更前commit `e704417`と比較して一致を確認。記録は`.local/validation/distribution-policy-2026-11-12-static.json`。
+  文書担当ではコード / tests / manifests変更、モデル取得・実推論、release artifact構築・実配布は実施していない。
+  並行するPhase 03.4の実装・実機検証は上記current workと個別実装記録で管理する。
+  文書のcommit / 通常pushは親側で直列化し、確定SHA・push結果はGit履歴と同名remote refで確認する。
+
 ## Phase 03.4 resumed implementation — 2026-11-12
 
 - Start / authorization: latest fetch成功、cleanな既存ブランチを継続。HEAD / remoteは

@@ -15,6 +15,14 @@ MoGe の明示 CPU E2E と成果物検証、Local robustness / CPU regression �
 これは開発運用の方針であり、Model / Environment / Backendの責務やschemaに新しい許可判定を追加しない。
 Phase承認、技術的受入、重大な安全性・互換性問題の停止条件は維持する。
 
+## Publication and model provisioning
+
+公開・配布対象はプラットフォーム本体と自作Adapter。外部モデルsource / checkpointは原則同梱・再配布せず、
+利用者が公式配布元から必要なモデルを別途準備し、各配布元の条件に従う構成とする。
+自作のmanifest / environment定義 / 準備scriptで取得先と固定版・digest・条件の出典を案内する。
+local研究用の準備と配布物への同梱は分け、license不確実性は上記の共通方針で影響範囲を限定して判断する。
+詳細は[公開・配布仕様](distribution-policy.md)。既存の責務分離・実装実績・Phaseの承認やExit条件は維持する。
+
 ## Repository investigation
 
 調査日: 2026-10-07。対象: `gradio_mde` の repository root。
