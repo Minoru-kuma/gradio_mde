@@ -5,6 +5,9 @@ History: work resumed after 03.3, then initially stopped before installation, we
 implementation because the applicable license evidence was unresolved. The subsequent user instruction
 revises that blanket stop: independent adapter / synthetic tests / geometry validation may proceed.
 This records conflicting labels and missing information, not a conclusion that use is prohibited.
+The 2026-11-12 documentation-only update applies the project-wide
+[license decision policy](../AGENTS.md#license-review-and-decisions). It preserves the findings and
+historical stop decisions below; it does not acquire weights, implement a runtime or execute a model.
 
 ## Scope and source identity
 
@@ -45,12 +48,15 @@ third-model E2E gate has not been marked successful. The uncertainty remains unr
 
 ## Work-specific stop conditions — revised user instruction
 
+The following is the current UniK3D case status, not a blanket rule for all models. Independent technical
+work remains subject to Phase / task authorization; the 2026-11-12 task authorizes documentation only.
+
 | Work | Current treatment |
 | --- | --- |
 | Independently authored adapter lifecycle, native-layout array conversion, synthetic fixtures, geometry and existing-reader tests | Continue without importing or copying upstream implementation or loading weights |
-| Real checkpoint acquisition, use or redistribution (including inference from an existing local copy) | On hold until authoritative evidence establishes the applicable terms |
-| Production registration, real runtime bridge and independent UniK3D environment | Deferred in this change; synthetic execution is not evidence for these adoption steps |
-| Work conflicting with an explicit prohibition | Stop the affected work and report the specific conflict; do not assume missing information is a prohibition |
+| Real checkpoint acquisition, use or redistribution (including inference from an existing local copy) | Existing case-specific hold remains. Reconsider the affected action under the common policy using intended use / risk assessment and any needed user decision; this update does not release the hold |
+| Production registration, real runtime bridge and independent UniK3D environment | Still unimplemented; this documentation-only update does not begin these steps. Synthetic execution is not adoption evidence |
+| Work conflicting with an explicit prohibition or presenting a major rights risk | Stop the affected work and report the specific conflict / risk; do not assume missing information is a prohibition |
 | 03.5 / 03.6 | Gate remains closed pending all 03.4 acceptance conditions, including real-model E2E |
 
 Public accessibility and a source-license label do not by themselves resolve checkpoint applicability.
@@ -87,17 +93,32 @@ Rays / confidence / pose serialization, new profiles and generic runtime-capabil
 
 ## Checkpoint resume gate and next steps
 
-Resume adoption when authoritative author-provided terms or permission establish the license applicable
-to the selected checkpoint and clarify the differing source labels for the intended research integration.
+Historical gate wording (2026-11-11), preserved as the earlier decision rather than the current common rule:
+
+> Resume adoption when authoritative author-provided terms or permission establish the license applicable
+> to the selected checkpoint and clarify the differing source labels for the intended research integration.
+
+Current operation (2026-11-12): follow the [AGENTS common policy](../AGENTS.md#license-review-and-decisions).
+Distinguish source and checkpoint conditions and record official sources, the intended action / purpose,
+uncertainty, risks and decision basis. Clear terms covering the intended use allow ordinary authorized work;
+uncertain terms directly affecting acquisition or use call for a scoped assessment and user judgment when needed.
+Unknown terms neither establish unrestricted permission nor prove a prohibition.
+The existing UniK3D checkpoint hold remains in place in this documentation-only change. Its reconsideration
+does not universally require direct author contact or individual permission: additional official documentation
+may supply evidence, and high-value author questions may be proposed to the user if needed.
+Commercial use, weight redistribution and public-package bundling require separate assessment from local research.
+An operational user decision is not a grant of rights by the rights holder.
+
 No external message or permission request has been sent to the authors.
 
-Then record the adoption decision and verified terms, establish an independent environment and runtime
+After an action-specific decision to resume, record the decision, applicable conditions and any remaining
+uncertainty, establish an independent environment and runtime
 bridge, verify local weights / config digests, and complete the depth-only CLI → Runner → Backend → worker
 E2E. Required optional outputs must also be verified against actual native outputs before their acceptance.
 Independent fixture preparation may precede these steps; it does not satisfy the real-model E2E.
 03.4 remains incomplete and 03.5 remains gated on 03.4 acceptance.
 
-Questions prepared for the authors (not sent):
+Questions prepared for the authors (not sent; optional clarification proposals, not mandatory gates for all models):
 
 1. For source revision `29f7862...`, should integration follow CC BY-NC or CC BY-NC-SA 4.0?
    Which files / components have different terms, if any, and where is the authoritative clarification?

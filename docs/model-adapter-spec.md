@@ -35,12 +35,26 @@ ModelInfo は JSON で表現可能な metadata。schema の検証と adapter imp
 | `parameter_schema` | 型、範囲、enum、default、説明、required、依存条件 |
 | `supported_devices`, `supported_dtypes` | 宣言値。実行可否は worker preflight で再検証 |
 | `input_constraints` | input view 数、image mode、サイズ、camera model の制約 |
-| `license`, `weights_license`, `citations` | upstream code / weights の出典。利用条件は採用時に確認 |
+| `license`, `weights_license`, `citations` | code / weights別の条件・出典。判断は下記の共通方針を参照 |
 
 manifest は runtime にモデルを load するための Python を含めない。parameter schema は
 JSON Schema の検証可能な subset を選定し、未知の引数は拒否する。値を shell に展開しない。
 Registry は plugin ID の重複、entrypoint の欠落、未知の必須 schema major をエラーにする。
 環境未作成はモデル発見失敗と区別し、UI には「未準備」として表示する。
+
+### License review and provenance
+
+全Phase・全モデルの運用は[AGENTSの共通方針](../AGENTS.md#license-review-and-decisions)に従う。
+公式LICENSE / README / model card等のURL・revision・確認日、ソースとcheckpointそれぞれの確認結果・
+不明点、予定する利用行為と用途・判断根拠をplugin READMEや調査記録に残す。
+条件が明確で予定用途が範囲内なら通常進め、表記差異・情報不足だけで独立adapter / fake検証を停止しない。
+取得・利用等に直接影響する不明点は行為別に用途・リスクを整理し、必要に応じユーザー判断を求める。
+明確な禁止との衝突・重大な権利リスクは該当作業を停止する。作者への照会・個別許諾は全モデル必須ではない。
+商用利用・重み再配布・公開package同梱はlocal研究利用と別に判断する。
+
+ソースのlicenseを根拠なくweightsへ転記せず、未確認値や不一致を推測で確定しない。
+不確実性はdocsに保持する。今回の方針更新はmanifest schema・必須field・adapter signature・
+Registry検証を変更せず、公開状況・capability宣言・技術テスト成功を利用許諾の根拠にはしない。
 
 ## Capabilities
 

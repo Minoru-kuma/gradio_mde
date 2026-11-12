@@ -5,6 +5,16 @@ MoGe の明示 CPU E2E と成果物検証、Local robustness / CPU regression �
 01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02Cは2026-10-27に全Exit達成でCOMPLETE、02Dも全Exit達成でCOMPLETE。Phase 03は2026-11-11に実装承認、段階実装中。Phase 04以降は未承認。
 以下の全体図には将来設計も含む。
 
+## License decision policy
+
+全Phase・全モデルの判断は[AGENTSの共通方針](../AGENTS.md#license-review-and-decisions)を正本とする。
+非商用の研究・検証を主用途とし、ソース / checkpointの条件・不明点・予定行為を分けて記録する。
+条件内の利用は通常進め、不確実性だけで独立作業を一律停止しない。直接影響する行為は用途・リスクを整理し、
+必要に応じユーザー判断を求める。禁止との衝突や重大な権利リスクは該当作業のみ停止する。
+作者への照会は共通必須条件にせず、商用 / 重み再配布 / 公開package同梱はlocal研究利用と別に判断する。
+これは開発運用の方針であり、Model / Environment / Backendの責務やschemaに新しい許可判定を追加しない。
+Phase承認、技術的受入、重大な安全性・互換性問題の停止条件は維持する。
+
 ## Repository investigation
 
 調査日: 2026-10-07。対象: `gradio_mde` の repository root。
@@ -280,5 +290,7 @@ independent adapter / synthetic geometry work under the revised stop conditions.
 See [investigation and resume conditions](unik3d-investigation.md).
 03.4 is partially implemented using an injected synthetic runtime, with no production manifest or real runtime bridge.
 Real checkpoint acquisition / use / redistribution remain on hold; source labels and checkpoint terms are unresolved.
+The 2026-11-12 documentation update keeps that case-specific hold while adopting the common policy above;
+direct author contact is not a universal adoption prerequisite. No new model work starts in this update.
 Depth / native points reuse existing profiles; core / UI / backend and schema are unchanged.
 03.4 real-model E2E is unmet, 03.5–03.6 remain unimplemented, and Phase 03 is not COMPLETE.

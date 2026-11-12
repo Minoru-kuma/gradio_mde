@@ -2,8 +2,9 @@
 
 Status: **実装中 / 03.1〜03.3受入完了、03.4独立adapter・合成検証を継続、実checkpoint保留**。Exit未達、COMPLETEではない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
-最新の停止条件見直し指示により03.4の独立実装・合成検証を継続。実checkpointの取得・利用・再配布は
-適用条件の根拠確認まで保留し、03.4実モデルE2E未達のまま03.5には進まない。
+2026-11-11の停止条件見直しで03.4の独立実装・合成検証を継続し、実checkpointの個別保留は維持した。
+2026-11-12の今回作業は[AGENTSの全Phase共通方針](../../AGENTS.md#license-review-and-decisions)と関連文書の更新のみ。
+モデル取得・実装・実推論は開始せず、UniK3Dの既存個別保留を解除しない。03.4実モデルE2E未達のまま03.5には進まない。
 直前の03.3で停止する指示と当時の受入結果は下記の履歴として保持する。
 PR作成・main統合・Phase 04以降には進まない。
 履歴: 2026-11-09は調査・計画・設計のみ承認、production実装・環境構築は未承認だった。
@@ -142,7 +143,15 @@ Verification results（今回実施）:
   実施ログは`.local/validation/phase-03-4-regression.log` / `phase-03-4-compatibility.json` / `phase-03-4-static.json`。
   これは独立部分の検証済進捗であり、03.4受入成功ではない。
 
-03.4の残条件: 作者の根拠による適用条件確認、採用判断、独立環境構築、実runtime接続、
+03.4の残条件: 共通方針に沿ったソース / checkpointの用途別利用判断と個別保留の再開判断
+（公式資料・用途 / リスク整理と必要なユーザー判断。作者への照会・個別許諾は共通必須条件にしない）、採用判断、独立環境構築、実runtime接続、
 checkpoint実file digest検証、実モデルdepth-only E2Eと必要optionalの実出力照合。
 [作者への確認事項](../unik3d-investigation.md#checkpoint-resume-gate-and-next-steps)は整理済み、送信していない。
 **03.4受入未達 / 03.5・03.6未着手 / Phase 03はCOMPLETEではない。**
+
+## License policy documentation update — 2026-11-12
+
+上記の調査事実・当時の停止判断・検証実績は履歴として保持する。今後の運用はAGENTS共通方針を正本とし、
+license不確実性を記録して非影響作業を継続し、直接影響する行為を個別判断する。
+今回の更新は実装・実推論の再開、既存checkpoint保留の解除、03.4受入や次段階への移行を意味しない。
+文書検証とGit結果は[今回の計画・記録](../../PLANS.md#license-policy-harness-update--2026-11-12)を参照。

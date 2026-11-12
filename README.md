@@ -21,11 +21,21 @@ MoGe、UniK3D、Depth Anything V3 を個別に動作させた経験を出発点�
 過去の Gradio と Slurm の同時開発で複雑化した経験を踏まえ、まず単一モデルの
 Local 実行を成立させ、UI、複数モデル、Tracking、Benchmark、Slurm を順に追加します。
 
+## ライセンス確認と研究利用
+
+非商用の研究・検証を主用途とし、ソースコードとcheckpointの条件を分けて公式資料から確認します。
+明確な条件内の作業は進め、不足・表記差異は記録して影響を受けない開発を継続します。
+取得・利用等に直接関係する不明点は用途・リスクを整理し、必要に応じユーザー判断を求めます。
+明確な禁止との衝突・重大な権利リスクでは該当作業を停止します。商用利用・重み再配布・公開package同梱は別に判断します。
+全Phase共通の正本は[AGENTSのライセンス判断方針](AGENTS.md#license-review-and-decisions)です。
+公開を無制限の許諾、不明確さを禁止と断定せず、作者への照会も全モデル共通の必須条件にはしません。
+この方針だけでUniK3Dの既存checkpoint保留を解除せず、Phaseの承認・検証条件も変更しません。
+
 ## 現在の開発状況
 
 **Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。**
 Phase 02Dは `codex/phase-02d-run-management` で実装・検証を完了し、PR経由でmain統合済みです。
-02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1〜03.3の受入検証を完了し、03.4は独立adapter・合成検証を継続し、UniK3D実checkpointの取得・利用・再配布は適用条件の確認まで保留しています。Phase 03全体のExitは未達です。Phase 04以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
+02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1〜03.3の受入検証を完了し、03.4は独立adapter・合成検証を継続し、UniK3D実checkpointの取得・利用・再配布は既存の個別判断として保留しています。Phase 03全体のExitは未達です。Phase 04以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -231,7 +241,7 @@ Three.js r180を同梱し、準備済み環境ではCDNなしのoffline操作を
 明示CPUのnative MoGeとfake / contract / browser / offlineの全Exitを達成し、02C COMPLETE。
 固定Chrome / Linuxで262,144 output pixelsまで検証。GPU / 他OS/browser / 学会実演は未検証。
 操作・保存schema・制限は [Results Viewer](docs/results-viewer.md)、実測結果は
-[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1〜03.3の受入検証を完了し、03.4は独立adapter・合成検証を継続し、UniK3D実checkpointの取得・利用・再配布は適用条件の確認まで保留しています。Phase 03全体のExitは未達です。Phase 04以降は未承認です。
+[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1〜03.3の受入検証を完了し、03.4は独立adapter・合成検証を継続し、UniK3D実checkpointの取得・利用・再配布は既存の個別判断として保留しています。Phase 03全体のExitは未達です。Phase 04以降は未承認です。
 
 ## Phase 02D Run Management
 

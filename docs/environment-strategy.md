@@ -75,6 +75,12 @@ provisioning は明示的な準備作業とし、Registry の一覧表示や推�
 checkpoint は設定した cache または local path から読む。研究室 node の外部通信は不明なので、
 事前取得と offline loading ができる adapter を優先する。推論 Job の中で最新版を download しない。
 
+準備するソース・依存packageとcheckpointの利用条件は別に確認し、
+[AGENTSの共通方針](../AGENTS.md#license-review-and-decisions)で予定行為ごとに判断する。
+情報不足だけで非影響の設計・fake検証を停止せず、取得・利用に直接関係する不明点は用途・リスクを整理し、
+必要に応じユーザー判断を求める。local研究用cacheの準備と、重み再配布・公開package同梱は別に判断する。
+この判断方針は自動取得の承認や既存個別保留の解除を意味せず、環境分離・digest・runtimeの技術的検証を代替しない。
+
 ## Conda and pip responsibilities
 
 Conda は Python と環境基盤、採用した native library を管理する。Conda にない upstream package や

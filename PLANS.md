@@ -2,13 +2,14 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03 — 03.4の独立実装・合成検証を継続、実checkpoint保留（2026-11-11）**。COMPLETEではない。
+- Current work: **ライセンス確認・判断の全Phase共通方針とハーネス文書の更新のみ（2026-11-12）**。
+  Phase 03は03.4部分実装 / 実E2E未達、COMPLETEではない。今回モデル取得・実装・実推論は開始しない。
 - Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
   最新の追加指示「再開して」により03.4から再開。03.3まで完了して停止する指示は当時の履歴として保持する。
-  最新指示でlicense不確実性による一律停止を見直す。実checkpoint取得・利用・再配布のみ根拠確認まで保留し、
-  独立adapter / fake / 幾何検証は継続。明確な禁止条件との衝突は該当作業を停止。03.4実E2E未達で03.5へ進まない。
+  2026-11-12の今回指示は文書更新のみ。今後のlicense判断は[AGENTS共通方針](AGENTS.md#license-review-and-decisions)に従う。
+  UniK3Dの既存checkpoint個別保留は今回解除しない。03.4実E2E未達で03.5へ進まない。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
 - PR作成・main統合・Phase 04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
 - Start evidence: fetch成功。最新origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`
@@ -18,11 +19,46 @@
   以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
 - main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
 
+## License policy harness update — 2026-11-12
+
+- Purpose / scope: 非商用の研究・検証を主用途とする実験基盤として、license確認を維持しつつ、
+  不確実性だけで研究開発全体を停止しない共通ルールをAGENTSに定義。全Phase・全モデル・関連依存に適用する。
+  今回はAGENTS / PLANS / README / 関連仕様 / UniK3D記録の文書更新のみ。
+  モデル取得・実装・実推論・環境構築・依存導入・外部への連絡は行わない。
+- Start: cleanな`codex/phase-03-implementation`を継続、HEAD / remoteは
+  `94907182f1a773548fde4bbb1c1943142ca32309`。fetch成功、origin/mainは
+  `e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま、追加remote更新なし。
+- Decisions: 公式資料の出典 / revision・確認日・確認結果 / 不明点と想定用途を、ソースとcheckpointに分けて記録。
+  明確な条件内の作業は通常実施。不足 / 不一致は記録して非影響作業を継続し、取得・利用等に直接関係する
+  不明点は行為ごとの用途 / リスクを整理し必要に応じユーザー判断を求める。判断待ちは該当行為のみ保留。
+  明確な禁止との衝突・重大な権利リスクは該当作業を停止し報告。公開や不明確さを許諾 / 禁止と断定しない。
+  作者への直接照会・個別許諾は共通必須条件にせず、必要性が高ければ提案しユーザー判断を仰ぎ、無断送信しない。
+  商用利用・重み再配布・公開package同梱はlocal研究利用と別に判断する。
+- History / boundaries: 過去の調査事実・停止判断は当時の記録として保持。今後のlicense運用はAGENTS共通方針を正本とする。
+  UniK3Dの表記差異 / checkpoint適用条件未確認を維持し、既存の個別保留を今回解除しない。
+  再開の判断方法は公式資料・想定用途 / リスク整理・必要なユーザー判断であり、作者への照会だけに限定しない。
+  Phase承認・責務分離・独立環境・raw不変・受入条件・Git運用と、license以外の重大な安全性 / 互換性の停止条件は維持。
+- Order: 現状 / remote / 正本確認 → 本計画更新 → AGENTSに共通ルール → 関連仕様・案内・UniK3D運用記述を整合 →
+  文書の内容 / links・anchors・fences / diff・変更範囲・履歴保持を検証 → commit / 同名remoteへ通常push。
+- Validation: 文書の静的検証、今回差分がMarkdownのみであること、ソース / manifests / tests / 依存定義・
+  UniK3D調査事実と過去の停止記録が変更されていないことを確認。実装suite・browser・実モデル検証は今回実施しない。
+- Risks / rollback: 一般方針を既存checkpoint保留の自動解除・利用許諾の確定と誤読しないよう明記。
+  過去の一律停止表現を今後の共通ルールとして再適用せず、安全性 / 互換性gateは緩和しない。
+  文書差分は通常の修正commitで戻せる。PR作成・main反映・force pushなし。
+- Results: Markdown9文書のみの変更を確認。Markdown32件 / local links・anchors261件 / Python AST46件の
+  静的検証はerrors 0、`git diff --check`成功。AGENTS規則2〜12と規則1の非license停止・Phase / Git条件、
+  UniK3Dのsource / checkpoint identity・license調査事実、PLANSの初回停止記録・独立実装実績、phaseの受入・停止履歴を
+  変更前commitと比較して一致を確認。ソース / manifests / tests / 依存定義に差分なし。
+  記録: `.local/validation/license-policy-2026-11-12-static.json` / `license-policy-2026-11-12-scope.json`。
+  今回は文書検証のみで、実装suite・browser・モデル取得・実装・実推論・環境構築・外部照会は未実施。
+  文書を同名ブランチへcommit / 通常pushし、確定結果はGit履歴とremote refで確認する。
+
 ## Phase 03 implementation record — 2026-11-11
 
 - Purpose / scope: 既存MoGe / CLI / Gradio / 旧Run / raw不変を維持し、下記03.1〜03.6を順次実装。
-  新モデルの採用はimmutable upstream / checkpoint・digest・license・CPU根拠を確定してから行う。
-  根拠不足に依存する採用作業・互換性問題・外部障害は停止して報告し、未達gateを飛ばさない。
+  実モデル採用ではimmutable upstream / checkpoint・digest・CPU根拠を確認する。licenseはソースとweightsを
+  分けて対象行為ごとにAGENTS共通方針で判断し、表記差異・情報不足だけで独立実装・調査・テストを一律停止しない。
+  重大な安全性・互換性問題や外部障害の停止条件、技術的受入gateは維持する。
 - 03.1変更順: baseline suite / browser → metadata-only discoveryと診断 → manifest scalar schema検証 →
   実効variant / environment選択の共通化 → Runner / CLI / 現行controllerへ適用 → fakeと既存回帰。
 - 03.1設計: variantのcapabilities / parameter_schema / devices / dtypes / input_constraints /
@@ -411,7 +447,7 @@ UniK3Dの方が適する証拠が得られれば順序を交換する。MoGe追�
 | Decision / 提案 | Reason | Trade-off | Future extension / 判断時点と必要証拠 |
 | --- | --- | --- | --- |
 | directory manifest discoveryを先行 | 既存plugin境界を活用 | 外部package配布をまだ扱わない | package entrypoint / hot reloadは将来。今回はsource checkout |
-| depth-onlyの第2実モデルを最初の実E2Eにする | 小さな成功を優先しMoGeを保つ | optional全対応は後続 | 実装前にvariant / immutable source・weights revision / SHA-256 / license / CPU依存と資源を確認して採用決定 |
+| depth-onlyの第2実モデルを最初の実E2Eにする | 小さな成功を優先しMoGeを保つ | optional全対応は後続 | 実モデル採用前にvariant / immutable source・weights revision / SHA-256 / CPU依存と資源を確認。licenseは対象行為ごとにAGENTS共通方針で判断し、独立実装・テストは先行可 |
 | variant metadata共通解決、schemaは全体置換を推奨 | UI / Runnerの判定差を防ぐ | manifestに重複記述があり得る | 03.1前にfallback / override規則とconditionalの検証可能subsetを仕様確定 |
 | target設定に環境・weights map | adapter / Jobへhost prefixを漏らさない | 設定形式が追加になる | 03.2〜03.3前にJSON等の形式・lookup key・既存CLI overrideの優先順位とdigest記録を確定 |
 | UI model選択はsession別snapshot | 実行中のmodel / checkpoint混線防止 | controlsの再構成が必要 | 03.3前にmodel切替と実行中編集の扱い、staleイベント破棄規則を確定。read-only起動互換も確認 |

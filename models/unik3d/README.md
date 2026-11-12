@@ -6,6 +6,9 @@ manifest. UniK3D is not available as a runnable model in CLI / Gradio discovery.
 The [investigation](../../docs/unik3d-investigation.md) preserves conflicting CC BY-NC / CC BY-NC-SA
 source labels and unresolved checkpoint applicability. Real checkpoint acquisition, use and redistribution
 remain on hold. Missing information alone does not stop independent synthetic contract work.
+The [project-wide policy](../../AGENTS.md#license-review-and-decisions), updated on 2026-11-12, governs
+future action-specific decisions; direct author contact / individual permission are not universal prerequisites.
+This documentation-only update does not release the existing UniK3D hold or change the adapter's guard.
 
 `UniK3DAdapter.load()` without an injected fixture factory reports that hold before path access or
 model / numeric imports. An injected runtime must be independently authored, accept HWC uint8 RGB,
