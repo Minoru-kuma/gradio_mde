@@ -299,3 +299,13 @@ job snapshot. Target configuration remains outside JobSpec; Backend still receiv
 contracts and does not branch on model names. CLI and Gradio composition roots share the same mapping
 contract. Explicit CLI overrides affect only the selected job. Local busy / cancel / timeout / collect
 and raw / terminal result immutability remain unchanged. See [target configuration](target-configuration.md).
+
+## Phase 03.5 multi-view terminal boundary
+
+The same submit / status / cancel / collect operations execute one batch Job in one independent worker.
+Multi-view inputs are explicitly gated by the model request kind, view-count constraints and common
+worker protocol1.1; no model-name dispatch or backend-specific model code is added.
+The optional JobResult.scene ArtifactRef is carried from the worker report and checked during terminal
+collect alongside every view and metadata document. It is absent from legacy results when unspecified.
+Failed batches publish no successful partial views / scene. Cancel / timeout / process cleanup remain
+Job-wide, and timing covers one adapter predict call and all requested view artifacts.

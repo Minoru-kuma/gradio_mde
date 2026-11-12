@@ -287,6 +287,8 @@ class ResultsService:
         depth = array("depth")
         valid, colors, rgba, stats = depth_view(depth, array("mask") if "mask" in output else None)
         stats.update({k: metadata.get(k, "unavailable") for k in ("depth_kind", "depth_unit", "scale_type", "camera_frame")})
+        if len(result['outputs']) > 1:
+            stats.update(view_id=output['view_id'], view_count=len(result['outputs']), preview='first input view')
         payload = {"run_id": run_id, "mode": mode, "stats": stats, "origin": "model raw depth",
                    "frame": FRAME, "unit": metadata["depth_unit"], "scale": metadata["scale_type"]}
         if mode == "Depth":
@@ -298,7 +300,7 @@ class ResultsService:
         # Include all validated raw artifacts plus RGB/job snapshots. This is a
         # conservative dependency set; changing any source invalidates reuse.
         job = read_json(contained_path(run, "job.json"))
-        source = job["inputs"][0]
+        source = next(source for source in job["inputs"] if source["view_id"] == output["view_id"])
         identity = {"algorithm": "grid-triangulation" if mode == "Mesh" else "pinhole-backprojection",
             "version": "1", "parameters": dict(MESH_PARAMETERS) if mode == "Mesh" else {},
             "run_id": run_id, "attempt_id": result["attempt_id"], "view_id": output["view_id"],

@@ -307,7 +307,7 @@ A later scoped user decision allowed fixed Small acquisition and noncommercial l
 The documentation-only update itself did not release the hold. The subsequent action-specific decision is recorded
 in the investigation; redistribution / public bundling / commercial use remain outside that decision.
 Depth / native points reuse existing profiles; core / UI / backend and schema are unchanged.
-03.4 native Small CPU E2E and native Points validation now pass. 03.5–03.6 remain unimplemented; Phase 03 is not COMPLETE.
+03.4 native Small CPU E2E and native Points validation now pass. 03.5 multi-view contracts now pass fake acceptance; 03.6 integration remains, so Phase 03 is not COMPLETE.
 
 ## Phase 03.4 runtime capability preflight
 
@@ -326,3 +326,13 @@ Native distance and Points use existing profiles with unknown units / scale; no 
 Unsupported native rays / confidence / pose are not exported. Their absence does not require a new profile
 for this accepted depth / Points integration. Existing UI / Registry / Runner / Backend remain model-independent.
 See the [plugin](../models/unik3d/README.md) and [03.4 acceptance](phases/phase-03.md#034-acceptance-evidence--pass).
+
+## Phase 03.5 explicit multi-view boundary
+
+A separate MultiViewPredictionRequest preserves the legacy single-view adapter interface. Ordered PNG
+inputs use schema1.1 and explicit model / request-kind / required-worker capabilities. The common worker
+checks all returned IDs before serialization and binds every output / RGB source by view_id.
+Per-view numerical profiles are unchanged; the new formal scene JSON ref survives terminal collect and export.
+Opaque unknown JSON is preserved without implicit file reads. New readers accept old single-view Runs
+without migration, while older one-view workers are not claimed to support this new execution feature.
+The current viewer is an explicitly identified first-view preview; real multi-view model/UI integration is deferred.

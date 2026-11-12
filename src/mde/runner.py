@@ -7,7 +7,8 @@ import threading
 import uuid
 from pathlib import Path
 
-from .contracts import ATTEMPT_ID, VIEW_ID, ExecutionBackend, JobHandle, JobSpec, ResourceSpec, normalize_outputs
+from .contracts import (ATTEMPT_ID, VIEW_ID, MULTIVIEW_SCHEMA_VERSION, ExecutionBackend, JobHandle,
+                        JobSpec, ResourceSpec, normalize_outputs, validate_view_request, view_id_for_index)
 from .registry import ModelRegistry, validate_parameters
 from .storage import RunStore, contained_path, inspect_png, read_json, run_path, sha256_file, write_json
 
@@ -23,6 +24,18 @@ class ExperimentRunner:
                walltime_seconds: int | None = None,
                requested_outputs: tuple[str, ...] = ("depth",), input_provenance: dict | None = None,
                environment_id: str | None = None) -> JobHandle:
+        return self._submit(model_id, [image], variant_id=variant_id, device=device, dtype=dtype,
+            parameters=parameters, walltime_seconds=walltime_seconds, requested_outputs=requested_outputs,
+            input_provenance=input_provenance, environment_id=environment_id)
+
+    def submit_views(self, model_id: str, images, **kwargs) -> JobHandle:
+        if not isinstance(images, (list, tuple)) or not images:
+            raise ValueError('submit_views requires a nonempty ordered PNG path list')
+        return self._submit(model_id, list(images), **kwargs)
+
+    def _submit(self, model_id, images, *, variant_id=None, device='cuda:0', dtype='float32',
+                parameters=None, walltime_seconds=None, requested_outputs=('depth',),
+                input_provenance=None, environment_id=None):
         info = self.registry.get_model(model_id)
         variant = info.effective_variant(variant_id)
         if device not in variant["supported_devices"] or dtype not in variant["supported_dtypes"]:
@@ -34,26 +47,36 @@ class ExperimentRunner:
                 raise ValueError(f"Unsupported requested output: {key}")
         parameters = validate_parameters(variant["parameter_schema"], {} if parameters is None else parameters)
         constraints = variant["input_constraints"]
-        if not constraints.get("min_views", 1) <= 1 <= constraints.get("max_views", 1):
-            raise ValueError("Selected variant does not support single-view input")
         if constraints.get("format", "PNG") != "PNG" or constraints.get("worker_mode", "RGB") != "RGB":
             raise ValueError("Selected variant requires unsupported input format / mode")
-        width, height = inspect_png(image)
         environment = info.environment(variant_id, environment_id)
+        validate_view_request(variant, environment, len(images))
+        if len(images) > 1 and input_provenance is not None:
+            raise ValueError('Multi-view preparation currently accepts PNG paths without JPEG provenance')
+        dimensions = [inspect_png(image) for image in images]
+        checksums = [sha256_file(image) for image in images]
         definition = contained_path(self.project_root, environment["definition_ref"])
         environment["definition_digest"] = sha256_file(definition)
         model_ref = {"model_id": model_id, "variant": variant, "manifest": info.data}
         request = {"model_ref": model_ref, "parameters": parameters,
-                   "device": device, "dtype": dtype, "input_sha256": sha256_file(image),
+                   "device": device, "dtype": dtype,
                    "environment": environment, "backend_id": self.backend.backend_id}
+        if len(images) == 1:
+            request['input_sha256'] = checksums[0]
+        else:
+            request['inputs'] = [{'view_id': view_id_for_index(index), 'sha256': checksum}
+                                 for index, checksum in enumerate(checksums, 1)]
+            request['request_kind'] = 'multi_view_v1'
         request["walltime_seconds"] = walltime_seconds
         if outputs != ["depth"]:
             request["requested_outputs"] = outputs
         digest = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
         run_id = str(uuid.uuid4())
-        run = self.store.prepare(run_id, image)
-        input_record = {"view_id": VIEW_ID, "path": f"input/views/{VIEW_ID}/image.png",
-                        "sha256": request["input_sha256"], "original_size": {"width": width, "height": height}}
+        run = self.store.prepare_views(run_id, images)
+        input_records = [{'view_id': view_id_for_index(index),
+                          'path': f'input/views/{view_id_for_index(index)}/image.png',
+                          'sha256': checksum, 'original_size': {'width': size[0], 'height': size[1]}}
+                         for index, (checksum, size) in enumerate(zip(checksums, dimensions), 1)]
         if input_provenance is not None:
             provenance = dict(input_provenance)
             source = Path(provenance.pop("source_path"))
@@ -61,7 +84,7 @@ class ExperimentRunner:
                 raise ValueError("Original input checksum mismatch")
             provenance["path"] = f"input/views/{VIEW_ID}/original.jpg"
             shutil.copyfile(source, run / provenance["path"])
-            input_record["source"] = provenance
+            input_records[0]["source"] = provenance
         sources = hashlib.sha256()
         for directory in (self.project_root / "src", self.registry.models_root / model_id):
             for path in sorted(directory.rglob("*")):
@@ -70,12 +93,15 @@ class ExperimentRunner:
                     sources.update(path.read_bytes())
         spec = JobSpec(run_id, model_ref,
                        environment, self.backend.backend_id, self.backend.profile_id,
-                       [input_record],
+                       input_records,
                        {"device": device, "dtype": dtype, "seed": 0, "parameters": parameters,
                         "requested_outputs": outputs, "resolution_policy": "native_input_grid"},
                        asdict(ResourceSpec(gpu_count=int(device.startswith("cuda")), walltime_seconds=walltime_seconds)),
                        {"run_location": run_id}, f"{run_id}/{ATTEMPT_ID}", digest,
-                       {"git_commit": "unknown", "source_digest": sources.hexdigest()})
+                       {"git_commit": "unknown", "source_digest": sources.hexdigest()},
+                       **({'schema_version': MULTIVIEW_SCHEMA_VERSION} if len(images) > 1 else {}))
+        if len(images) > 1:
+            spec.inference['request_kind'] = 'multi_view_v1'
         write_json(run / "job.json", spec.to_dict())
         write_json(run / "attempts" / ATTEMPT_ID / "job.json", spec.to_dict())
         return self.backend.submit(spec)

@@ -99,3 +99,10 @@ payloadはbase64 buffers、同時に1つの3D objectを保持、切替・compone
 material / texture / controlsをdisposeする。WebGL非対応時は初期化失敗理由を表示する。
 
 検証OS / browser / 容量実測とGPU未検証の区別は02Cの証拠を参照する。
+
+## Phase 03.5 saved multi-view boundary
+
+Saved multi-view Runs retain every input, output view and scene for collection / export. The current
+viewer previews the first input view and identifies that limited preview in its statistics; it does not
+render a combined scene or add multi-view selection controls. RGB dependencies are matched by view_id,
+so return order cannot bind a point map to another view's image. Legacy one-view display is unchanged.

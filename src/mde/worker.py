@@ -9,8 +9,9 @@ import time
 from pathlib import Path
 
 from .contracts import (JobSpec, ModelInfo, ModelLoadContext, PredictionRequest,
-                        SCHEMA_VERSION, GEOMETRY_PROFILE, normalize_outputs, check_schema, utc_now)
-from .storage import artifact_ref, contained_path, read_json, sha256_file, write_json
+                        SCHEMA_VERSION, MULTIVIEW_SCHEMA_VERSION, GEOMETRY_PROFILE, normalize_outputs, check_schema, utc_now,
+                        PredictionView, MultiViewPredictionRequest, WORKER_PROTOCOL_VERSION)
+from .storage import artifact_ref, contained_path, read_json, sha256_file, write_json, json_metadata, validate_scene_metadata
 from .runtime import environment_fingerprint, timed, reset_allocator, observe_allocator
 from .runtime_capabilities import check_runtime_capabilities
 
@@ -35,6 +36,97 @@ def framework_runtime(device: str) -> dict:
     return data
 
 
+def serialize_view(run, spec, output, loaded, context, original_size):
+    import numpy as np
+    source_metadata = json_metadata(output.metadata, 'View metadata')
+    if output.depth is None:
+        raise ValueError("Missing required depth")
+    if np.asarray(output.depth).dtype.hasobject:
+        raise ValueError("Object depth arrays are forbidden")
+    depth = np.asarray(output.depth, dtype=np.dtype("<f4"), order="C")
+    if depth.ndim != 2 or min(depth.shape) < 1:
+        raise ValueError("Depth must have shape [H,W]")
+    valid = np.isfinite(depth) & (depth > 0)
+    if output.mask is not None:
+        mask = np.asarray(output.mask)
+        if mask.dtype != np.dtype(bool):
+            raise ValueError("Model mask must be bool")
+        if mask.shape != depth.shape:
+            raise ValueError("Mask/depth shape mismatch")
+        valid &= mask
+    if not valid.any():
+        raise ValueError("All depth pixels are invalid")
+    depth = np.where(valid, depth, np.nan).astype("<f4")
+    metadata = {**source_metadata, "shape": list(depth.shape), "dtype": "float32",
+                "original_size": original_size,
+                "output_size": {"width": depth.shape[1], "height": depth.shape[0]},
+                "model": loaded.identity, "device": context.device, "inference_dtype": context.dtype,
+                "warnings": loaded.warnings + source_metadata.get("warnings", []),
+                "invalid_depth": "NaN; valid pixels are finite and positive",
+                "valid_pixels": int(valid.sum()), "invalid_pixels": int((~valid).sum()),
+                "resize_policy": "adapter metadata; original RGB input is preserved"}
+    for key in ("depth_kind", "scale_type", "depth_unit", "camera_frame"):
+        if key not in metadata:
+            raise ValueError(f"Missing output metadata: {key}")
+    if metadata["depth_kind"] not in ("z_depth", "ray_distance"):
+        raise ValueError("Unknown depth kind")
+    if metadata["scale_type"] == "metric" and metadata["depth_unit"] != "m":
+        raise ValueError("Metric depth must be in metres")
+    def save_array(name, array, unit):
+        array = np.ascontiguousarray(array)
+        path = contained_path(run, f"output/{spec.attempt_id}/views/{output.view_id}/{name}.npy")
+        if path.exists():
+            raise ValueError("Raw artifacts are immutable")
+        temporary = path.with_suffix(".npy.tmp")
+        with temporary.open("xb") as stream:
+            np.save(stream, array, allow_pickle=False)
+        os.replace(temporary, path)
+        return artifact_ref(run, path, media_type="application/x-npy", shape=list(array.shape),
+                            dtype="bool" if array.dtype == np.dtype(bool) else "float32", unit=unit)
+
+    ref = save_array("depth", depth, metadata["depth_unit"])
+    serialized = {"view_id": output.view_id, "depth": ref, "metadata": metadata, "extras": json_metadata(output.extras, "View extras")}
+    artifacts = [ref]
+    requested = normalize_outputs(spec.inference["requested_outputs"])
+    profile = "01A-depth-only"
+    if requested != ["depth"]:
+        profile = GEOMETRY_PROFILE
+        meanings = source_metadata.get("geometry", {})
+        metadata["requested_outputs"] = requested
+        metadata["geometry"] = {"mask": {"origin": "validation",
+            "conversion": "finite-positive depth AND model mask; invalid depth and vectors stored as NaN"}}
+        serialized["mask"] = save_array("mask", valid, "unitless")
+        artifacts.append(serialized["mask"])
+        if output.mask is not None:
+            serialized["model_mask"] = save_array("model_mask", np.asarray(output.mask), "unitless")
+            metadata["geometry"]["model_mask"] = meanings.get("model_mask", {})
+            artifacts.append(serialized["model_mask"])
+        if "mask" in requested and output.mask is None:
+            raise ValueError("Missing requested model mask")
+        for key in ("points", "normals", "intrinsics"):
+            if key not in requested:
+                continue
+            value = getattr(output, key)
+            if value is None:
+                raise ValueError(f"Missing requested {key}")
+            raw = np.asarray(value)
+            if raw.dtype.hasobject:
+                raise ValueError(f"Object {key} arrays are forbidden")
+            array = np.asarray(value, dtype=np.dtype("<f4"), order="C")
+            expected = (3, 3) if key == "intrinsics" else (*depth.shape, 3)
+            if array.shape != expected:
+                raise ValueError(f"{key} shape mismatch")
+            if key != "intrinsics":
+                array = np.where(valid[..., None], array, np.nan).astype("<f4")
+            unit = metadata["depth_unit"] if key == "points" else "pixel" if key == "intrinsics" else "unitless"
+            serialized[key] = save_array(key, array, unit)
+            metadata["geometry"][key] = meanings.get(key, {})
+            artifacts.append(serialized[key])
+    else:
+        metadata.pop("geometry", None)
+    return serialized, artifacts, metadata, profile
+
+
 def execute(job_path: Path, run: Path) -> int:
     worker_started = time.perf_counter()
     import numpy as np
@@ -47,12 +139,13 @@ def execute(job_path: Path, run: Path) -> int:
     output_dir = run / "output" / spec.attempt_id
     if (output_dir / "result.json").exists() or (run / "attempts" / spec.attempt_id / "job-result.json").exists():
         raise ValueError("Published inference results are immutable; create a new Run")
-    report = {"schema_version": SCHEMA_VERSION, "run_id": spec.run_id, "attempt_id": spec.attempt_id,
+    report = {"schema_version": spec.schema_version, "run_id": spec.run_id, "attempt_id": spec.attempt_id,
               "outcome": "FAILED", "outputs": [], "artifacts": [], "metrics": {}, "warnings": [],
               "started_at": utc_now(), "execution": {"python_version": platform.python_version(),
               "python_implementation": platform.python_implementation(), "python_prefix": sys.prefix,
               "conda_environment": os.environ.get("CONDA_DEFAULT_ENV", "unknown"),
               "requested_environment": spec.environment_ref["environment_id"],
+              "worker_protocol_version": WORKER_PROTOCOL_VERSION,
               "worker_pid": os.getpid(), "device": spec.inference["device"], "provenance": spec.provenance}}
     adapter = None
     stage = "preflight"
@@ -76,117 +169,57 @@ def execute(job_path: Path, run: Path) -> int:
         report["warnings"].extend(loaded.warnings)
         stage = "preflight"
         capability_check, capability_warnings = check_runtime_capabilities(
-            loaded.capabilities, spec.inference["requested_outputs"])
+            loaded.capabilities, spec.inference["requested_outputs"], view_count=len(spec.inputs))
         report["execution"]["runtime_capability_check"] = capability_check
         report["warnings"].extend(capability_warnings)
-        input_spec = spec.inputs[0]
-        path = contained_path(run, input_spec["path"])
-        if sha256_file(path) != input_spec["sha256"]:
-            raise ValueError("Input hash mismatch")
-        with Image.open(path) as image:
-            image = image.convert("RGB")
-            original_size = {"width": image.width, "height": image.height}
-            if original_size != input_spec["original_size"]:
-                raise ValueError("Input size mismatch")
-            rgb = np.asarray(image).copy()
-        stage = "predict"
-        print(f"predict: {original_size}", flush=True)
+        views = []
+        for input_spec in spec.inputs:
+            path = contained_path(run, input_spec['path'])
+            if sha256_file(path) != input_spec['sha256']:
+                raise ValueError('Input hash mismatch')
+            with Image.open(path) as image:
+                image = image.convert('RGB')
+                size = {'width': image.width, 'height': image.height}
+                if size != input_spec['original_size']:
+                    raise ValueError('Input size mismatch')
+                views.append(PredictionView(input_spec['view_id'], np.asarray(image).copy()))
+        stage = 'predict'
+        print(f'predict: {len(views)} view(s)', flush=True)
         allocator_measured = reset_allocator(context.device)
-        with timed(report["metrics"], "predict_seconds", "adapter.predict including preprocessing, inference, postprocessing and CPU output; CUDA synchronized", context.device):
-            batch = adapter.predict(PredictionRequest(input_spec["view_id"], rgb,
-                                      spec.inference["parameters"], tuple(spec.inference["requested_outputs"])))
-        if len(batch.views) != 1 or batch.views[0].view_id != input_spec["view_id"]:
-            raise ValueError("Prediction view identity mismatch")
-        stage = "serialize"
+        parameters = spec.inference['parameters']
+        requested = tuple(spec.inference['requested_outputs'])
+        request = (PredictionRequest(views[0].view_id, views[0].image, parameters, requested) if len(views) == 1
+                   else MultiViewPredictionRequest(tuple(views), parameters, requested))
+        with timed(report['metrics'], 'predict_seconds', 'adapter.predict including preprocessing, inference, postprocessing and CPU output; CUDA synchronized', context.device):
+            batch = adapter.predict(request)
+        expected = [view.view_id for view in views]
+        actual = [output.view_id for output in batch.views]
+        if len(actual) != len(expected) or len(set(actual)) != len(actual) or set(actual) != set(expected):
+            raise ValueError('Prediction view identity mismatch: missing, duplicate or unknown view')
+        outputs = {output.view_id: output for output in batch.views}
+        scene_metadata = json_metadata(batch.scene_metadata, 'Scene metadata')
+        validate_scene_metadata(scene_metadata, expected)
+        stage = 'serialize'
         serialization_started = time.perf_counter()
-        output = batch.views[0]
-        if output.depth is None:
-            raise ValueError("Missing required depth")
-        if np.asarray(output.depth).dtype.hasobject:
-            raise ValueError("Object depth arrays are forbidden")
-        depth = np.asarray(output.depth, dtype=np.dtype("<f4"), order="C")
-        if depth.ndim != 2 or min(depth.shape) < 1:
-            raise ValueError("Depth must have shape [H,W]")
-        valid = np.isfinite(depth) & (depth > 0)
-        if output.mask is not None:
-            mask = np.asarray(output.mask)
-            if mask.dtype != np.dtype(bool):
-                raise ValueError("Model mask must be bool")
-            if mask.shape != depth.shape:
-                raise ValueError("Mask/depth shape mismatch")
-            valid &= mask
-        if not valid.any():
-            raise ValueError("All depth pixels are invalid")
-        depth = np.where(valid, depth, np.nan).astype("<f4")
-        metadata = {**output.metadata, "shape": list(depth.shape), "dtype": "float32",
-                    "original_size": original_size,
-                    "output_size": {"width": depth.shape[1], "height": depth.shape[0]},
-                    "model": loaded.identity, "device": context.device, "inference_dtype": context.dtype,
-                    "warnings": loaded.warnings + output.metadata.get("warnings", []),
-                    "invalid_depth": "NaN; valid pixels are finite and positive",
-                    "valid_pixels": int(valid.sum()), "invalid_pixels": int((~valid).sum()),
-                    "resize_policy": "adapter metadata; original RGB input is preserved"}
-        for key in ("depth_kind", "scale_type", "depth_unit", "camera_frame"):
-            if key not in metadata:
-                raise ValueError(f"Missing output metadata: {key}")
-        if metadata["depth_kind"] not in ("z_depth", "ray_distance"):
-            raise ValueError("Unknown depth kind")
-        if metadata["scale_type"] == "metric" and metadata["depth_unit"] != "m":
-            raise ValueError("Metric depth must be in metres")
-        def save_array(name, array, unit):
-            array = np.ascontiguousarray(array)
-            path = contained_path(run, f"output/{spec.attempt_id}/views/{output.view_id}/{name}.npy")
-            if path.exists():
-                raise ValueError("Raw artifacts are immutable")
-            temporary = path.with_suffix(".npy.tmp")
-            with temporary.open("xb") as stream:
-                np.save(stream, array, allow_pickle=False)
-            os.replace(temporary, path)
-            return artifact_ref(run, path, media_type="application/x-npy", shape=list(array.shape),
-                                dtype="bool" if array.dtype == np.dtype(bool) else "float32", unit=unit)
-
-        ref = save_array("depth", depth, metadata["depth_unit"])
-        serialized = {"view_id": output.view_id, "depth": ref, "metadata": metadata, "extras": output.extras}
-        report["outputs"] = [serialized]
-        report["artifacts"] = [ref]
-        requested = normalize_outputs(spec.inference["requested_outputs"])
-        profile = "01A-depth-only"
-        if requested != ["depth"]:
-            profile = GEOMETRY_PROFILE
-            meanings = output.metadata.get("geometry", {})
-            metadata["requested_outputs"] = requested
-            metadata["geometry"] = {"mask": {"origin": "validation",
-                "conversion": "finite-positive depth AND model mask; invalid depth and vectors stored as NaN"}}
-            serialized["mask"] = save_array("mask", valid, "unitless")
-            report["artifacts"].append(serialized["mask"])
-            if output.mask is not None:
-                serialized["model_mask"] = save_array("model_mask", np.asarray(output.mask), "unitless")
-                metadata["geometry"]["model_mask"] = meanings.get("model_mask", {})
-                report["artifacts"].append(serialized["model_mask"])
-            if "mask" in requested and output.mask is None:
-                raise ValueError("Missing requested model mask")
-            for key in ("points", "normals", "intrinsics"):
-                if key not in requested:
-                    continue
-                value = getattr(output, key)
-                if value is None:
-                    raise ValueError(f"Missing requested {key}")
-                raw = np.asarray(value)
-                if raw.dtype.hasobject:
-                    raise ValueError(f"Object {key} arrays are forbidden")
-                array = np.asarray(value, dtype=np.dtype("<f4"), order="C")
-                expected = (3, 3) if key == "intrinsics" else (*depth.shape, 3)
-                if array.shape != expected:
-                    raise ValueError(f"{key} shape mismatch")
-                if key != "intrinsics":
-                    array = np.where(valid[..., None], array, np.nan).astype("<f4")
-                unit = metadata["depth_unit"] if key == "points" else "pixel" if key == "intrinsics" else "unitless"
-                serialized[key] = save_array(key, array, unit)
-                metadata["geometry"][key] = meanings.get(key, {})
-                report["artifacts"].append(serialized[key])
-        else:
-            metadata.pop("geometry", None)
-        report["execution"]["serialization_profile"] = profile
+        metadata_views = []
+        for input_spec in spec.inputs:
+            serialized, artifacts, metadata, profile = serialize_view(run, spec, outputs[input_spec['view_id']],
+                loaded, context, input_spec['original_size'])
+            report['outputs'].append(serialized)
+            report['artifacts'].extend(artifacts)
+            metadata_views.append(metadata)
+            report['execution']['serialization_profile'] = profile
+            print(f"saved: {serialized['depth']['path']} shape={metadata['shape']}", flush=True)
+        if len(views) > 1 or scene_metadata:
+            validate_scene_metadata(scene_metadata, expected, metadata_views)
+            report['schema_version'] = MULTIVIEW_SCHEMA_VERSION
+            scene_path = output_dir / 'scene.json'
+            if scene_path.exists():
+                raise ValueError('Raw scene artifact is immutable')
+            write_json(scene_path, {'schema_version': MULTIVIEW_SCHEMA_VERSION, 'run_id': spec.run_id,
+                'attempt_id': spec.attempt_id, 'view_ids': expected, 'metadata': scene_metadata})
+            report['scene'] = artifact_ref(run, scene_path, media_type='application/json')
+            report['artifacts'].append(report['scene'])
         from .geometry import validate_geometry
         validate_geometry(run, report)
         report["metrics"]["serialization_seconds"] = {"value": time.perf_counter() - serialization_started,
@@ -194,9 +227,12 @@ def execute(job_path: Path, run: Path) -> int:
         if allocator_measured:
             observe_allocator(context.device, report["metrics"])
         report["outcome"] = "COMPLETED"
-        print(f"saved: {ref['path']} shape={depth.shape}", flush=True)
     except Exception as error:
         traceback.print_exc()
+        if len(spec.inputs) > 1:
+            report['outputs'] = []
+            report['artifacts'] = []
+            report.pop('scene', None)
         report["error"] = {"code": "WORKER_ERROR", "stage": stage, "message": str(error),
                            "retryability": False, "traceback_path": f"logs/{spec.attempt_id}/stderr.log"}
     finally:
@@ -216,9 +252,9 @@ def execute(job_path: Path, run: Path) -> int:
     if report["outcome"] == "COMPLETED":
         try:
             with timed(report["metrics"], "metadata_serialization_seconds", "metadata JSON write and checksum"):
-                write_json(output_dir / "metadata.json", {"schema_version": SCHEMA_VERSION, "run_id": spec.run_id,
-                           "attempt_id": spec.attempt_id, "execution": report["execution"], "views": [metadata],
-                           "warnings": report["warnings"]})
+                write_json(output_dir / "metadata.json", {"schema_version": report['schema_version'], "run_id": spec.run_id,
+                           "attempt_id": spec.attempt_id, "execution": report["execution"], "views": metadata_views,
+                           "warnings": report["warnings"], **({'scene': report['scene']} if 'scene' in report else {})})
                 report["artifacts"].append(artifact_ref(run, output_dir / "metadata.json", media_type="application/json"))
         except Exception as error:
             traceback.print_exc()

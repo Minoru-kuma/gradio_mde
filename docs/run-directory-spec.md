@@ -286,3 +286,41 @@ Jobs retain logical environment / model / variant and content identities; runtim
 record the actual selected Python environment. No layout, profile, required output or raw/result semantics change.
 Model switching creates a fresh Run, while opening / collecting saved Runs performs no inference or migration.
 The two real CPU UI Runs and old saved Runs are checked for hash / mtime immutability after repeated reads.
+
+## Phase 03.5 multi-view records
+
+Single-view JobSpec writers retain schema1.0 and `view-0001` layout. Multi-view Jobs explicitly use
+schema1.1 / inference.request_kind=multi_view_v1 and require the new common worker and declared protocol1.1.
+The worker currently supports required protocol1.0 / 1.1, records actual version1.1 in execution metadata,
+and rejects a required future version1.2. Generic record-schema major compatibility remains unchanged;
+known request kinds and required worker features determine execution support, not merely a 1.x label.
+Each input / output view uses its assigned `view-NNNN` directory. One attempt remains the only supported
+attempt. All input IDs / hashes are included in the ordered request digest.
+
+The existing 01A-depth-only / 02A-geometry-v1 numerical profiles apply independently to every view.
+`metadata.json.views` and `outputs` contain all view metadata in input order. Header, shape, validity,
+units, provenance, path and checksum checks cover all views, not just the first.
+
+A new optional `scene` ArtifactRef appears in WorkerReport / JobResult and the metadata document:
+
+```json
+{
+  "schema_version": "1.1",
+  "run_id": "<Run ID>",
+  "attempt_id": "attempt-0001",
+  "view_ids": ["view-0001", "view-0002"],
+  "metadata": {"reference_view_id": "view-0001", "scale_type": "relative", "depth_unit": "arbitrary"}
+}
+```
+
+This is the content of `output/attempt-0001/scene.json`, registered as application/json with size / SHA-256.
+The scene ref is mandatory for completed multi-view results. Its exact identity, order and optional
+reference / scale / unit fields are validated, and the ref must agree across worker, metadata and terminal
+records. A nonempty single-view model scene also emits the new 1.1 result / metadata / scene format;
+existing plugins returning empty scene metadata continue writing the legacy format.
+
+Missing scene fields in old Runs are normal and are not rewritten. `JobResult.scene=None` is omitted from
+wire output. New readers support legacy records and the opt-in multi-view extension; old single-view
+workers / readers are not claimed to understand multiple views. No raw migration is performed.
+Unknown scene / extras metadata remains opaque JSON rather than an implicit file reference. Formally
+registered scene and per-view artifacts, plus every original input, are included by Run export.

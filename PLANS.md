@@ -2,8 +2,8 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03.4受入PASS / commit・通常push後に03.5へ（2026-11-12）**。
-  Phase 03全体はCOMPLETEではない。03.5 / 03.6は未着手。
+- Current work: **Phase 03.5受入PASS / commit・通常push後に03.6へ（2026-11-12）**。
+  Phase 03全体はCOMPLETEではなく03.6未着手。
 - Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
@@ -20,6 +20,59 @@
 - 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、関連仕様。
   以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
 - main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
+
+## Phase 03.5 implementation plan — 2026-11-12
+
+- Start / gate: 03.4 PASS、`f337bf568a24d4b89f23c38d9b5c8654094f7d27`通常push済み。
+  並行配布文書は`0786272`、デモ仕様は`59d2cef4acb1749b8c92401abf83c6caff73acb2`で通常push済み。
+  cleanな同じブランチで03.5へ進む。origin/mainは`e22322d5acc8ce7603b38d36311fc39ea56f6135`。
+- Scope / evidence: contracts / worker / storage / geometryにone-view固定、Runnerは単一hash / recordを構築し、
+  Backendは既存field以外をterminalへ伝搬しないことを確認。既存3 adapterはview_id / imageを読む。
+  旧Requestを改変せず、別のMultiViewPredictionRequestとordered PredictionView tupleを追加する。
+  実モデルmulti-view / multi-view入力UI / queueは今回必須にしない。fake2viewで共通契約を確認する。
+- Version / opt-in: single-viewのwire schema1.0、旧PredictionRequest / CLI / path / profilesを維持。
+  新multi-view Job / report / metadataはschema1.1。manifestのmulti_view、input_constraints.request_kind=multi_view_v1、
+  environmentのworker_protocol_version=1.1を明示する。最低必要worker版を実対応上限1.1と照合し1.2を拒否する。
+  Genericなrecord schemaの同major未知optional互換は維持し、実行能力を1.xというlabelだけから推定しない。古いworker互換とは主張しない。
+  Legacy空runtime能力は複数viewでは許可せず、明示的なmulti_view能力とRequest対応を要求する。
+- API / storage: Runner.submit_views(model_id, ordered PNG paths, ...)を追加し、submit(single)は同じ内部処理へ委譲。
+  全inputのID / hashを順序付きでdigestへ入れ、view-0001 / 0002...を共通採番。全inputの型・checksum・サイズを検証。
+  predictは1回、返却view ID集合の欠落 / 重複 / 未知IDを保存前に拒否し、保存順は入力順に正規化する。
+  数値検証・geometry profileは全viewへ同じ既存契約を適用。異なるviewのshapeを混同しない。
+- Scene: existing PredictionBatch.scene_metadataをfinite JSONとして保存。scene.jsonはschema1.1、run / attempt、
+  view_ids、model-provided metadataを持つ。reference_view_idがある場合は入力IDを参照し、scale / unitがあれば整合を検証。
+  reference未指定は未指定のまま、identity pose / Kを補わない。現profileではpose tensorを保存しない。
+  optional JobResult.scene ArtifactRefをBackend経由で保持し、Noneは旧wireへ出さない。全refとmetadata / worker / terminalを照合。
+  未知extras / scene metadataはopaque JSONとして保持し、pathというkeyだけで任意fileを参照しない。
+- UI / export boundary: Resultsは先頭view previewを維持し、RGB sourceはview_idで対応付ける。
+  multi-view selection / scene renderingは実装しない。Run管理 / ZIPは全views・inputs・sceneを保持し、rawを書き換えない。
+- Order: 本計画 / 仕様更新 → types / schema / Runner / Store → runtime gate / worker → validators / Backend / reader →
+  fake2view正常・順序反転・異常 / scene・extras・refs / export / legacy回帰 → docs証拠 → 03.5成功commit / 通常push。
+- Validation: 別shapeのfake2view、1predict、input順IDとoutput対応、missing / duplicate / unknown ID、second-view破損、
+  runtime multi_view未宣言・unsupported拒否、scene referenceとchecksum / path異常、unknown JSON roundtrip。
+  新instance / CLI collect・ZIPで全fileを検証しhash / mtime不変。既存3モデルはsingle-only宣言を維持する。
+- Risks / rollback: first-viewのみの検証を残さず、sceneがterminalで失われないよう明示field化する。
+  1.0のraw移行なし、single CLI / JPEG provenance / cancel / timeout / derived readersの既存回帰を維持。
+  失敗batchを成功部分として公開しない。新interfaceは通常修正commitで戻せる。Phase 04以降 / PR / main反映なし。
+- Results / 03.5 acceptance: **PASS**。別shape2view fake、返却逆順・ID対応、欠落 / 重複 / 未知ID、second input / depth / points破損、
+  scene参照・scale / unit・JSON異常、runtime multi_view未宣言 / unsupported、未知extras / scene roundtrip、ZIP全view保持を確認。
+  future required worker1.2はRun準備前・JobSpec読込時に拒否。並行read-only reviewのprotocol指摘へ対応済み。
+  初回検証はfixtureが入力PNGをRunRootに置いていたため「root空」検査が失敗し、Run directory未生成を確認する形へ修正。
+  初回fullはpreview test内class名誤記で1件失敗し、実在ResultsServiceへ修正して単独成功。
+  最終full139件 / 132成功 / browser opt-in7 skip（218.558秒）。multi-view対象10 tests成功（42.071秒）、
+  nonempty single-scene版の追加検証も成功（最終fullに含む）。
+- Retained fake E2E: Run `380684a3-942f-4e08-a8f5-6ba17f043a94`、schema1.1、shape[2,3] / [4,5]、1predict。
+  native response逆順でも保存IDは入力順、scene.reference_view_id / unknown extras保持。
+  新Backend2collect + 新CLI2collect + ZIP exportで全file hash / mtime不変。Python egress guard下で成功。
+  source_digest `38d43538bfa00f9c77b0c53c2f9982898d1dc47378700d81cafe4b77fe380490`。
+- Legacy actual CPU: MoGe Run `58345407-fbf7-4397-a720-4bcec045f5fe`、single wire1.0 / scene field省略 / native値は
+  同CPU条件の既存MoGe出力と配列完全一致。2CLI collect不変。旧4Run各2collect不変、旧01B1件はlocal不在で未検証。
+- Evidence: `.local/validation/phase-03-5-final-regression.log` / `phase-03-5-compatibility.json` / `phase-03-5-moge-check.json` /
+  `phase-03-5-evidence/acceptance.json`。ZIPはfake Run export検証でありdemo packageではなく、実model weightsを含まない。
+  静的検証 / diff検査は成功、最終件数はphase文書へ記録。
+- Unverified / next: 実モデルmulti-view / multi-view入力UI / pose tensor export / generic typed-extra array exporterは未実装で
+  この段階の必須ではない。browser opt-in・3実モデル統合回帰 / matrix照合は03.6で行う。
+  03.5 commit / 通常push成功後に03.6へ進み、全Exitを満たすまでPhase 03 COMPLETEとしない。
 
 ## Demo edition specification update — 2026-11-12
 

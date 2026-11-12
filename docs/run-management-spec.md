@@ -122,3 +122,10 @@ atomic replaceする。削除は親descriptorとdevice / inodeを照合する。
 unit / frame / scale / 条件は元JobResult・derived manifest内の値を保持する。
 logs・credentials・環境ファイル・Run外path・未参照file・partial / failed derivedは含めない。
 大容量ZIPはapplication / browser memoryを消費する。解像度上限・MoGe推定品質は今回変更しない。
+
+## Phase 03.5 multi-view export
+
+Run detail retains the complete Job inputs, terminal outputs and optional scene ArtifactRef. Export
+includes every registered per-view artifact, the scene record and all inputs, subject to the existing
+integrity / containment / size checks. Unknown JSON extras are retained in their records; arbitrary
+path-like metadata is not opened. No raw record is rewritten by repeated collect / export.

@@ -352,3 +352,48 @@ requests are rejected and unrequested outputs are not serialized. Native keys ar
 that every native tensor is exported. The checkpoint-free synthetic seam remains for numeric tests.
 Source / weight license facts and the scoped research decision remain in the
 [investigation](unik3d-investigation.md); operational approval is not a rights-holder license grant.
+
+## Phase 03.5 multi-view request and scene contract
+
+The existing `PredictionRequest(view_id, image, parameters, requested_outputs)` remains unchanged.
+`ExperimentRunner.submit_views(model_id, ordered_png_paths, **single_view_options)` prepares an ordered
+input list. A single path still dispatches the legacy request. Two or more paths dispatch a separate
+`MultiViewPredictionRequest(views, parameters, requested_outputs)`, where `views` is an ordered tuple
+of immutable `PredictionView(view_id, image)` records. Each image is worker-local RGB uint8 HWC.
+This is one model prediction call for one Job, not separate Benchmark jobs.
+
+Multi-view requires all three explicit opt-ins: variant `multi_view` capability supported / conditional,
+`input_constraints.request_kind: multi_view_v1` with compatible min/max_views, and environment
+`worker_protocol_version: 1.1` for the current implementation. The declaration is a minimum required
+worker version and is checked against the actual supported upper bound 1.1 (1.2 is rejected before Run
+creation and by worker JobSpec parsing). Stable record-schema minor extensions and unknown optional
+metadata do not by themselves imply new worker execution capabilities. Worker load-time capabilities must also explicitly allow `multi_view`;
+legacy empty maps do not authorize a new batch interface. Conditional strings are not evaluated by core.
+All three current real plugins remain single-view; this stage's multi-view evidence uses a fake adapter.
+
+Multi-view JobSpec uses schema **1.1** and `inference.request_kind: multi_view_v1`. Older workers that
+support only the single-view protocol do not support this feature, even though the major is still 1.
+New common worker code is required. The legacy one-view Job / request / paths / numeric profiles remain
+1.0 compatible; no stored Run is migrated. IDs are assigned in input order as `view-0001`, `view-0002`, ... .
+The ordered IDs and checksums enter the request digest; equal image contents do not collapse distinct views.
+
+`PredictionBatch.views` must contain each input ID exactly once, with no unknown ID. Return order can differ;
+worker normalizes serialization order to input order. Missing / duplicate / unknown IDs fail before writing
+numeric artifacts. Every returned depth and requested optional output receives the same existing numerical
+and provenance validation independently, including when view dimensions differ. A failed batch does not
+publish successful partial outputs; diagnostic partial files may remain and are never reused or overwritten.
+
+`PredictionBatch.scene_metadata` is a finite JSON object. A multi-view result always saves a scene record;
+a nonempty scene object from a single-view result can also use the new scene wire format. Scene export uses
+schema1.1 and `output/<attempt>/scene.json` with run_id, attempt_id, ordered view_ids and model-provided metadata.
+An optional `reference_view_id` must name an input view. Optional scale_type / depth_unit must be consistent
+with each other and all view metadata; optional camera_frame must match the standard camera frame.
+No reference, shared transform or identity pose is invented. A reference ID alone does not assert estimated
+camera poses. Pose tensors remain unsupported in the current serialization profiles; a future exposed pose
+must retain the camera-to-world convention and declared scene reference / scale.
+
+Per-view extras and unknown scene fields round-trip as opaque JSON. A key named `path` does not make an
+opaque JSON object an artifact reference. Only formally registered ArtifactRefs are read / validated /
+exported; this stage adds the formal scene ref, not a generic arbitrary-array extras exporter.
+`JobResult.scene` is optional, is omitted from legacy wire records when None, and is preserved through
+worker, backend terminal result, new-instance collect and export. See the Run Directory specification.

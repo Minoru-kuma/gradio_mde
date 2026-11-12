@@ -1,4 +1,4 @@
-"""Small, dependency-free model and execution contracts (protocol 1.0)."""
+"""Dependency-free contracts: legacy single view and opt-in multi-view protocol."""
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
@@ -9,12 +9,35 @@ import uuid
 from typing import Any
 
 SCHEMA_VERSION = "1.0"
+MULTIVIEW_SCHEMA_VERSION = "1.1"
+WORKER_PROTOCOL_VERSION = "1.1"
 ATTEMPT_ID = "attempt-0001"
 VIEW_ID = "view-0001"
 
 
 OUTPUT_NAMES = ("depth", "points", "normals", "intrinsics", "mask")
 GEOMETRY_PROFILE = "02A-geometry-v1"
+
+
+def view_id_for_index(index: int) -> str:
+    return f"view-{index:04d}"
+
+
+def validate_view_request(variant, environment, count):
+    constraints = variant.get('input_constraints', {})
+    protocol = environment.get('worker_protocol_version', '1.0')
+    check_schema({'schema_version': protocol})
+    if int(protocol.split('.')[1]) > int(WORKER_PROTOCOL_VERSION.split('.')[1]):
+        raise ValueError(f'Required common worker protocol {protocol} exceeds supported {WORKER_PROTOCOL_VERSION}')
+    if not constraints.get('min_views', 1) <= count <= constraints.get('max_views', 1):
+        raise ValueError('Selected variant does not support this input view count')
+    if count > 1:
+        if variant.get('capabilities', {}).get('multi_view', {}).get('status') not in ('supported', 'conditional'):
+            raise ValueError('Selected variant does not support multi-view input')
+        if constraints.get('request_kind') != 'multi_view_v1':
+            raise ValueError('Multi-view adapter must explicitly implement multi_view_v1 requests')
+        if int(protocol.split('.')[1]) < 1:
+            raise ValueError('Multi-view requires common worker protocol 1.1 or later')
 
 
 def normalize_outputs(value) -> list[str]:
@@ -142,6 +165,19 @@ class PredictionRequest:
     requested_outputs: tuple[str, ...] = ("depth",)
 
 
+@dataclass(frozen=True)
+class PredictionView:
+    view_id: str
+    image: Any
+
+
+@dataclass
+class MultiViewPredictionRequest:
+    views: tuple[PredictionView, ...]
+    parameters: dict = field(default_factory=dict)
+    requested_outputs: tuple[str, ...] = ("depth",)
+
+
 @dataclass
 class MDEOutput:
     view_id: str
@@ -168,7 +204,7 @@ class ModelAdapter(ABC):
     def load(self, context: ModelLoadContext) -> LoadedModelInfo: ...
 
     @abstractmethod
-    def predict(self, request: PredictionRequest) -> PredictionBatch: ...
+    def predict(self, request: PredictionRequest | MultiViewPredictionRequest) -> PredictionBatch: ...
 
     @abstractmethod
     def unload(self) -> None: ...
@@ -203,8 +239,8 @@ class JobSpec:
         check_schema(value)
         job = cls(**{key: value[key] for key in cls.__dataclass_fields__ if key in value})
         if (job.attempt_id != ATTEMPT_ID or type(job.attempt_number) is not int or job.attempt_number != 1
-                or not isinstance(job.inputs, list) or len(job.inputs) != 1):
-            raise UnsupportedOperation("Phase 01 supports one view and one initial attempt")
+                or not isinstance(job.inputs, list) or not job.inputs):
+            raise UnsupportedOperation("One initial attempt and at least one view are required")
         if str(uuid.UUID(job.run_id)) != job.run_id:
             raise ValueError("Invalid Run ID")
         for key in ("model_ref", "environment_ref", "inference", "resources", "storage", "provenance"):
@@ -222,16 +258,24 @@ class JobSpec:
         if not isinstance(job.model_ref.get("manifest"), dict) or not isinstance(job.model_ref.get("variant"), dict):
             raise ValueError("Malformed model reference")
         check_schema(job.model_ref["manifest"])
-        source = job.inputs[0]
-        if not isinstance(source, dict) or source.get("view_id") != VIEW_ID:
-            raise ValueError("Invalid input view")
-        if not isinstance(source.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", source["sha256"]):
-            raise ValueError("Invalid input checksum")
-        if not isinstance(source.get("path"), str) or not isinstance(source.get("original_size"), dict):
-            raise ValueError("Malformed input reference")
-        for axis in ("width", "height"):
-            if type(source["original_size"].get(axis)) is not int or source["original_size"][axis] < 1:
-                raise ValueError("Invalid input dimensions")
+        if len(job.inputs) > 1:
+            if int(job.schema_version.split('.')[1]) < 1:
+                raise UnsupportedOperation('Multi-view requires JobSpec schema 1.1 or later')
+            if job.inference.get('request_kind') != 'multi_view_v1':
+                raise ValueError('Missing multi_view_v1 request kind')
+        validate_view_request(job.model_ref['variant'], job.environment_ref, len(job.inputs))
+        for index, source in enumerate(job.inputs, 1):
+            if not isinstance(source, dict) or source.get("view_id") != view_id_for_index(index):
+                raise ValueError("Invalid or out-of-order input view ID")
+            if not isinstance(source.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", source["sha256"]):
+                raise ValueError("Invalid input checksum")
+            if not isinstance(source.get("path"), str) or not isinstance(source.get("original_size"), dict):
+                raise ValueError("Malformed input reference")
+            if len(job.inputs) > 1 and source['path'] != f"input/views/{source['view_id']}/image.png":
+                raise ValueError('Invalid multi-view input path')
+            for axis in ("width", "height"):
+                if type(source["original_size"].get(axis)) is not int or source["original_size"][axis] < 1:
+                    raise ValueError("Invalid input dimensions")
         if job.inference.get("device") not in ("cpu", "cuda:0") or job.inference.get("dtype") != "float32":
             raise UnsupportedOperation("Phase 01 supports cpu / cuda:0 and float32")
         if not isinstance(job.inference.get("parameters"), dict) or type(job.inference.get("seed")) is not int:
@@ -297,9 +341,13 @@ class JobResult:
     warnings: list[str] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
     schema_version: str = SCHEMA_VERSION
+    scene: dict | None = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        result = asdict(self)
+        if self.scene is None:
+            result.pop('scene')
+        return result
 
 
 class ExecutionBackend(ABC):

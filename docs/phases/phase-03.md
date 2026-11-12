@@ -1,6 +1,6 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: **実装中 / 03.1〜03.4受入完了、03.5 / 03.6未着手**。Phase全体Exit未達、COMPLETEではない。
+Status: **実装中 / 03.1〜03.5受入完了、03.6未着手**。Phase全体Exit未達、COMPLETEではない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
 2026-11-11の停止条件見直しで03.4の独立実装・合成検証を継続し、実checkpointの個別保留は維持した。
 履歴: 2026-11-12の直前作業は[AGENTSの全Phase共通方針](../../AGENTS.md#license-review-and-decisions)と関連文書の更新のみだった。
@@ -204,3 +204,33 @@ UniK3Dの[行為別評価と選択肢](../unik3d-investigation.md#scoped-decisio
 03.4のcommit / 通常push後に03.5へ進む。**Phase 03全体はCOMPLETEではない。**
 
 Final static validation: Markdown33件 / local links・anchors289件 / Python AST51件、errors 0。diff whitespace検査成功。
+
+## 03.5 implementation in progress
+
+03.4 commit / 通常push完了後に開始。旧PredictionRequestを保持し、別MultiViewPredictionRequestと
+Runner.submit_viewsを追加。multi-viewのみschema1.1 / request_kind / worker protocol1.1と明示能力でopt-inする。
+全input / output ID対応・per-view数値検証・scene JSON / optional terminal ref・全view ZIP保存を実装中。
+UIは先頭view previewを維持し、実モデルmulti-view / multi-view入力UIはこの段階の必須にしない。
+受入結果は検証後に記録する。03.6 / Phase 04以降には進んでいない。
+
+## 03.5 acceptance evidence — PASS
+
+- Legacy PredictionRequest / single wire1.0 / pathを維持し、別MultiViewPredictionRequestとRunner.submit_viewsを追加。
+  multi-viewはJob / result1.1、既知request_kind・variant能力・view数・required worker1.1でopt-in。
+  実worker上限1.1を超える要求1.2をRunner準備前とworker読込時に拒否し、一般metadataの同major互換は維持。
+- 全input / output ID・順序、全viewのchecksum / shape / original-size provenance / 数値geometryを検証。
+  sceneをworker / metadata / terminal / CLI collect / ZIPで保持。未知extrasはopaque JSONで保持し、任意pathは開かない。
+- Fake E2E `380684a3-942f-4e08-a8f5-6ba17f043a94`、shape[2,3] / [4,5]、native返却逆順を入力ID順へ保存。
+  source_digest `38d43538bfa00f9c77b0c53c2f9982898d1dc47378700d81cafe4b77fe380490`。
+  1predict / unload、新Backend2collect・新CLI2collect・ZIPでhash / mtime不変、scene.reference_view_idと未知metadata保持。
+- Missing / duplicate / unknown IDs、second-view破損、要求欠落、scene reference / scale / nonfinite JSON、
+  formal ref path / checksum異常、runtime未対応を拒否。失敗batchは部分成功を公開しない。
+  先頭view previewとIDによるRGB対応、raw不変・再推論なしも確認。
+- 最終full139件 / 132成功 / browser opt-in7 skip（218.558秒）、multi-view10 tests成功（42.071秒）。
+  追加single nonempty-sceneはjob1.0 / result1.1を確認（最終fullに含む）。
+- 実MoGe CPU `58345407-fbf7-4397-a720-4bcec045f5fe`はlegacy wire1.0 / scene省略、旧同条件出力と配列完全一致、
+  新CLI2collect不変。旧4Run各2collect不変、旧01B1件はlocal不在で未検証。
+- 実モデルmulti-view / multi-view入力UI / pose tensor / generic extras-array exporterは今回の必須scope外、実装していない。
+  browser opt-inと3実モデル統合受入・capability matrixは03.6で実施する。
+
+03.5 commit / 通常push後に03.6へ進む。Phase 03全体のCOMPLETEはまだ宣言しない。

@@ -178,7 +178,9 @@ class LocalBackend(ExecutionBackend):
         job.result = JobResult(job.spec.run_id, job.spec.attempt_id, self.backend_id, status.value,
                                [] if error else report["outputs"], [] if error else report["artifacts"],
                                execution, job.snapshot.started_at, finished, error,
-                               (report or {}).get("warnings", []), (report or {}).get("metrics", {}))
+                               (report or {}).get("warnings", []), (report or {}).get("metrics", {}),
+                               schema_version=(report or {}).get('schema_version', job.spec.schema_version),
+                               scene=None if error else report.get('scene'))
         write_json(job.run / "attempts" / job.spec.attempt_id / "job-result.json", job.result.to_dict())
         self._save_status(job)
 
@@ -258,7 +260,8 @@ class LocalBackend(ExecutionBackend):
                     worker = read_json(contained_path(job.run, f"output/{job.spec.attempt_id}/result.json"))
                     validate_report(worker, handle.run_id, handle.attempt_id)
                     validate_outputs(job.run, worker)
-                    if worker["outcome"] != "COMPLETED" or any(worker.get(key, {}) != saved[key] for key in ("outputs", "artifacts", "metrics", "warnings")):
+                    if (worker["outcome"] != "COMPLETED" or worker.get('scene') != saved.get('scene')
+                            or any(worker.get(key, {}) != saved[key] for key in ("outputs", "artifacts", "metrics", "warnings"))):
                         raise ArtifactIntegrityError("Worker / terminal result mismatch")
             except Exception as error:
                 raise ArtifactIntegrityError(f"Terminal result integrity check failed: {error}") from error
