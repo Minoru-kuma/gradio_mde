@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "definition_ref": "models/geocalib/task.json",
+  "environment": {"prefix": "../.local/envs/mde-geocalib"},
+  "checkpoint": "../.local/weights/geocalib-pinhole/checkpoint.tar",
+  "timeout_seconds": 180
+}

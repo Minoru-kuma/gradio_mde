@@ -13,7 +13,7 @@ manifest / runtimeの契約であり、`tested` / `untested`は実行証拠の�
 | 固定variant | CPU single-view | Depth kind / scale / unit | optional出力 | Camera / grid |
 | --- | --- | --- | --- | --- |
 | [MoGe-2 ViT-S Normal](../models/moge/README.md) | tested、float32、num_tokens=1200 | z_depth / metric / m、scale headの推定値 | Points / normals / intrinsics / native maskはconditional、実CPU保存・数値検証済み | OpenCV x right / y down / z forward、入力grid、native Pointsを保存。normalized Kは整数pixel中心へ変換 |
-| [DA3-SMALL](../models/da3/README.md) | tested、float32、process_res=252 | z_depth / relative / arbitrary | depth以外はunsupported。nativeの存在をexport済みと扱わない | OpenCV、検証sampleのnative resize後252×252を維持。RGB identity対応を主張しない |
+| [DA3-SMALL](../models/da3/README.md) | tested、float32、process_res=252 | z_depth / relative / arbitrary | 03.7でnative pixel K supported。Points / pose / confidence等はunsupported。点群はderivedで生成 | OpenCV、検証sampleのnative resize後252×252を維持。RGB identity対応を主張しない |
 | [UniK3D Small](../models/unik3d/README.md) | tested、float32、resolution_level=0 | ray_distance / unknown / unknown、native値を維持 | native Points supported、実CPU保存・直接API照合済み。他optionalはunsupported | OpenCV、検証sampleのnative448×448処理から元256×256 gridへ戻す。norm(Points)=range、Points.zはrangeと同一視しない |
 
 3モデルとも必須depthはsupported。MoGeのみmetric_depth supportedだが、GTによる精度保証ではない。
@@ -25,7 +25,7 @@ core / UI / Runner / Backendへモデル名分岐を追加しない。仮K・便
 fake 2-viewでtested（view ID、異なるshape、scene、未知extras、保存・collect・ZIP）。実モデルmulti-view、
 pose tensor / typed rays exporter、multi-view入力UIは未実装で、実モデル能力をfakeから推定しない。
 未対応要求は推論前に拒否し、不要求・unsupported出力の不在は正常とする。
-DA3 manifestの「deferred to 03.4 / 03.5」は当時の検討時点の理由であり、現状の対応宣言はunsupportedのまま。
+DA3 manifestのconfidence / pose / multi-viewの「deferred to 03.4 / 03.5」は当時の検討時点の理由であり、これらは現状unsupportedのまま。native intrinsicsのみ03.7でsupportedへ更新した。
 Phase 03.5の共通契約完成がDA3のoptional / multi-view実装済みを意味することはない。
 
 ## Independent environments and reproducibility
@@ -67,3 +67,10 @@ MoGe / DA3の条件・出典は各README / manifest、UniK3Dは[調査履歴](un
 UniK3DのNC / NC-SA表記差異とweights適用条件は未解決。個別承認は固定Smallの取得・非商用local CPU研究のみで、
 権利者の許諾確定、再配布・公開同梱・商用・公開デモへ拡張しない。
 MoGe-2 ViT-S Normalのみを含む別デモ版は仕様決定済みだが、package生成・weights同梱・実配布は行っていない。
+
+## Additional 03.7 reconstruction
+
+03.1〜03.6 COMPLETE履歴を保持。DA3 native Kと記録したpixel affineからderived点群・可視表面2.5D meshを生成する。
+保存Kがない場合は、既知Kまたは独立GeoCalib taskの推定Kを使える。これはDA3 native Points / poseの能力追加ではない。
+[03.7契約](depth-reconstruction-spec.md)、[GeoCalib条件・実測](geocalib-investigation.md)、
+[独立環境定義](../models/geocalib/environment.yml)を参照。GeoCalibはsource / weights非同梱で、第四のdepth modelではない。

@@ -3,47 +3,100 @@
   "model_id": "da3",
   "display_name": "Depth Anything 3 Small (CPU)",
   "adapter_entrypoint": "models.da3.adapter:DA3Adapter",
-  "adapter_version": "0.1.0",
+  "adapter_version": "0.2.0",
   "upstream_url": "https://github.com/ByteDance-Seed/Depth-Anything-3",
   "upstream_revision": "3d835ec1a5802d64a8b8b15f817a1ab54809bfe4",
   "default_variant": "da3-small",
-  "variants": [{
-    "variant_id": "da3-small",
-    "model_version": "da3-small",
-    "native_model_name": "da3-small",
-    "checkpoint": {
-      "repo_id": "depth-anything/DA3-SMALL",
-      "revision": "e08cab65ca0ec38e7826075418411ab90cab4da3",
-      "filename": "model.safetensors",
-      "sha256": "364492e38a3a06d221ac75da7f6621ada3f2361cd24fde11ba79091e9f40efcf",
-      "size_bytes": 137248940,
-      "config": {
-        "filename": "config.json",
-        "sha256": "a486e29e82b7ab4a7d4cefc1ea4526cfe2ae438a572c8ca98917cfbcde7447d2",
-        "size_bytes": 1202
+  "variants": [
+    {
+      "variant_id": "da3-small",
+      "model_version": "da3-small",
+      "native_model_name": "da3-small",
+      "checkpoint": {
+        "repo_id": "depth-anything/DA3-SMALL",
+        "revision": "e08cab65ca0ec38e7826075418411ab90cab4da3",
+        "filename": "model.safetensors",
+        "sha256": "364492e38a3a06d221ac75da7f6621ada3f2361cd24fde11ba79091e9f40efcf",
+        "size_bytes": 137248940,
+        "config": {
+          "filename": "config.json",
+          "sha256": "a486e29e82b7ab4a7d4cefc1ea4526cfe2ae438a572c8ca98917cfbcde7447d2",
+          "size_bytes": 1202
+        }
       }
     }
-  }],
+  ],
   "capabilities": {
-    "depth": {"status": "supported"},
-    "metric_depth": {"status": "unsupported", "condition": "SMALL has relative scale; no metric head or external calibration"},
-    "points": {"status": "unsupported"},
-    "normals": {"status": "unsupported"},
-    "intrinsics": {"status": "unsupported", "condition": "native output integration deferred to 03.4"},
-    "mask": {"status": "unsupported"},
-    "rays": {"status": "unsupported"},
-    "confidence": {"status": "unsupported", "condition": "native output integration deferred to 03.4"},
-    "camera_pose": {"status": "unsupported", "condition": "native output integration deferred to 03.4"},
-    "multi_view": {"status": "unsupported", "condition": "single-view integration; batch contract deferred to 03.5"}
+    "depth": {
+      "status": "supported"
+    },
+    "metric_depth": {
+      "status": "unsupported",
+      "condition": "SMALL has relative scale; no metric head or external calibration"
+    },
+    "points": {
+      "status": "unsupported"
+    },
+    "normals": {
+      "status": "unsupported"
+    },
+    "intrinsics": {
+      "status": "supported",
+      "condition": "fixed SMALL CameraDec pixel K on native depth grid; no pose export"
+    },
+    "mask": {
+      "status": "unsupported"
+    },
+    "rays": {
+      "status": "unsupported"
+    },
+    "confidence": {
+      "status": "unsupported",
+      "condition": "native output integration deferred to 03.4"
+    },
+    "camera_pose": {
+      "status": "unsupported",
+      "condition": "native output integration deferred to 03.4"
+    },
+    "multi_view": {
+      "status": "unsupported",
+      "condition": "single-view integration; batch contract deferred to 03.5"
+    }
   },
-  "environment_refs": [{"environment_id": "mde-da3", "definition_ref": "models/da3/environment.yml", "worker_protocol_version": "1.0"}],
-  "supported_devices": ["cpu"],
-  "supported_dtypes": ["float32"],
-  "input_constraints": {"min_views": 1, "max_views": 1, "format": "PNG", "worker_mode": "RGB"},
-  "parameter_schema": {"type": "object", "additionalProperties": false, "properties": {
-    "process_res": {"type": "integer", "enum": [252, 504], "default": 252,
-                    "description": "Native upper-bound resize; output dimensions rounded to patch size 14"}
-  }},
+  "environment_refs": [
+    {
+      "environment_id": "mde-da3",
+      "definition_ref": "models/da3/environment.yml",
+      "worker_protocol_version": "1.0"
+    }
+  ],
+  "supported_devices": [
+    "cpu"
+  ],
+  "supported_dtypes": [
+    "float32"
+  ],
+  "input_constraints": {
+    "min_views": 1,
+    "max_views": 1,
+    "format": "PNG",
+    "worker_mode": "RGB"
+  },
+  "parameter_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "process_res": {
+        "type": "integer",
+        "enum": [
+          252,
+          504
+        ],
+        "default": 252,
+        "description": "Native upper-bound resize; output dimensions rounded to patch size 14"
+      }
+    }
+  },
   "license": "Apache-2.0 (including inherited DINOv2 components)",
   "weights_license": "Apache-2.0"
 }

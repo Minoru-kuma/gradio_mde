@@ -106,3 +106,12 @@ Saved multi-view Runs retain every input, output view and scene for collection /
 viewer previews the first input view and identifies that limited preview in its statistics; it does not
 render a combined scene or add multi-view selection controls. RGB dependencies are matched by view_id,
 so return order cannot bind a point map to another view's image. Legacy one-view display is unchanged.
+
+## Phase 03.7 depth-only reconstruction
+
+Additional camera resolution uses explicit known K, then saved native K, then a configured independent camera estimator.
+Existing native Points remain raw and take priority over reconstruction. The optional Results known-camera inputs
+choose source or depth grid explicitly. Failed calibration / unknown mapping never uses a fixed-FOV substitute.
+K-only derived generations, provenance, grid transforms and saved reuse are defined in the
+[03.7 reconstruction specification](depth-reconstruction-spec.md). Legacy Runs are not edited; without sufficient
+camera/mapping or a saved calibration they retain the defined 3D-unavailable behavior.

@@ -46,6 +46,11 @@ class CondaLauncher:
         return [self.executable, "run", "--no-capture-output", *target,
                 "python", "-m", "mde.worker", "--job", str(job_path), "--run-dir", str(run)]
 
+    def task_argv(self, profile, request_path, result_path):
+        target = ["--prefix", profile.prefix] if profile.prefix else ["--name", profile.name]
+        return [self.executable, "run", "--no-capture-output", *target, "python", "-m", "mde.task_worker",
+                "--request", str(request_path), "--result", str(result_path)]
+
 
 @dataclass
 class WorkerProcess:
@@ -141,4 +146,23 @@ class WorkerManager:
                                        cwd=self.project_root, env=environment,
                                        stdout=stdout, stderr=stderr, start_new_session=True,
                                        stdin=subprocess.DEVNULL)
+        return WorkerProcess(process)
+
+    def start_task(self, reference, request_path, result_path, work_dir):
+        profile = self.resolver.resolve(reference)
+        definition = contained_path(self.project_root, reference["definition_ref"])
+        if sha256_file(definition) != reference["definition_digest"]:
+            raise ValueError("Auxiliary environment definition digest mismatch")
+        if profile.prefix and Path(profile.prefix).resolve() == Path(sys.prefix).resolve():
+            raise ValueError("Auxiliary task must use an independent environment")
+        environment = os.environ.copy()
+        environment.pop("MDE_CHECKPOINT_PATH", None)
+        environment["PYTHONPATH"] = os.pathsep.join([str(self.project_root / "src"), str(self.project_root), environment.get("PYTHONPATH", "")])
+        environment["PYTHONUNBUFFERED"] = "1"
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        environment["MDE_CONTROL_PREFIX"] = sys.prefix
+        with (work_dir / "stdout.log").open("xb") as stdout, (work_dir / "stderr.log").open("xb") as stderr:
+            process = subprocess.Popen(self.launcher.task_argv(profile, request_path, result_path),
+                cwd=self.project_root, env=environment, stdout=stdout, stderr=stderr,
+                start_new_session=True, stdin=subprocess.DEVNULL)
         return WorkerProcess(process)

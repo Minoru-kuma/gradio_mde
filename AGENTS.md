@@ -13,7 +13,12 @@
    履歴: 直前の指示では03.3の受入・commit / 通常push完了で停止していた。
    最新の2026-11-12再開指示によりPhase 03の実装・検証・関連docs更新を継続する。
    03.1〜03.5は受入・commit / 通常push済み。2026-11-13に03.6統合受入と全Exitを達成しPhase 03 COMPLETE。
-   03.6のcommit / 通常pushで終了し、PR / main統合・Phase 04以降を自動開始しない。
+   履歴: 03.6のcommit / 通常pushで当初承認範囲を終了した。
+   最新の追加指示で03.7 Depth-only 3D Reconstructionを承認。同じブランチで計画・受入条件を先に追加し、
+   DA3 native K調査、既知→native→GeoCalibのK優先、独立GeoCalib環境、derived点群・2.5D mesh・実CPU / browser検証を実施。
+   GeoCalibは通常版・MoGeデモへ同梱しない。03.1〜03.6 COMPLETE履歴とraw / 旧Run不変を維持。
+   2026-11-13に03.7も全受入達成でCOMPLETE。03.7のcommit / 通常pushで終了する。
+   PR / main統合・Phase 04以降は引き続き未承認。
    履歴: 直前の2026-11-12指示はハーネス・関連文書更新のみで、モデル作業は開始していなかった。
    今後のlicense判断は下記13の全Phase共通方針に従う。UniK3Dのlicense表記差異・checkpoint適用条件未確認は維持。
    2026-11-12の個別判断で固定Small checkpointの取得・非商用local CPU研究利用を承認。不確実性を記録して進める。
@@ -29,7 +34,7 @@
    当時未承認だったPhase 03実装・環境構築は2026-11-11の指示で承認された。
    force pushは禁止。Phase 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02はCOMPLETE。
    02Cは全Exit達成でCOMPLETE（fake / contract / browser / 実CPU native Points / offline）。
-   Phase 03のMoGe / UniK3D / DA3以外のモデル、MLflow / Benchmark / Slurm / 高度なqueue・active recoveryは未承認。
+   Phase 03のMoGe / UniK3D / DA3と03.7のGeoCalib calibration以外のモデル、MLflow / Benchmark / Slurm / 高度なqueue・active recoveryは未承認。
    phase完了による次phaseの自動開始はしない。Gradioは独立application環境で既存Runner / Backendを利用し、
    全sessionで1つのLocalBackendを共有。Inference / Resultsの2タブを維持。
    CPUを明示選択し、CUDA要求時の自動fallbackを行わない。

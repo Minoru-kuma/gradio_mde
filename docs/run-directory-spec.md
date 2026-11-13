@@ -324,3 +324,15 @@ wire output. New readers support legacy records and the opt-in multi-view extens
 workers / readers are not claimed to understand multiple views. No raw migration is performed.
 Unknown scene / extras metadata remains opaque JSON rather than an implicit file reference. Formally
 registered scene and per-view artifacts, plus every original input, are included by Run export.
+
+## Phase 03.7 derived calibration
+
+Raw Run / JobSpec / WorkerResult / JobResult remain immutable. The existing derived schema1.0 gains an additional
+algorithm, single-image-calibration version1, with a float32 intrinsics[3,3] NPZ member instead of points/faces.
+Its output path remains derived/key/generation/geometry.npz. Cache readers validate finite positive pinhole K,
+dtype/shape, SHA, identity, publication and selection before reuse. Existing points / mesh generation formats
+remain unchanged; older readers are not claimed to understand the new K-only algorithm. No Run migration occurs.
+Optional manifest.provenance records actual task runtime/fingerprint. Reconstruction identity records K source,
+source/output grids and grid_space, integer/half centers, explicit affine transform, source/checkpoint/seed,
+calibration output ref and original input/depth dependencies. Existing history / atomic publication / export
+includes this generation. See [03.7 specification](depth-reconstruction-spec.md).

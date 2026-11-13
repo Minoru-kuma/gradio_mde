@@ -194,3 +194,22 @@ State output changes did not start render, so an invisible JSON component carrie
 The authoritative ticket stays in the server session. Selection/render events use always_last; inference
 and Timer events remain once. Dynamic input components explicitly enable editing. Only the Timer writes
 status / Results / tab selection. Inference / Results remain the two tabs; saved Runs do not require inference.
+
+## Phase 03.7 depth-only 3D setup
+
+DA3 native K is available by selecting intrinsics with depth before inference. Saved native K is preferred
+over estimation. For automatic calibration of a depth-only Run, first prepare the
+[independent GeoCalib environment/weights](../models/geocalib/README.md), then launch:
+
+```bash
+OMP_NUM_THREADS=2 PYTHONPATH=src .local/envs/mde-ui/bin/python -m mde.ui --model da3 \
+  --target-config configs/local-targets.example.json \
+  --camera-estimator-config configs/camera-estimator.example.json
+```
+
+Select cpu explicitly. Results Point Cloud / Mesh save derived geometry without changing raw Run or JobResult.
+Known camera calibration inputs override native/estimated K for derived geometry; choose source image or depth
+output grid and enter that grid's dimensions. Native Points remain unchanged. Missing/failed calibration is
+shown as an error, with no fixed-FOV replacement. Saved calibration allows later --read-only viewing without
+model/estimator environments; omit --camera-estimator-config for that read-only launch.
+See [03.7 specification](depth-reconstruction-spec.md) for provenance, relative scale and 2.5D limits.

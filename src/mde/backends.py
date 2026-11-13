@@ -41,6 +41,7 @@ class LocalBackend(ExecutionBackend):
         self._jobs: dict[str, _LocalJob] = {}
         self._keys: dict[str, str] = {}
         self._lock = threading.RLock()
+        self._auxiliary_active = False
 
     def submit(self, spec: JobSpec) -> JobHandle:
         with self._lock:
@@ -53,6 +54,8 @@ class LocalBackend(ExecutionBackend):
                 if old.spec.to_dict() != spec.to_dict():
                     raise ValueError("Submission identity conflict")
                 return old.handle
+            if self._auxiliary_active:
+                raise BackendBusy("LocalBackend instance is busy with an auxiliary task; no queue")
             for old in list(self._jobs.values()):
                 if not old.snapshot.status.terminal and not self.status(old.handle).status.terminal:
                     raise BackendBusy("LocalBackend instance is busy; no queue is supported")
@@ -90,6 +93,42 @@ class LocalBackend(ExecutionBackend):
                     job.cleanup = job.worker.stop(self.stop_grace_seconds)
                 self._finish(job, None, self._error("LAUNCH_FAILED", "backend", str(error)))
             return handle
+
+    def execute_task(self, reference, request_path, result_path, work_dir, *, timeout_seconds=180):
+        if type(timeout_seconds) is not int or timeout_seconds < 1:
+            raise ValueError("Auxiliary timeout must be a positive integer")
+        with self._lock:
+            if self._auxiliary_active or any(not self.status(j.handle).status.terminal for j in list(self._jobs.values())):
+                raise BackendBusy("LocalBackend instance is busy; no auxiliary queue")
+            if self.manager is None:
+                raise UnsupportedOperation("Read-only backend cannot execute an auxiliary task")
+            self._auxiliary_active = True
+        worker = None
+        try:
+            worker = self.manager.start_task(reference, request_path, result_path, work_dir)
+            deadline = time.monotonic() + timeout_seconds
+            while worker.process.poll() is None:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("Auxiliary task timed out")
+                time.sleep(.05)
+            if worker.group_alive():
+                raise RuntimeError("Auxiliary worker left active child processes")
+            report = read_json(result_path) if Path(result_path).is_file() else {}
+            if worker.process.returncode != 0 or report.get("status") != "COMPLETED":
+                raise RuntimeError(f"Auxiliary task failed: {report.get('error', 'see worker logs')}")
+            if report.get("schema_version") != "1.0" or not isinstance(report.get("output"), dict):
+                raise ArtifactIntegrityError("Invalid auxiliary result")
+            return report["output"]
+        finally:
+            cleanup_confirmed = False
+            try:
+                if worker is not None and (worker.process.poll() is None or worker.group_alive()):
+                    worker.stop(self.stop_grace_seconds)
+                cleanup_confirmed = True
+            finally:
+                if cleanup_confirmed:
+                    with self._lock:
+                        self._auxiliary_active = False
 
     @staticmethod
     def _validate_resources(spec):

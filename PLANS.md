@@ -2,9 +2,12 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03 COMPLETE / 全Exit達成（2026-11-13）**。
-  03.5は`0fa251b4b4fb9880025e3fb0f84ad88724fbdc01`でcommit・通常push済み。03.6統合受入・全Exit監査成功。03.6 commit / 通常push後に終了し、次Phaseを開始しない。
-- Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
+- Current work: **Phase 03.7 Depth-only 3D Reconstruction COMPLETE（2026-11-13）**。
+  03.1〜03.6 COMPLETE（2026-11-13）の履歴・受入は維持。03.7は独立した追加stageとして全受入を達成した。commit / 通常push後に終了する。
+  履歴: 03.5は`0fa251b4b4fb9880025e3fb0f84ad88724fbdc01`、03.6は`1ce8c8470b5fc39030ee9d41e8274fbee98ea753`でcommit・通常push済み。
+  今回は03.7のcommit / 通常pushで終了し、次Phaseを開始しない。
+- Authorization: 最新の追加指示で03.7の実装・独立GeoCalib環境・実CPU / browser検証を承認。
+  2026-11-11の03.1〜03.6承認とCOMPLETE履歴を維持。03.7も受入完了後に同じブランチへcommit / 通常pushする。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
   最新の追加指示「再開して」により03.4から再開。03.3まで完了して停止する指示は当時の履歴として保持する。
@@ -20,6 +23,58 @@
 - 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、関連仕様。
   以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
 - main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
+
+## Phase 03.7 Depth-only 3D Reconstruction — implementation plan
+
+- Authorization / branch: ユーザーの追加指示で03.7のみを承認。既存`codex/phase-03-implementation`を継続。
+  03.1〜03.6のCOMPLETE / commitsを維持し、03.7受入後にcommit / 通常push。PR / main統合・Phase 04以降なし。
+- Start: HEAD `1ce8c8470b5fc39030ee9d41e8274fbee98ea753`、作業ツリーclean。
+  GitHub connectorで最新main `e22322d5acc8ce7603b38d36311fc39ea56f6135`を確認。local origin/mainと一致。
+- Purpose / scope: 単眼depth-onlyから、根拠あるKと共通逆投影でderived点群・可視表面2.5D meshを作る。
+  native Pointsと区別し、raw Run / JobResult / 旧Runを変更しない。既存DerivedStore・Results・再利用・管理を使う。
+- Order: (1) DA3固定source / SMALL checkpointのnative Kをsource・実CPUで調査。取得可能ならadapterで厳密変換・optional保存。
+  (2) GeoCalib公式固定source / checkpoint、sourceとweightsの条件・依存・CPUを調査し独立環境を準備。
+  (3) 既知K → 保存native K → GeoCalib推定Kの選択・grid変換・provenance / cache契約を仕様化し実装。
+  (4) 共通逆投影・既存triangulationへ接続。(5) fixture→実DA3 CPU→保存・再読込・browser→既存回帰→Exit監査。
+- Boundary: モデル固有処理は各models directory、UI / core / backendにモデル名分岐なし。
+  GeoCalibは別環境・明示準備・Backend経由で実行し、UIにtorch / 外部modelを導入しない。
+  通常版 / MoGeデモ版にsource・weights・環境を同梱しない。推論時の自動download / installなし。
+- K / geometry: source画像grid・pixel-center・resize / crop / paddingの変換を記録しdepth gridへKを写す。
+  既知K・native Kを推定より優先。native Pointsがある既存Runの挙動を維持。
+  K推定失敗・未準備・不正値は理由付きエラーとし固定FOV / 仮Kへfallbackしない。
+  相対depthはrelative / arbitraryのまま、pose推定・multi-view統合・閉曲面生成を含めない。
+- Acceptance:
+  - [x] DA3-SMALL固定版のnative K可否を実CPUで確定しsource / 値・shape / gridの根拠を記録。
+  - [x] GeoCalib固定source・checkpoint SHA / size・ライセンス区別・独立依存定義・実CPU calibrationを確認。
+  - [x] 既知→native→推定Kの優先順位、pixel center・非正方形resize / crop fixture、失敗時の非捏造を検証。
+  - [x] z / range逆投影、相対scale、invalid / depth discontinuityの点群・2.5D meshをfixtureで検証。
+  - [x] K由来 / 手法 / source・weights版 / grid変換・depth依存digestをderived identityへ保存。
+    同条件reuse・条件差分離・破損拒否・再起動読込・export・raw / terminal hashとmtime不変を確認。
+  - [x] 実DA3 CPU→点群・mesh→保存 / 新service再読込 / Results browserを検証。GeoCalib fallbackも実CPUで検証。
+  - [x] MoGe / UniK3D・旧Run・single / multi-view契約・管理 / browserの必要回帰、静的links / JSON / diff確認。
+- Risks / stop: native camera head欠如、pixel center誤解、resize grid不整合、calibration失敗、checkpoint条件・CPU依存。
+  不確実性を記録して影響を限定し、明確な禁止との衝突・重大な技術互換性問題を推測で解消しない。
+  実E2E未達では03.7 COMPLETEとしない。旧Runを補修・rawにderived refsを後付けしない。
+- Design refinement: GeoCalibはdepthを捏造するModelAdapterとして登録せず、汎用auxiliary task workerのK-only返値を
+  既存ExecutionBackendの追加optional method経由で実行。同じLocalBackendのadmissionを共有し、model推論との並走・queueを作らない。
+  DerivedStoreはK-only NPZの検証を加算し、既存generation / history / digest / exportを再利用。K推定cacheは画像・版・環境digestをidentityにする。
+  native Kは既存geometry profileのoptional intrinsics、既知KはResultsの明示入力。既存native Points優先を維持する。
+  新DA3はOpenCVの二段resizeをinteger-pixel affineとして記録。unknown mappingを推測せず推定Kの適用を拒否する。
+- Investigation: DA3固定SMALLのCameraDecと実CPUの252×252 / 126×252 Kを確認。native GLBのinteger meshgridに従いK値は不変。
+  initialprobeはPYTHONPATH不足で失敗後、明示repo pathとoffline guardで再実行成功。remote fetch再試行も成功、main / branch更新なし。
+- Results: **PASS / 03.7 COMPLETE**。最終full150件 / 142成功 / browser opt-in8 skip（312.084秒）、別browser8件全成功（254.132秒）。
+  native K・GeoCalib双方のDA3 CPU→derived点群63,504点 / mesh124,193面→再読込・browser・ZIPを確認。
+  native depth / Kは独立公式API probeと配列完全一致。source_digestも最終sourceと一致。
+  3新Runを各新Backend2 + CLI2collectし全file hash / mtime不変。旧4Run各2collect不変、旧01B1件local不在。
+  既存3実モデルも同じBackend / 別環境で成功、depth baseline完全一致、各4collect不変。
+  GeoCalib source / weights条件・SHA固定、safe / strict889state、独立CPU環境・最終pip check成功。
+  先行full149件成功後、grid曖昧性 / float32 overflow・range norm / 冪等性を修正して最終150件を再実行。
+  初回browser1件のFile再upload手順エラーは別sessionへ修正し、8件を最終sourceで再実行成功。
+  初回headless OpenCV代替のpip metadata不足は新GeoCalib環境だけofficial opencv-pythonへ変更して解消。
+  最終証拠は[03.7 phase record](docs/phases/phase-03.md#037-depth-only-3d-reconstruction--additional-stage)、
+  [reconstruction spec](docs/depth-reconstruction-spec.md)、[GeoCalib調査](docs/geocalib-investigation.md)。
+  GPU / distorted / 他OS / lock別prefix再作成 / 幾何精度 / pose / multi-viewは未検証・scope外。
+  以下の03.1〜03.6は当時の受入履歴。
 
 ## Phase 03.6 integration acceptance plan — 2026-11-12
 

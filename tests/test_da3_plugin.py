@@ -76,7 +76,8 @@ assert output.metadata['depth_kind']=='z_depth'
 assert output.metadata['scale_type']=='relative'
 assert output.metadata['depth_unit']=='arbitrary'
 assert output.points is None and output.intrinsics is None and output.camera_pose is None
-assert output.metadata['image_to_output']['type']=='unverified'
+assert output.metadata['image_to_output']['type']=='affine'
+np.testing.assert_array_equal(output.metadata['image_to_output']['matrix'],[[.5,0,-.25],[0,.5,-.25],[0,0,1]])
 for value in [np.ones((2,3),dtype='float32'),np.ones((2,2,3),dtype='float32'),
               np.ones((1,2,3),dtype='float64'),np.ones((1,0,3),dtype='float32')]:
  try: map_prediction(SimpleNamespace(depth=value),'view-0001',(2,3),252,['depth'])

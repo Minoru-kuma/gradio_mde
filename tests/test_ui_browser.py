@@ -18,7 +18,7 @@ PROJECT = Path(__file__).resolve().parents[1]
 
 
 class BrowserHarness:
-    def start(self, models_root, model_id, run_root, port, checkpoint=None, targets=None):
+    def start(self, models_root, model_id, run_root, port, checkpoint=None, targets=None, camera_config=None):
         import gradio as gr
         from playwright.sync_api import sync_playwright
         from mde.backends import LocalBackend
@@ -40,7 +40,11 @@ class BrowserHarness:
             checkpoints=targets.checkpoints if targets else None))
         self.runner = ExperimentRunner(registry, backend, self.store, PROJECT)
         self.controller = InferenceController(self.runner, model_id, targets=targets)
-        self.app = build_app(self.controller)
+        estimator = None
+        if camera_config is not None:
+            from mde.calibration import CameraEstimator
+            estimator = CameraEstimator(backend, PROJECT, camera_config)
+        self.app = build_app(self.controller, camera_estimator=estimator)
         self.app.launch(server_name="127.0.0.1", server_port=port, share=False, prevent_thread_lock=True,
             max_file_size=10 * 1024 * 1024, ssr_mode=False, enable_monitoring=False, quiet=True,
             theme=gr.themes.Default(font=["system-ui"], font_mono=["monospace"]), footer_links=[], run_history=False)

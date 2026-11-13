@@ -399,3 +399,14 @@ opaque JSON object an artifact reference. Only formally registered ArtifactRefs 
 exported; this stage adds the formal scene ref, not a generic arbitrary-array extras exporter.
 `JobResult.scene` is optional, is omitted from legacy wire records when None, and is preserved through
 worker, backend terminal result, new-instance collect and export. See the Run Directory specification.
+
+## Phase 03.7 optional native K and calibration provider
+
+DA3-SMALL fixed CameraDec supplies native pixel K on its native depth grid. The adapter supports optional
+intrinsics alongside required depth, using the existing geometry profile. It exports no Points or pose; derived
+backprojection remains application-side. Default depth-only CLI is unchanged. K is preserved numerically,
+matching the fixed official integer-grid exporter, and input-to-output OpenCV resize is recorded as affine.
+GeoCalib is a separate camera-only task definition under models/geocalib, not a fabricated depth ModelAdapter or
+a fourth entry in model discovery. The common auxiliary worker/backend uses its explicit provider entrypoint.
+All provider-specific load/predict/cleanup and fixed source/checkpoint validation stay inside its model directory.
+See [reconstruction contract](depth-reconstruction-spec.md) and [GeoCalib evidence](geocalib-investigation.md).

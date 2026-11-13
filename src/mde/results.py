@@ -20,8 +20,9 @@ from PIL import Image
 from .contracts import ATTEMPT_ID, ArtifactIntegrityError, JobHandle
 from .run_access import run_lock, locked_view, write_sidecar
 from .geometry import FRAME
+from .cameras import align_camera, output_transform, pixel_k
 from .storage import (artifact_ref, contained_path, read_json, run_path,
-                      sha256_file, validate_artifact, write_json)
+                      sha256_file, validate_artifact, write_json, json_metadata)
 
 MAX_PIXELS = 262144
 MESH_PARAMETERS = {"relative_depth_jump": 0.05, "relative_edge_length": 0.1,
@@ -74,10 +75,15 @@ def depth_view(depth, mask=None):
 
 
 def backproject(depth, k, kind):
-    y, x = np.indices(depth.shape, dtype=np.float32)
-    rays = np.stack((x, y, np.ones_like(x)), axis=-1) @ np.linalg.inv(k).T
+    # Normalize rays in float64: a finite float32 K can still produce rays
+    # whose squared length overflows float32 and collapses range points to 0.
+    y, x = np.indices(depth.shape, dtype=np.float64)
+    rays = np.stack((x, y, np.ones_like(x)), axis=-1) @ np.linalg.inv(np.asarray(k,dtype=np.float64)).T
     if kind == "ray_distance":
-        rays /= np.linalg.norm(rays, axis=-1, keepdims=True)
+        length=np.linalg.norm(rays,axis=-1,keepdims=True)
+        if not np.isfinite(length).all() or (length<=0).any():
+            raise ValueError('Invalid camera rays for range backprojection')
+        rays /= length
     elif kind != "z_depth":
         raise ValueError("Back-projection unavailable: unsupported depth kind")
     return np.asarray(rays * depth[..., None], dtype="<f4")
@@ -116,7 +122,7 @@ class DerivedStore:
     _guard = threading.Lock()
     _locks = {}
 
-    def get(self, run, identity, generate, *, force=False):
+    def get(self, run, identity, generate, *, force=False, provenance=None):
         key = hashlib.sha256(canonical(identity)).hexdigest()
         location = derived_path(run, f"derived/{key}")
         with self._guard:
@@ -163,6 +169,8 @@ class DerivedStore:
                     "generation_id": generation, "publication_protocol": "history-commit-v1", "created_at": datetime.now(timezone.utc).isoformat(),
                     "identity": identity, "output": ref, "arrays": shapes,
                     "warnings": ["No coordinate transform or LOD; raw geometry is unchanged"]}
+                if provenance is not None:
+                    manifest['provenance'] = json_metadata(provenance(), 'Derived provenance')
                 write_json(staging / "manifest.json", manifest)
                 os.rename(staging, final)
                 history_path = derived_path(run, "derived/history.json")
@@ -229,6 +237,14 @@ class DerivedStore:
 
     @staticmethod
     def _validate(arrays):
+        if set(arrays) == {"intrinsics"}:
+            if arrays['intrinsics'].dtype != np.dtype('<f4'):
+                raise ArtifactIntegrityError('Invalid derived camera dtype')
+            try:
+                pixel_k(arrays['intrinsics'])
+            except ValueError as error:
+                raise ArtifactIntegrityError(str(error)) from error
+            return
         if set(arrays) not in ({"points"}, {"points", "faces"}):
             raise ArtifactIntegrityError("Invalid derived array names")
         p = arrays["points"]
@@ -257,9 +273,61 @@ class DerivedStore:
 
 
 class ResultsService:
-    def __init__(self, store, collect):
+    def __init__(self, store, collect, *, camera_estimator=None):
         self.store, self.collect = store, collect
         self.derived = DerivedStore()
+        self.camera_estimator = camera_estimator
+
+    def _camera(self, run, result, output, source, known_camera):
+        metadata=output['metadata'];shape=metadata['shape']
+        source_shape=[source['original_size']['height'],source['original_size']['width']]
+        if metadata.get('camera_frame') != FRAME:
+            raise ValueError('3D unavailable: depth camera frame is not OpenCV')
+        if known_camera is not None:
+            k,provenance=align_camera(known_camera,metadata,source_shape,shape)
+            return k,{'source':'known',**provenance}
+        if 'intrinsics' in output:
+            meaning=metadata.get('geometry',{}).get('intrinsics',{})
+            camera={'K':np.load(contained_path(run,output['intrinsics']['path']),allow_pickle=False),
+                'grid_space':'depth',
+                'grid':meaning.get('grid'),'pixel_center':meaning.get('pixel_center'),
+                'camera_model':meaning.get('camera_model'),'camera_frame':metadata.get('camera_frame')}
+            k,provenance=align_camera(camera,metadata,source_shape,shape)
+            return k,{'source':'model native','artifact':output['intrinsics'],'meaning':meaning,**provenance}
+        # Calibration is on the input RGB grid. Refuse unknown resize/crop even
+        # when dimensions happen to match, before starting any model task.
+        output_transform(metadata,source_shape,shape)
+        base={'algorithm':'single-image-calibration','version':'1','run_id':result['run_id'],
+              'attempt_id':result['attempt_id'],'view_id':output['view_id'],'inputs':[source],
+              'job_sha256':sha256_file(run/'job.json'),'grid':source_shape,'frame':FRAME}
+        if self.camera_estimator is not None:
+            identity={**base,'provider':self.camera_estimator.identity()}
+        else:
+            history_path=derived_path(run,'derived/history.json')
+            history=read_json(history_path) if history_path.exists() else {'events':[]}
+            candidates=[e['manifest']['identity'] for e in history['events']
+                if e.get('operation') in ('generate','regenerate')
+                and {k:v for k,v in e.get('manifest',{}).get('identity',{}).items() if k!='provider'}==base]
+            if not candidates:
+                raise ValueError('3D unavailable: no saved points or defined pinhole camera / pixel K; configure a camera estimator. No fixed FOV is substituted.')
+            identity=candidates[-1]
+        observation={}
+        def estimate():
+            if self.camera_estimator is None:
+                raise ValueError('Calibration cache unavailable; configure a camera estimator to create it')
+            camera=self.camera_estimator.estimate(contained_path(run,source['path']))
+            observation.update(camera.get('execution',{}))
+            # Store only K on its original grid; no gravity / pose is exported.
+            k,prov=align_camera({**camera,'grid_space':'source'},{'image_to_output':{'type':'identity','pixel_center':'integer'}},source_shape,source_shape)
+            return {'intrinsics':k}
+        arrays,manifest,reused=self.derived.get(run,identity,estimate,provenance=lambda:observation)
+        camera={'K':arrays['intrinsics'],'grid':source_shape,'pixel_center':'integer',
+                'grid_space':'source',
+                'camera_model':'pinhole','camera_frame':FRAME}
+        k,provenance=align_camera(camera,metadata,source_shape,shape)
+        return k,{'source':'estimated','calibration_key':manifest['key'],
+            'calibration_output':manifest['output'],'provider':identity['provider'],
+            'execution':manifest.get('provenance',{}),**provenance}
 
     @locked_view
     def load(self, run_id):
@@ -277,7 +345,7 @@ class ResultsService:
         return run, result, output
 
     @locked_view
-    def view(self, run_id, mode, *, regenerate=False):
+    def view(self, run_id, mode, *, regenerate=False, known_camera=None):
         if mode not in ("Depth", "RawDepth", "Point Cloud", "Mesh"):
             raise ValueError("Unknown Results mode")
         run, result, output = self.load(run_id)
@@ -313,16 +381,21 @@ class ResultsService:
             points = array("points")
             payload["origin"] = "model points (saved raw)"
         else:
-            meaning = metadata.get("geometry", {}).get("intrinsics", {})
-            if ("intrinsics" not in output or meaning.get("camera_model") != "pinhole"
-                    or meaning.get("pixel_center") != "integer" or meaning.get("grid") != list(depth.shape)
-                    or metadata.get("camera_frame") != FRAME):
-                raise ValueError("3D unavailable: no saved points or defined pinhole camera / pixel K. No geometry is invented.")
+            k,camera_provenance=self._camera(run,result,output,source,known_camera)
+            identity={**identity,'camera':camera_provenance}
             point_identity = {**identity, "algorithm": "pinhole-backprojection", "parameters": {}}
-            arrays, generated, reuse = self.derived.get(run, point_identity,
-                lambda: {"points": np.where(valid[..., None], backproject(depth, array("intrinsics"), metadata["depth_kind"]), np.nan).astype("<f4")})
+            def reconstruct():
+                with np.errstate(over='ignore', invalid='ignore', divide='ignore'):
+                    reconstructed=backproject(depth,k,metadata['depth_kind'])
+                if not np.isfinite(reconstructed[valid]).all():
+                    raise ValueError('Derived points exceed finite float32 range; check camera K and depth')
+                return {'points':np.where(valid[...,None],reconstructed,np.nan).astype('<f4')}
+            arrays, generated, reuse = self.derived.get(run, point_identity, reconstruct)
             points = arrays["points"]
-            payload.update(origin="derived points from saved depth + pixel K", point_cache_reused=reuse)
+            payload.update(origin="derived points from saved depth + pixel K", point_cache_reused=reuse,
+                           camera=camera_provenance)
+        if not np.isfinite(points[valid]).all():
+            raise ArtifactIntegrityError('Nonfinite points at valid depth pixels')
         faces = None
         if mode == "Mesh":
             arrays, generated, reuse = self.derived.get(run, identity,

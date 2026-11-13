@@ -122,3 +122,12 @@ UniK3Dの調査事実・停止判断の履歴・固定Smallの非商用local CPU
 weightsの実同梱、実配布物の同梱内容の検証、公開・配布作業は今回実施していない。
 これらを実施するときは、対象artifactの内容と必要な帰属表示・通知を確認する。
 既存のRun export形式・raw不変契約は変更しない。文書のcommit / 通常push完了後に元のPhase 03作業へ戻る。
+
+## Phase 03.7 camera calibration boundary
+
+GeoCalib is an optional locally prepared calibration dependency for depth-only reconstruction. Its upstream
+source, pinhole weights and independent environment are not bundled in either the normal edition or the
+MoGe-2 ViT-S Normal demo edition. The platform may provide its self-authored task adapter, fixed-version
+metadata, environment definition and explicit preparation instructions. Source Apache-2.0 and weights CC BY4.0
+were checked separately; sources, attribution and actual-use evidence are in the
+[GeoCalib investigation](geocalib-investigation.md). This addition does not add a demo model or authorize actual distribution.

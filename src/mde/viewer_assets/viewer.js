@@ -113,6 +113,7 @@ function bind() {
   q('[data-color]').onchange = e => { pointColor = e.target.value; draw3D(false); };
   q('[data-mesh]').onchange = e => { meshStyle = e.target.value; draw3D(false); };
   q('[data-reset]').onclick = resetCamera;
+  q('[data-apply-camera]').onclick = refresh;
 }
 async function refresh() {
   const serial = ++requestSerial;
@@ -123,14 +124,24 @@ async function refresh() {
   if (!selectedRun) { q('[data-message]').textContent = 'Select a completed Run to view its saved artifacts.'; return; }
   q('[data-message]').textContent = currentMode === 'Mesh' ? 'Loading mesh; first request generates and saves derived geometry…' : 'Loading saved artifacts…';
   try {
-    const result = await server.render_view({ run_id: selectedRun, mode: currentMode });
+    let known = null;
+    if (q('[data-known-camera]').checked && ['Point Cloud', 'Mesh'].includes(currentMode)) {
+      const value = key => { const text = q('[data-k-' + key + ']').value;
+        if (!text || !Number.isFinite(Number(text))) throw new Error('Enter every known camera value.');
+        return Number(text); };
+      known = { K: [[value('fx'), 0, value('cx')], [0, value('fy'), value('cy')], [0,0,1]],
+        grid_space: q('[data-k-space]').value,
+        grid: [value('height'), value('width')], pixel_center: 'integer', camera_model: 'pinhole',
+        camera_frame: 'opencv_x_right_y_down_z_forward' };
+    }
+    const result = await server.render_view({ run_id: selectedRun, mode: currentMode, known_camera: known });
     if (serial !== requestSerial) return;
     if (result.error) throw new Error(result.error);
     data = result; setOptions();
     q('[data-stats]').textContent = JSON.stringify(data.stats, null, 2);
     q('[data-provenance]').textContent = JSON.stringify({ origin: data.origin, frame: data.frame, unit: data.unit,
       scale: data.scale, normal_orientation: data.normal_orientation, rgb: data.rgb_reason || 'recorded identity grid',
-      normal: data.normal_reason, derived: data.derived, display: 'No LOD or coordinate transform; camera up = -Y' }, null, 2);
+      normal: data.normal_reason, camera: data.camera, derived: data.derived, display: 'No LOD or coordinate transform; camera up = -Y' }, null, 2);
     if (currentMode === 'Depth') { q('[data-depth]').src = data.image; q('[data-depth]').style.display = 'block'; }
     else if (currentMode === 'RawDepth') {
       const a = q('[data-download]'); a.href = 'data:application/octet-stream;base64,' + data.download;
@@ -151,6 +162,7 @@ async function refresh() {
   }
 }
 function update() {
+  if ((props.value || '') !== selectedRun) q('[data-known-camera]').checked = false;
   selectedRun = props.value || ''; currentMode = 'Depth'; data = null;
   bind(); refresh();
 }

@@ -1,8 +1,8 @@
 # DA3-SMALL plugin — Phase 03.2
 
-Status: **03.2 acceptance PASS**; CPU CLI E2E and legacy regression confirmed.
+Status: **03.2 acceptance PASS** is retained. Phase 03.7 adds optional native pixel K; acceptance is tracked in Phase 03.
 This variant integrates single-view **relative z-depth**, float32, explicit CPU only.
-GPU / native optional outputs / multi-view execution are not integrated at this stage.
+GPU / other native optional outputs / multi-view execution remain unsupported. Derived Points are separate from native outputs.
 Actual pinned network size: 34,299,463 unique parameters (measured by summing native parameters).
 
 The source pin is [`3d835ec1a5802d64a8b8b15f817a1ab54809bfe4`](https://github.com/ByteDance-Seed/Depth-Anything-3/tree/3d835ec1a5802d64a8b8b15f817a1ab54809bfe4).
@@ -82,3 +82,20 @@ worker in the three-model browser acceptance. Saved output reload and fresh Back
 file hashes and mtimes. This does not establish GPU, other variants or full upstream tools. See
 [final evidence](../../docs/phases/phase-03.md#036-integration-acceptance-evidence--2026-11-13) and the
 [capability / reproduction matrix](../../docs/model-capability-matrix.md) for scope and remaining unknowns.
+
+## Phase 03.7 native intrinsics
+
+The fixed SMALL CameraDec returns intrinsics on the native depth grid, verified with square and nonsquare inputs.
+Request --outputs depth intrinsics (or check intrinsics in the UI). Default depth-only runs remain valid and do not
+save K. Native pixel values are preserved without half-pixel translation; the pinned official GLB exporter uses
+integer meshgrid. Points / pose / confidence remain unsupported as native exported outputs.
+OpenCV input-to-depth resize is now recorded as an integer-pixel affine including 0.5*s-0.5 offsets.
+[Reconstruction](../../docs/depth-reconstruction-spec.md) uses known K, then saved native K, then a configured
+GeoCalib task; all resulting Points / 2.5D mesh are derived, with relative scale and arbitrary units unchanged.
+
+Native K evidence at source revision 3d835ec1a5802d64a8b8b15f817a1ab54809bfe4:
+[SMALL config](https://github.com/ByteDance-Seed/Depth-Anything-3/blob/3d835ec1a5802d64a8b8b15f817a1ab54809bfe4/src/depth_anything_3/configs/da3-small.yaml),
+[CameraDec invocation](https://github.com/ByteDance-Seed/Depth-Anything-3/blob/3d835ec1a5802d64a8b8b15f817a1ab54809bfe4/src/depth_anything_3/model/da3.py),
+[pixel K construction](https://github.com/ByteDance-Seed/Depth-Anything-3/blob/3d835ec1a5802d64a8b8b15f817a1ab54809bfe4/src/depth_anything_3/model/utils/transform.py),
+[integer-grid backprojection](https://github.com/ByteDance-Seed/Depth-Anything-3/blob/3d835ec1a5802d64a8b8b15f817a1ab54809bfe4/src/depth_anything_3/utils/export/glb.py).
+The prior 03.2 depth-only acceptance remains the historical baseline.

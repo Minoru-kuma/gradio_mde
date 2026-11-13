@@ -366,3 +366,7 @@ class ExecutionBackend(ABC):
 
     def cancel(self, handle: JobHandle, reason: str | None = None):
         raise UnsupportedOperation("cancel is not supported in Phase 01A")
+
+    def execute_task(self, reference, request_path, result_path, work_dir, *, timeout_seconds=180):
+        """Optional bounded auxiliary task, separate from immutable inference Runs."""
+        raise UnsupportedOperation("Auxiliary tasks are not configured on this backend")

@@ -129,3 +129,11 @@ Run detail retains the complete Job inputs, terminal outputs and optional scene 
 includes every registered per-view artifact, the scene record and all inputs, subject to the existing
 integrity / containment / size checks. Unknown JSON extras are retained in their records; arbitrary
 path-like metadata is not opened. No raw record is rewritten by repeated collect / export.
+
+## Phase 03.7 calibration generations
+
+K-only derived calibration generations use the existing history / publication / selection and export inventory.
+Raw inference JobResult remains unchanged. Regenerate Mesh uses the default saved-native / configured-estimator
+camera path; browser-supplied known K is session-specific and does not overwrite that default.
+Explicit known-K regeneration is available through ResultsService.view with known_camera and regenerate=True.
+K cache and reconstruction provenance: [03.7 specification](depth-reconstruction-spec.md).

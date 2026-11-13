@@ -1,6 +1,7 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: **COMPLETE（2026-11-13、03.1〜03.6と全Exit達成）**。03.6のcommit / 通常pushをもって承認範囲を終了し、Phase 04以降には進まない。
+Status: **03.1〜03.6 COMPLETE（2026-11-13）を維持。追加03.7もCOMPLETE（2026-11-13、全受入達成）**。
+最新ユーザー指示で03.7 Depth-only 3D Reconstructionを独立追加。PR / main統合・Phase 04以降には進まない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
 2026-11-11の停止条件見直しで03.4の独立実装・合成検証を継続し、実checkpointの個別保留は維持した。
 履歴: 2026-11-12の直前作業は[AGENTSの全Phase共通方針](../../AGENTS.md#license-review-and-decisions)と関連文書の更新のみだった。
@@ -280,3 +281,61 @@ UniK3Dのlicense条件不確実性と過去停止履歴を保持し、個別loca
 
 Final static validation: Markdown34件 / local links・anchors323件 / Python AST53件、errors 0。
 JSONとdiff whitespaceも検証。最終read-only並行reviewでもblockerなし。
+
+## 03.7 Depth-only 3D Reconstruction — additional stage
+
+03.1〜03.6のCOMPLETEと全受入証拠を変更しない。追加承認による単眼研究用の拡張。
+詳細な順序・リスク・受入checklistは[03.7 plan](../../PLANS.md#phase-037-depth-only-3d-reconstruction--implementation-plan)。
+
+### Scope and required implementation
+
+DA3-SMALL固定checkpointのnative K可否を先に実証し、可能な出力のみAdapterへ加算する。
+点群のKは既知K → モデルnative K → GeoCalib自動推定Kの順。Kとdepthのgrid・座標系を整合し、
+既存逆投影とinvalid / 深度不連続を除外するtriangulationでderived点群・可視表面2.5D meshを生成する。
+GeoCalibは公式固定版・weights・source / weightsの条件、依存・CPUを確認し独立環境に準備する。
+通常版・MoGeデモ版への同梱は対象外。外部姿勢推定・multi-view統合・閉曲面補完を実装しない。
+
+### Exit criteria for 03.7
+
+- [x] DA3 native Kの可否・固定版根拠・shape / 値 / grid変換を実CPUで確認。取得可能な場合だけnative出力を拡張。
+- [x] GeoCalib固定source・weightsの条件を区別して記録し、独立環境・実CPU calibrationを確認。
+- [x] 既知 / native / 推定Kの選択順、grid / pixel center変換、z / range・relative scaleを数値fixtureで検証。
+- [x] 既存derived保存 / reuse / 再読込 / Results表示に接続し、K由来・手法・版・変換・digestを記録。
+- [x] DA3実CPU→derived点群・2.5D mesh→保存・新service再読込・browserを確認し、GeoCalib fallbackも実証。
+- [x] invalid / 深度不連続、calibration失敗・不正K、cache破損・条件差、raw / JobResult不変と旧Run・既存モデル回帰を確認。
+
+K推定失敗に固定FOVや便宜的Kで代用しない。元depth・native成果物とderived成果物を混同しない。
+追加Exit全達成後だけ03.7をCOMPLETEとし、同じブランチへcommit / 通常pushして終了する。
+
+### 03.7 final acceptance evidence — PASS
+
+| 検証 | 結果 |
+| --- | --- |
+| DA3 native K / 正方形・非正方形 | 固定SMALL CameraDec、252×252 / 126×252上のfloat32 Kを直接APIで確認。公式integer-grid exporterに従い値不変、poseをexportしない |
+| CLI native K | Run `b7b32503-d65e-4705-9dbb-589ff85c66ad` COMPLETED。depth / native Kは独立probeと配列完全一致、既定depth-onlyは維持 |
+| Native K browser | Run `8cd82c35-eaf7-4216-88cb-75f9ada63987`。63,504 derived points / 124,193 mesh faces、既知K overrideとnative復帰も確認 |
+| Depth-only / GeoCalib browser | Run `262d9ce4-7b68-46e2-b1b7-3298e23e1972`。元256×256 K fx=fy483.3321838 / c128、明示affineでdepth252×252へ変換。63,504点 / 124,193面 |
+| Source / 数値 / 不変性 | 上記3Runのsource_digest `a5385cdb79c7d99d4de1786825fe091e0d8f6daa422052962465c84a397f29ef`が最終sourceと一致。depth完全一致 / points.z=depth、各新Backend2+CLI2collect、cache再読込・ZIPで全file hash / mtime不変 |
+| GeoCalib | source / weightsの条件を分離、公式asset116074121 bytes / SHA固定、safe weights_only / 全889state strict。独立Python3.11.14 / torch2.6+cpu / NumPy1.26.4 / Kornia0.8、seed0 / CPU float32。最終pip check成功 |
+| Camera / derived fixture | known→native→estimated、半画素 / 非正方形 / crop / 同寸法grid_space、不正 / overflow K、range normのfloat64安定化、valid点の有限性、相対scale、不連続face除外、推定失敗 / cache破損で非捏造、reuse / export / raw不変 |
+| Backend | 独立補助worker、推論との排他・Busy即拒否、冪等handle維持、失敗 / timeout後cleanup・slot再利用。モデル名分岐なし、registryは3 depth modelsのまま |
+| 最終回帰 | 150 tests、142成功 / browser opt-in8 skip、312.084秒。browserは別実行8件全成功、254.132秒 |
+| 既存モデル | MoGe `f32007d2-29a2-4220-98df-248fa07b8702`、DA3 `5ee12454-0342-44ea-948c-62fa3dd23c64`、UniK3D `26727fbc-91a9-4e43-a33f-0356d66a208a`、各別prefix / 同Backend。旧baselineのdepthと完全一致、各4collectで不変 |
+| 旧Run / offline | 現存旧4Run各2CLI collect不変、旧01B1件local不在で未検証。Python socket guard / browser routeで外部通信遮断、外部接続試行・page errorなし |
+
+最終sourceの証拠は`.local/validation/phase-03-7-exit-regression.log` / `phase-03-7-exit-browser.log`、
+`phase-03-7-readback.json`、`phase-03-7-three-model-readback.json`、`phase-03-7-compatibility.json`、offline logs。
+生成物はGit除外。先行149 / 150件成功後の数値・grid / 冪等性修正を含めて最終試験を実行した。
+初回browserのupload済みFileへ再設定するfixture手順エラーは別session化で解消。
+初回headless OpenCV代替のmetadata不整合は新環境だけofficial opencv-pythonへ変更しpip check成功。
+既存event-loop ResourceWarningは残るが、最終試験失敗はない。
+
+GPU / distorted camera / 他OS / arch / lock別prefix再作成 / metric accuracy / 外部pose / multi-view統合 / 閉曲面は未検証・scope外。
+DA3 native Points / pose / confidenceを対応済みとしない。RGB textureは従来のidentity grid条件のみで、DA3 resizeでは無効。
+GeoCalib source・weights・環境を通常版 / MoGeデモへ同梱せず、UniK3D条件不確実性・過去履歴を維持する。
+
+**03.7追加Exit全達成によりCOMPLETE。03.1〜03.6のCOMPLETE履歴を保持。**
+同じ実装ブランチへcommit / 通常push後に終了し、PR / main統合・Phase 04以降へ進まない。
+
+03.7 final static validation: Markdown37件 / local links・anchors367件 / Python AST61件、errors 0。
+JS syntax / JSON / target設定 / diff whitespace成功。並行read-only最終監査で実装blockerなし、READMEの旧状態も履歴として整合。

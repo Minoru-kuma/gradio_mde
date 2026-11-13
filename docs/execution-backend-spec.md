@@ -309,3 +309,17 @@ The optional JobResult.scene ArtifactRef is carried from the worker report and c
 collect alongside every view and metadata document. It is absent from legacy results when unspecified.
 Failed batches publish no successful partial views / scene. Cancel / timeout / process cleanup remain
 Job-wide, and timing covers one adapter predict call and all requested view artifacts.
+
+## Phase 03.7 auxiliary camera tasks
+
+ExecutionBackend.execute_task(reference, request_path, result_path, work_dir, timeout_seconds=180) is an optional
+bounded synchronous operation; unsupported backends raise UnsupportedOperation. It does not create or rewrite an inference JobResult.
+LocalBackend shares its admission slot with inference: new concurrent tasks/submissions return BackendBusy,
+while identical existing inference submissions retain their idempotent handle. WorkerManager resolves the task's
+independent logical environment and definition digest, and the common mde.task_worker imports only the configured
+provider. Task JSON schema1.0 requires explicit CPU, input content SHA validation and a separate result.
+Python/torch/environment fingerprint and timing are observed in the worker and retained in calibration provenance.
+Success, failure and timeout confirm process-group cleanup; uncertain cleanup retains the busy guard. There is
+no task queue, active recovery or UI cancellation for calibration. Private task request/result/logs stay under
+ignored .local/auxiliary-tasks; published calibration is a validated derived generation.
+Details: [03.7 specification](depth-reconstruction-spec.md).

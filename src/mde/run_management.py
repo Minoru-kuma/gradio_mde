@@ -15,8 +15,9 @@ from .storage import contained_path, run_path
 
 
 class RunManagementService:
-    def __init__(self, store, collect):
+    def __init__(self, store, collect, *, camera_estimator=None):
         self.store, self.collect = store, collect
+        self.camera_estimator = camera_estimator
 
     def _lock(self, run_id):
         run = run_path(self.store.root, run_id)
@@ -128,7 +129,7 @@ class RunManagementService:
     def regenerate_derived(self, run_id):
         from .results import ResultsService
         with self._lock(run_id):
-            return ResultsService(self.store, self.collect).view(run_id, 'Mesh', regenerate=True)['derived']
+            return ResultsService(self.store, self.collect, camera_estimator=self.camera_estimator).view(run_id, 'Mesh', regenerate=True)['derived']
 
     def _safe_file(self, run, relative):
         """Reject every symlink component, including links within the same Run."""

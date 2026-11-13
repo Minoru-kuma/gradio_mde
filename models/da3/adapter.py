@@ -1,4 +1,4 @@
-"""Pinned native DA3 network + processors, explicit float32 depth-only inference."""
+"""Pinned native DA3 network + processors, explicit float32 depth and optional native pixel K."""
 import gc
 import importlib.metadata
 import json
@@ -52,8 +52,8 @@ class DA3Adapter(ModelAdapter):
     def predict(self, request):
         if self.model is None:
             raise RuntimeError('Adapter is not loaded')
-        if tuple(request.requested_outputs) != ('depth',):
-            raise ValueError('This DA3 integration currently supports depth-only requests')
+        if set(request.requested_outputs) - {'depth', 'intrinsics'} or 'depth' not in request.requested_outputs:
+            raise ValueError('This DA3 integration supports depth and optional native intrinsics')
         import torch
         images, _, _ = self.input_processor([request.image], process_res=request.parameters['process_res'],
             process_res_method='upper_bound_resize', sequential=True)
@@ -63,7 +63,7 @@ class DA3Adapter(ModelAdapter):
                                 ref_view_strategy='first')
             prediction = self.output_processor(native)
         output = map_prediction(prediction, request.view_id, request.image.shape[:2],
-                                request.parameters['process_res'], sorted(native))
+                                request.parameters['process_res'], sorted(native), include_intrinsics='intrinsics' in request.requested_outputs)
         return PredictionBatch([output])
 
     def unload(self):
@@ -84,7 +84,7 @@ def load_native_checkpoint(model, path):
     load_model(wrapper, str(path), strict=True, device='cpu')
 
 
-def map_prediction(prediction, view_id, input_shape, process_res, native_keys):
+def map_prediction(prediction, view_id, input_shape, process_res, native_keys, *, include_intrinsics=False):
     import numpy as np
     depth = np.asarray(prediction.depth)
     if depth.ndim != 3 or depth.shape[0] != 1 or min(depth.shape[1:]) < 1 or depth.dtype != np.dtype('float32'):
@@ -96,9 +96,26 @@ def map_prediction(prediction, view_id, input_shape, process_res, native_keys):
                 'native_output_keys': native_keys,
                 'native_inference': {'api': 'InputProcessor / DepthAnything3Net / OutputProcessor',
                     'autocast': False, 'infer_gs': False, 'use_ray_pose': False, 'ref_view_strategy': 'first'},
-                'image_to_output': {'type': 'unverified', 'reason': 'native resized grid; RGB identity mapping not asserted'},
+                'image_to_output': {'type': 'affine', 'pixel_center': 'integer',
+                    'matrix': [[depth.shape[1]/input_shape[1], 0., .5*depth.shape[1]/input_shape[1]-.5],
+                               [0., depth.shape[0]/input_shape[0], .5*depth.shape[0]/input_shape[0]-.5], [0.,0.,1.]],
+                    'method': 'OpenCV boundary resize then patch-divisible resize; no crop or padding'},
                 'resize_crop_padding': {'method': 'upper_bound_resize', 'process_res': process_res,
                     'patch_size': 14, 'original_hw': list(input_shape), 'output_hw': list(depth.shape),
                     'native_pipeline': 'longest-side boundary resize then nearest patch-divisible resize; no padding'},
                 'warnings': []}
-    return MDEOutput(view_id, depth, metadata)
+    k = None
+    if include_intrinsics:
+        native_k = np.asarray(prediction.intrinsics)
+        if (native_k.dtype != np.dtype('float32') or native_k.shape != (1,3,3)
+                or not np.isfinite(native_k).all() or native_k[0,0,0] <= 0 or native_k[0,1,1] <= 0
+                or not np.allclose(native_k[0,2], [0,0,1], rtol=0, atol=1e-6)
+                or abs(native_k[0,1,0]) > 1e-6):
+            raise ValueError('Invalid native DA3 pixel intrinsics')
+        k = np.ascontiguousarray(native_k[0])
+        metadata['geometry'] = {'intrinsics': {'origin': 'model', 'camera_model': 'pinhole',
+            'pixel_center': 'integer', 'grid': list(depth.shape),
+            'native_convention': 'CameraDec pose encoding to pixel K at native depth H,W; official GLB uses integer meshgrid',
+            'conversion': 'singleton view removal only; retain native K without half-pixel offset',
+            'native_intrinsics': k.tolist()}}
+    return MDEOutput(view_id, depth, metadata, intrinsics=k)

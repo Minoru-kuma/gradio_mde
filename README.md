@@ -50,9 +50,9 @@ core / UI / backendへデモ用のモデル名分岐を加えず、既存Plugin�
 
 固定variantごとの実測・対応出力・独立環境の再現条件は[capability matrix](docs/model-capability-matrix.md)を参照してください。
 
-**Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 / Phase 03 COMPLETE。**
+**Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 / Phase 03（03.1〜03.6）COMPLETE。**
 Phase 02Dは `codex/phase-02d-run-management` で実装・検証を完了し、PR経由でmain統合済みです。
-02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1〜03.6の受入検証と全Exitを達成し、固定UniK3D Smallの個別承認された非商用local CPU研究E2Eも確認しました。外部モデルsource・weightsは同梱・再配布していません。Phase 03は2026-11-13にCOMPLETEとしました。Phase 04以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
+02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1〜03.6の受入検証と全Exitを達成し、固定UniK3D Smallの個別承認された非商用local CPU研究E2Eも確認しました。外部モデルsource・weightsは同梱・再配布していません。Phase 03の03.1〜03.6は2026-11-13にCOMPLETEとしました。追加03.7（depth-only 3D）も全受入達成でCOMPLETEです。Phase 04以降は未承認です。起動・環境・offline条件は [Gradio Inference](docs/gradio-inference.md) を参照してください。
 
 調査対象の repository root では、文書作成前に空の `.git`、`.agents`、
 `.codex`、`.aws` ディレクトリだけが見えました。ソース、依存定義、モデルスクリプトは
@@ -85,7 +85,7 @@ GradioのInference / Resultsを02Bで実装しました。02Cの3D viewerも全E
 | --- | --- | --- |
 | MoGe | 01A CPU の single-image E2E を確認 | 固定した MoGe-2 ViT-S Normal。GPU / 他 variant は未検証。詳細・環境手順は [plugin README](models/moge/README.md) |
 | UniK3D | Smallのsingle-view CPU E2E確認 | native range / Points、scale・unitはunknown。利用条件の不確実性と個別研究判断は[調査記録](docs/unik3d-investigation.md)、実装は[plugin README](models/unik3d/README.md) |
-| Depth Anything V3 / Depth Anything 3（DA3） | DA3-SMALLのsingle-view CPU E2E確認 | relative z-depth、独立CPU環境。optional / multi-view / GPUは未検証。[plugin README](models/da3/README.md) |
+| Depth Anything V3 / Depth Anything 3（DA3） | DA3-SMALLのsingle-view CPU E2E確認 | relative z-depth、独立CPU環境。03.7でnative Kを追加、Points / pose / multi-view / GPUは未対応。[plugin README](models/da3/README.md) |
 
 上記モデルをユーザーが過去に動作させたことと、この基盤が対応済みであることは別です。
 upstream の公式情報と、このリポジトリ内の実測結果は分けて記録します。
@@ -168,7 +168,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | [00](docs/phases/phase-00.md) | Foundation / Architecture | COMPLETE |
 | [01](docs/phases/phase-01.md) | 01A: Minimum Local E2E → 01B: Local robustness | COMPLETE。01A / 01B COMPLETE（CPU E2E / Local robustness） |
 | [02](docs/phases/phase-02.md) | Geometry Artifacts / Gradio Inference / 3D Results / Run Management | COMPLETE（02A〜02D全Exit達成） |
-| [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | COMPLETE（03.1〜03.6・全Exit達成） |
+| [03](docs/phases/phase-03.md) | Model Plugin Architecture / Multi-model | COMPLETE（03.1〜03.6と追加03.7の全受入達成） |
 | [04](docs/phases/phase-04.md) | MLflow Tracking | 未着手 |
 | [05](docs/phases/phase-05.md) | Benchmark Mode | 未着手 |
 | [06](docs/phases/phase-06.md) | Execution Backend Expansion / MockSlurm | 未着手 |
@@ -258,7 +258,7 @@ Three.js r180を同梱し、準備済み環境ではCDNなしのoffline操作を
 明示CPUのnative MoGeとfake / contract / browser / offlineの全Exitを達成し、02C COMPLETE。
 固定Chrome / Linuxで262,144 output pixelsまで検証。GPU / 他OS/browser / 学会実演は未検証。
 操作・保存schema・制限は [Results Viewer](docs/results-viewer.md)、実測結果は
-[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1〜03.6の受入検証と全Exitを達成し、固定UniK3D Smallの個別承認された非商用local CPU研究E2Eも確認しました。外部モデルsource・weightsは同梱・再配布していません。Phase 03は2026-11-13にCOMPLETEとしました。Phase 04以降は未承認です。
+[02C evidence](docs/phases/phase-02/phase-02c.md) を参照してください。02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認、03.1〜03.6の受入検証と全Exitを達成し、固定UniK3D Smallの個別承認された非商用local CPU研究E2Eも確認しました。外部モデルsource・weightsは同梱・再配布していません。Phase 03の03.1〜03.6は2026-11-13にCOMPLETEとしました。追加03.7（depth-only 3D）も全受入達成でCOMPLETEです。Phase 04以降は未承認です。
 
 ## Phase 02D Run Management
 
@@ -296,7 +296,7 @@ derived pathが空ならrawを含む全Run削除です。入力を変えた場�
 Inferenceでmodel / variantをsession別に選択し、parameter schemaとrequested outputsを切り替えます。
 全sessionで1つのBackendを共有し、同時推論は1件受理・他はbusyで拒否します。
 複数モデルの環境 / weightsは [target configuration](docs/target-configuration.md) を参照してください。
-MoGe / DA3の実CPU UIを検証済み。03.3完了での一時停止後に再開し、03.4でUniK3D Smallの独立CPU E2Eも確認しました。Phase全体のExitは未達です。
+MoGe / DA3の実CPU UIを検証済み。03.3完了での一時停止後に再開し、03.4でUniK3D Smallの独立CPU E2Eも確認しました。履歴: 03.4時点ではPhase全体のExitは未達でした。その後03.6で全Exitを達成し、追加03.7も全受入を完了しました。
 [調査記録と再開条件](docs/unik3d-investigation.md)を参照してください。
 
 ## Phase 03.5 multi-view contract
@@ -306,3 +306,12 @@ scene / unknown extras・保存 / 新instance collect / ZIPを検証済みです
 既存single-view Request / CLI / wire1.0は互換で、multi-viewは新common worker1.1と明示opt-inが必要です。
 現在のResultsは先頭viewをpreviewし、複数view選択UIや結合scene表示は追加していません。
 詳細は[ModelAdapter契約](docs/model-adapter-spec.md#phase-035-multi-view-request-and-scene-contract)を参照してください。
+
+## Phase 03.7 Depth-only 3D Reconstruction
+
+Status: **COMPLETE（2026-11-13、追加stageの全受入達成）**。
+
+DA3-SMALLのnative Kをoptional出力として使い、既知K → 保存native K → 設定済みGeoCalib推定Kの順に、
+depthからderived点群・2.5D meshを生成します。相対scaleを維持し、raw Run / JobResultは変更しません。
+[操作・契約](docs/depth-reconstruction-spec.md)、[独立GeoCalib準備](models/geocalib/README.md)を参照してください。
+GeoCalibは通常版・MoGeデモ版に同梱せず、固定FOVによる代用は行いません。03.1〜03.6のCOMPLETE履歴は維持します。

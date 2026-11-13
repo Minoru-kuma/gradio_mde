@@ -268,3 +268,15 @@ for native inference; they are installed in this model environment only and no t
 Full upstream training / evaluation extras and a clean recreation of this new lock are not claimed.
 The fixed source and checkpoint are prepared separately from official distributors, never bundled in the
 platform. Source / checkpoint terms remain uncertain and the local research action has a recorded user decision.
+
+## Phase 03.7 independent camera environment
+
+GeoCalib calibration uses a fourth independent worker environment, mde-geocalib, without adding dependencies to
+UI / MoGe / DA3 / UniK3D. It is an auxiliary camera role and is not a fourth depth model. Python3.11.14, CPU
+torch2.6.0+cpu / torchvision0.21.0+cpu, NumPy1.26.4, Kornia0.8.0 and the official fixed source are recorded in
+[environment.yml](../models/geocalib/environment.yml) / [requirements.lock](../models/geocalib/requirements.lock).
+The initial headless OpenCV substitute worked natively but did not satisfy upstream package metadata; it was
+replaced only in this new environment with official opencv-python4.10.0.84. Final pip check succeeds.
+Resolved package / Conda fingerprint is observed in actual calibration workers and saved as derived provenance.
+Clean lock recreation on a second prefix, GPU and other platforms remain unverified.
+Preparation, local target configuration and nonbundling: [GeoCalib README](../models/geocalib/README.md).

@@ -16,19 +16,19 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 from .ui_controller import InferenceController, MAX_UPLOAD_BYTES
 
 
-def build_app(controller):
+def build_app(controller, *, camera_estimator=None):
     import gradio as gr
     from .results import ResultsService
     from .run_management import RunManagementService
 
     assets = Path(__file__).with_name("viewer_assets")
     gr.set_static_paths(paths=[assets / "vendor"])
-    results_service = ResultsService(controller.runner.store, controller.runner.collect)
-    management = RunManagementService(controller.runner.store, controller.runner.collect)
+    results_service = ResultsService(controller.runner.store, controller.runner.collect, camera_estimator=camera_estimator)
+    management = RunManagementService(controller.runner.store, controller.runner.collect, camera_estimator=camera_estimator)
 
     def render_view(request):
         try:
-            return results_service.view(request["run_id"], request["mode"])
+            return results_service.view(request["run_id"], request["mode"], known_camera=request.get('known_camera'))
         except Exception as error:
             return {"error": str(error)}
 
@@ -307,6 +307,7 @@ def main(argv=None):
     parser.add_argument("--conda-exe")
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--target-config", type=Path, help="Local environment and per-variant checkpoint map")
+    parser.add_argument("--camera-estimator-config", type=Path, help="Optional independent camera calibration task target")
     parser.add_argument("--read-only", action="store_true", help="Read terminal Runs without a model environment")
     parser.add_argument("--port", type=int, default=7860)
     args = parser.parse_args(argv)
@@ -341,7 +342,11 @@ def main(argv=None):
         targets = TargetConfiguration()
     backend = LocalBackend(store.root, manager)
     controller = InferenceController(ExperimentRunner(registry, backend, store, root), args.model, targets=targets)
-    app = build_app(controller)
+    camera_estimator = None
+    if args.camera_estimator_config:
+        from .calibration import CameraEstimator
+        camera_estimator = CameraEstimator(backend, root, args.camera_estimator_config)
+    app = build_app(controller, camera_estimator=camera_estimator)
     app.launch(server_name="127.0.0.1", server_port=args.port, share=False, inbrowser=False,
                max_file_size=MAX_UPLOAD_BYTES, enable_monitoring=False, ssr_mode=False,
                theme=__import__("gradio").themes.Default(font=["system-ui"], font_mono=["monospace"]),

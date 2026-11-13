@@ -2,7 +2,7 @@
 
 Status: Phase 00 COMPLETE。Phase 01A の最小経路を実装し、fake tests を確認済み。
 MoGe の明示 CPU E2E と成果物検証、Local robustness / CPU regression により
-01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02Cは2026-10-27に全Exit達成でCOMPLETE、02Dも全Exit達成でCOMPLETE。Phase 03は2026-11-13に03.1〜03.6と全Exitを達成しCOMPLETE。Phase 04以降は未承認。
+01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02Cは2026-10-27に全Exit達成でCOMPLETE、02Dも全Exit達成でCOMPLETE。Phase 03は2026-11-13に03.1〜03.6と全Exitを達成しCOMPLETE。追加承認された03.7も別受入の全Exitを達成しCOMPLETE。Phase 04以降は未承認。
 以下の全体図には将来設計も含む。
 
 ## License decision policy
@@ -336,3 +336,13 @@ Per-view numerical profiles are unchanged; the new formal scene JSON ref survive
 Opaque unknown JSON is preserved without implicit file reads. New readers accept old single-view Runs
 without migration, while older one-view workers are not claimed to support this new execution feature.
 The current viewer is an explicitly identified first-view preview; real multi-view model/UI integration is deferred.
+
+## Phase 03.7 camera and derived geometry boundary
+
+DA3 optional native K conversion stays inside its adapter. Core camera helpers validate explicit source/depth
+grids and pixel transforms; Results reconstructs only derived Points / 2.5D mesh. Known K precedes native K,
+then an explicitly configured calibration provider. Existing native Points remain unchanged. GeoCalib source
+and weights live in a fourth independent camera environment; its API is only imported in an auxiliary worker.
+ExecutionBackend's optional task method shares LocalBackend admission with inference. No core / UI / backend
+model-name branches, fabricated depth models, raw mutation or redistribution are introduced.
+See [03.7 contract](depth-reconstruction-spec.md).
