@@ -84,9 +84,9 @@ class MultiModelBrowserTests(unittest.TestCase,BrowserHarness):
             finally:self.stop()
 
 
-@unittest.skipUnless(os.environ.get('MDE_UI_CPU_SMOKE')=='1','Opt-in two real model CPU UI')
+@unittest.skipUnless(os.environ.get('MDE_UI_CPU_SMOKE')=='1','Opt-in three real model CPU UI')
 class MultiModelCPUUIBrowserTests(unittest.TestCase,BrowserHarness):
-    def test_moge_and_da3_share_backend_use_separate_environments_and_checkpoint_map(self):
+    def test_three_models_share_backend_use_separate_environments_and_checkpoint_map(self):
         from playwright.sync_api import expect
         from mde.environments import EnvironmentProfile
         from mde.targets import TargetConfiguration
@@ -94,19 +94,24 @@ class MultiModelCPUUIBrowserTests(unittest.TestCase,BrowserHarness):
         prefix=os.environ.get('MDE_TEST_CONDA_PREFIX')
         targets=TargetConfiguration({
             'mde-moge':EnvironmentProfile('mde-moge',name=None if prefix else 'mde-moge',prefix=prefix),
-            'mde-da3':EnvironmentProfile('mde-da3',prefix=str(PROJECT/'.local/envs/mde-da3'))},
+            'mde-da3':EnvironmentProfile('mde-da3',prefix=str(PROJECT/'.local/envs/mde-da3')),
+            'mde-unik3d':EnvironmentProfile('mde-unik3d',prefix=str(PROJECT/'.local/envs/mde-unik3d'))},
             {'moge/moge-2-vits-normal':PROJECT/'.local/weights/moge-2-vits-normal.pt',
-             'da3/da3-small':PROJECT/'.local/weights/da3-small'})
-        root=PROJECT/'runs'
+             'da3/da3-small':PROJECT/'.local/weights/da3-small',
+             'unik3d/unik3d-small':PROJECT/'.local/weights/unik3d-small'})
+        root=PROJECT/'.local/validation/phase-03-6-browser-runs'
         self.start(PROJECT/'models','moge',root,7867,targets=targets)
         evidence=[]
         try:
-            a,b=self.page(),self.page()
+            a,b,u=self.page(),self.page(),self.page()
+            self.select(u,'#model-choice','UniK3D Small (CPU)')
+            expect(u.locator('#parameter-resolution_level input')).to_have_value('0')
+            self.assertEqual(u.locator('#parameter-num_tokens').count(),0)
             self.select(b,'#model-choice','Depth Anything 3 Small (CPU)')
             expect(b.locator('#parameter-process_res')).to_be_visible()
             self.assertEqual(b.locator('#parameter-num_tokens').count(),0)
             expect(a.locator('#parameter-num_tokens')).to_be_visible()
-            for page,model,unit,shape in ((a,'moge','m',[256,256]),(b,'da3','arbitrary',[252,252])):
+            for page,model,unit,shape in ((a,'moge','m',[256,256]),(b,'da3','arbitrary',[252,252]),(u,'unik3d','unknown',[256,256])):
                 self.upload(page,PROJECT/'tests/assets/sample.png');self.select(page,'#device-choice','cpu')
                 page.locator('#submit-run').click()
                 expect(page.locator('#job-status textarea')).to_have_value('COMPLETED',timeout=120000)
@@ -125,8 +130,8 @@ class MultiModelCPUUIBrowserTests(unittest.TestCase,BrowserHarness):
                 self.assertEqual(before,after)
                 evidence.append({'model':model,'run_id':run_id,'torch':result['execution']['torch_version'],
                     'prefix':result['execution']['python_prefix'],'shape':shape,'unit':unit,'raw_hash_mtime_unchanged':True})
-            self.assertNotEqual(evidence[0]['prefix'],evidence[1]['prefix'])
-            self.assertEqual(len(self.runner.backend._jobs),2)
+            self.assertEqual(len({x['prefix'] for x in evidence}),3)
+            self.assertEqual(len(self.runner.backend._jobs),3)
             self.assertEqual(self.external,[]);self.assertEqual(self.errors,[])
-            print(json.dumps({'two_real_cpu_models':evidence,'external_requests':self.external,'page_errors':self.errors}),flush=True)
+            print(json.dumps({'three_real_cpu_models':evidence,'external_requests':self.external,'page_errors':self.errors}),flush=True)
         finally:self.stop()

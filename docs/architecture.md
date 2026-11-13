@@ -2,7 +2,7 @@
 
 Status: Phase 00 COMPLETE。Phase 01A の最小経路を実装し、fake tests を確認済み。
 MoGe の明示 CPU E2E と成果物検証、Local robustness / CPU regression により
-01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02Cは2026-10-27に全Exit達成でCOMPLETE、02Dも全Exit達成でCOMPLETE。Phase 03は2026-11-11に実装承認、段階実装中。Phase 04以降は未承認。
+01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02Cは2026-10-27に全Exit達成でCOMPLETE、02Dも全Exit達成でCOMPLETE。Phase 03は2026-11-13に03.1〜03.6と全Exitを達成しCOMPLETE。Phase 04以降は未承認。
 以下の全体図には将来設計も含む。
 
 ## License decision policy
@@ -307,7 +307,7 @@ A later scoped user decision allowed fixed Small acquisition and noncommercial l
 The documentation-only update itself did not release the hold. The subsequent action-specific decision is recorded
 in the investigation; redistribution / public bundling / commercial use remain outside that decision.
 Depth / native points reuse existing profiles; core / UI / backend and schema are unchanged.
-03.4 native Small CPU E2E and native Points validation now pass. 03.5 multi-view contracts now pass fake acceptance; 03.6 integration remains, so Phase 03 is not COMPLETE.
+03.4 native Small CPU E2E and native Points validation now pass. 03.5 multi-view contracts now pass fake acceptance; 03.6 integration and all Phase 03 Exit criteria pass. See the [capability matrix](model-capability-matrix.md) for tested conditions and limits.
 
 ## Phase 03.4 runtime capability preflight
 

@@ -166,3 +166,11 @@ Runのsource_digestが最終src / models/mogeの対象source filesと一致す�
 Points [256,256,3] / m、65,536 valid、points.z-depth誤差0 m、Normals / Intrinsics / masksも再検証。
 新CLIによる2回collectで全file hash / mtime不変、predictは1回。
 初回geometryと既定depth-onlyのdepth SHA-256も一致。GPU / GT精度は未検証。
+
+## Phase 03.6 integration
+
+The pinned variant completed explicit CPU inference through the shared Runner / Backend and its independent
+worker in the three-model browser acceptance. Saved output reload and fresh Backend / CLI collect preserved
+file hashes and mtimes. This does not establish GPU, other variants or full upstream tools. See
+[final evidence](../../docs/phases/phase-03.md#036-integration-acceptance-evidence--2026-11-13) and the
+[capability / reproduction matrix](../../docs/model-capability-matrix.md) for scope and remaining unknowns.

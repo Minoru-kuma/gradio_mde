@@ -4,7 +4,7 @@
 names / prefixes and model / variant IDs to local checkpoint locations. Model adapters do not
 select a backend or environment, and Registry reads metadata without provisioning anything.
 
-The [example](../configs/local-targets.example.json) contains MoGe and DA3. Edit a local copy for
+The [example](../configs/local-targets.example.json) contains MoGe, DA3 and UniK3D. Edit a local copy for
 your machine; paths resolve relative to the configuration file's directory. Never commit personal
 prefixes, weights or credentials. Configuration loading performs no install or download.
 
@@ -43,3 +43,6 @@ has already succeeded. Changing a target file or installing an environment requi
 Host prefixes and local checkpoint paths stay in target configuration and worker launch context;
 JobSpec retains logical environment / model / variant / checkpoint identity and content digests.
 The same shared Backend serves all browser sessions, with immediate busy rejection and no job queue.
+
+The UniK3D entry is a local research target, not a redistribution authorization. Its source-label discrepancy
+and unconfirmed checkpoint conditions remain recorded in the [investigation](unik3d-investigation.md).

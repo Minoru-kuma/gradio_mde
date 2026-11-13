@@ -2,10 +2,12 @@
   "schema_version": "1.0",
   "environments": {
     "mde-moge": {"name": "mde-moge"},
-    "mde-da3": {"prefix": "../.local/envs/mde-da3"}
+    "mde-da3": {"prefix": "../.local/envs/mde-da3"},
+    "mde-unik3d": {"prefix": "../.local/envs/mde-unik3d"}
   },
   "checkpoints": {
     "moge/moge-2-vits-normal": "../.local/weights/moge-2-vits-normal.pt",
-    "da3/da3-small": "../.local/weights/da3-small"
+    "da3/da3-small": "../.local/weights/da3-small",
+    "unik3d/unik3d-small": "../.local/weights/unik3d-small"
   }
 }

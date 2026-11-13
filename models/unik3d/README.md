@@ -28,6 +28,7 @@ and bootstrap; pip provides torch 2.6.0+cpu / torchvision 0.21.0+cpu / NumPy 2.2
 Install the fixed official source separately, without its full dependency set:
 
 ```sh
+conda env create --prefix .local/envs/mde-unik3d -f models/unik3d/environment.yml
 .local/envs/mde-unik3d/bin/python -m pip install --no-deps --no-build-isolation \
   'git+https://github.com/lpiccinelli-eth/UniK3D@29f7862f3c3ee79c53ef0153dfc901ce511df575'
 PYTHONPATH=src .local/envs/mde-unik3d/bin/python -m models.unik3d.prepare_checkpoint \
@@ -87,3 +88,11 @@ Saved depth and Points matched a separate direct native invocation exactly. Each
 CLI processes without inference / hash / mtime changes. Python nonloopback socket guards were active and
 recorded no external connection attempts. The sample had no negative-z pixels; synthetic fixtures cover them.
 Actual accuracy / metric scale, GPU and browser integration for this new plugin are not established by these runs.
+
+## Phase 03.6 integration
+
+The pinned variant completed explicit CPU inference through the shared Runner / Backend and its independent
+worker in the three-model browser acceptance. Saved output reload and fresh Backend / CLI collect preserved
+file hashes and mtimes. This does not establish GPU, other variants or full upstream tools. See
+[final evidence](../../docs/phases/phase-03.md#036-integration-acceptance-evidence--2026-11-13) and the
+[capability / reproduction matrix](../../docs/model-capability-matrix.md) for scope and remaining unknowns.

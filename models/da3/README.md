@@ -74,3 +74,11 @@ The source revision is included. Full upstream extras remain outside this native
 The environment was created once from environment.yml; recreation from this lock is not yet tested.
 MoGe retains its own torch 2.6.0+cu124 environment; Gradio remains in its application environment.
 `process_res=504`, GPU, other platforms and native optional outputs remain untested.
+
+## Phase 03.6 integration
+
+The pinned variant completed explicit CPU inference through the shared Runner / Backend and its independent
+worker in the three-model browser acceptance. Saved output reload and fresh Backend / CLI collect preserved
+file hashes and mtimes. This does not establish GPU, other variants or full upstream tools. See
+[final evidence](../../docs/phases/phase-03.md#036-integration-acceptance-evidence--2026-11-13) and the
+[capability / reproduction matrix](../../docs/model-capability-matrix.md) for scope and remaining unknowns.

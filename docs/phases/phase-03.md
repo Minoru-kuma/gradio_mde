@@ -1,11 +1,11 @@
 # Phase 03 — Model Plugin Architecture / Multi-model Support
 
-Status: **実装中 / 03.1〜03.5受入完了、03.6未着手**。Phase全体Exit未達、COMPLETEではない。
+Status: **COMPLETE（2026-11-13、03.1〜03.6と全Exit達成）**。03.6のcommit / 通常pushをもって承認範囲を終了し、Phase 04以降には進まない。
 `codex/phase-03-implementation`で03.1〜03.6を順番に実施し、受入成功ごとにcommit / 通常push。
 2026-11-11の停止条件見直しで03.4の独立実装・合成検証を継続し、実checkpointの個別保留は維持した。
 履歴: 2026-11-12の直前作業は[AGENTSの全Phase共通方針](../../AGENTS.md#license-review-and-decisions)と関連文書の更新のみだった。
 最新の再開後、用途・リスクを提示し、固定Smallの取得・非商用local CPU研究利用について個別回答を得た。
-不確実性と当時の保留履歴を保持してUniK3D実E2Eを検証した。03.4のcommit / 通常push後に03.5へ進む。
+不確実性と当時の保留履歴を保持してUniK3D実E2Eを検証し、03.4・03.5の受入・commit / 通常push後に03.6へ進んだ。
 直前の03.3で停止する指示と当時の受入結果は下記の履歴として保持する。
 PR作成・main統合・Phase 04以降には進まない。
 履歴: 2026-11-09は調査・計画・設計のみ承認、production実装・環境構築は未承認だった。
@@ -44,15 +44,15 @@ repository の既存 production implementation としての取り込みや、取
 
 ## Implementation tasks
 
-- [ ] `models/moge/`、`models/unik3d/`、`models/da3/` の必要 adapter / manifest / environment を整える。
-- [ ] upstream / checkpoint / license / scale / shape / camera conventions を variant ごとに記録。
-- [ ] 3 environment の解決と独立 worker 実行を確認し、依存を application に混ぜない。
-- [ ] normalized K、w2c / c2w、native dtype / channel layout 等の変換を adapter で行う。
-- [ ] rays、non-pinhole camera、optional normal / confidence / pose、extras の不足を正しく扱う。
-- [ ] manifest parameter schema から controls を生成し、worker runtime capability と照合。
-- [ ] representative single-view を 3 モデルで実行し raw artifacts / metrics を揃える。
-- [ ] 新しい fake plugin directory の追加だけで Registry に発見されることを確認。
-- [ ] shared interface を変える必要がある場合は docs / schema reader / compatibility を同時更新。
+- [x] `models/moge/`、`models/unik3d/`、`models/da3/` の必要 adapter / manifest / environment を整える。
+- [x] upstream / checkpoint / license / scale / shape / camera conventions を variant ごとに記録。
+- [x] 3 environment の解決と独立 worker 実行を確認し、依存を application に混ぜない。
+- [x] normalized K、w2c / c2w、native dtype / channel layout 等の変換を adapter で行う。
+- [x] rays、non-pinhole camera、optional normal / confidence / pose、extras の不足を正しく扱う。
+- [x] manifest parameter schema から controls を生成し、worker runtime capability と照合。
+- [x] representative single-view を 3 モデルで実行し raw artifacts / metrics を揃える。
+- [x] 新しい fake plugin directory の追加だけで Registry に発見されることを確認。
+- [x] shared interface を変える必要がある場合は docs / schema reader / compatibility を同時更新。
 
 ## Tests
 
@@ -88,6 +88,8 @@ multi-view sequence の高度な UI、3D / pose / normal benchmark、全 variant
 | --- | --- | --- | --- |
 | representative variant を先に統合 | family ごとの能力差を検証可能な範囲にする | 全 variant 対応を主張しない | manifest に variant を追加 |
 | single-view 共通契約を必須にする | MDE 比較の最小単位を先に安定させる | 完全な multi-view 評価は後回し | 同じ PredictionBatch に scene 情報を追加 |
+
+以下は各時点の履歴。停止・未着手の記述を削除せず、後続の受入記録と冒頭の最新状態で更新を追跡する。
 
 ## Stage acceptance status — 2026-11-11
 
@@ -205,7 +207,7 @@ UniK3Dの[行為別評価と選択肢](../unik3d-investigation.md#scoped-decisio
 
 Final static validation: Markdown33件 / local links・anchors289件 / Python AST51件、errors 0。diff whitespace検査成功。
 
-## 03.5 implementation in progress
+## 03.5 implementation record
 
 03.4 commit / 通常push完了後に開始。旧PredictionRequestを保持し、別MultiViewPredictionRequestと
 Runner.submit_viewsを追加。multi-viewのみschema1.1 / request_kind / worker protocol1.1と明示能力でopt-inする。
@@ -234,3 +236,47 @@ UIは先頭view previewを維持し、実モデルmulti-view / multi-view入力U
   browser opt-inと3実モデル統合受入・capability matrixは03.6で実施する。
 
 03.5 commit / 通常push後に03.6へ進む。Phase 03全体のCOMPLETEはまだ宣言しない。
+
+## 03.6 integration acceptance evidence — 2026-11-13
+
+03.5 commit / 通常push `0fa251b4b4fb9880025e3fb0f84ad88724fbdc01`の後に開始。
+実装範囲は3モデルtarget設定例、既存browser試験の3モデル化、再現条件・capability matrixと受入docs。
+core / UI / backendのモデル名分岐や外部source / weightsの同梱を追加していない。
+
+| 統合試験 | 実測証拠 |
+| --- | --- |
+| 共有Runner / Backend、実CPU / 独立worker | MoGe `7ff6a9da-502a-4d65-83b1-251f7f1f10a1`、DA3 `aecee741-9fe9-461e-af6d-ff2150074892`、UniK3D `4b49e2bd-92d9-4e0c-a43c-239963bc94a4`、全てCOMPLETED |
+| Runtime / shape / scale | 3別prefix / Python3.11.14、MoGe torch2.6+cu124 CPU / 256×256 z metric m、DA3 torch2.6+cpu / 252×252 z relative arbitrary、UniK3D torch2.6+cpu / 256×256 range unknown unknown |
+| Native optional | MoGe JPEG・Points / normals / K / maskのbrowser4表示、Run `4b9bd75d-38fd-407c-b880-dd7ead47aca1`。UniK3D CLI Points `6f851ef4-8fed-426b-85e1-e28557ecd764`、rangeとnorm(Points)整合、旧直接API照合済みPointsと配列完全一致 |
+| Source / numeric regression | 上記共有Backendの3depth RunとUniK3D CLI Points Runのsource_digestを現sourceと照合。3モデルのdepthは03.4同CPU条件の保存値と配列完全一致。値を再scale・補完していない |
+| Collect / raw不変 | この4Runを新Backend2回・新CLI2回collect、全file hash / mtime不変、predict各1回・unload完了。wire1.0 / scene省略を維持 |
+| Browser | 7 tests全成功、180.328秒。3モデル切替・別session、同時1受理1busy、未準備・controls reset、cancel / timeout / CUDA失敗、Results4表示・再起動・export / deleteを回帰 |
+| Offline | Chrome154.0.8037.92、browser外部routeとPython socket guardで遮断。外部接続試行・page errorなし。既存のevent-loop ResourceWarningは残る |
+| 旧Run | 現存4Runを各2CLI collect、hash / mtime不変。旧01B `f4a2052f-71da-4664-9c9f-281cca95fb41`はlocal不在、実Run再検証は未実施 |
+
+Local evidence: `.local/validation/phase-03-6-browser.log`、`phase-03-6-readback.json`、
+`phase-03-6-compatibility.json`、`phase-03-6-unik3d.stdout.json`とoffline guard logs。
+生成物はGitへ追加しない。全回帰の初回はcontrol Pythonを誤使用しNumPy不足6 errors / 35 skipsとなった。
+失敗ログを`phase-03-6-wrong-environment.log`へ保持し、独立UI Pythonで再実行し成功した。
+
+最終全回帰は独立UI環境で139件 / 132成功 / browser opt-in7 skip（209.238秒）。
+browserは上記別実行7件全成功。target設定5 testsも成功（0.009秒）。
+並行read-only監査で新たなExit blockerなし。DA3 / UniK3D lock別prefix再作成やGPU、全upstream extras、
+実multi-view / 精度評価、demo packageは未検証であり、今回のExitに含まれない。
+
+### Final Exit audit
+
+- [x] 3モデル各1代表variantのLocal single-view E2E: 上記3実CPU Runが共通経路で成功。
+- [x] Directory plugin追加で動作: 03.1 fake discovery / import分離・同じRunner実行、03.2 / 03.4実plugin。
+  core / UI / backendにモデル名分岐なし（source検索・import境界回帰）。選択modelだけが独立workerでload。
+- [x] Capability matrixのtested / conditional / untested、optional / raw保存: [matrix](../model-capability-matrix.md)、
+  MoGe / UniK3D実native optional、DA3 depth-only、runtime拒否・要求欠落、03.5 fake2view / scene / extrasで検証。
+- [x] 3環境の再現条件・版・幾何convention・互換docs: 定義・lock・source / checkpoint pin・SHA、
+  各plugin README / matrixに再作成手順と未検証範囲を記録。旧single / CLI / raw不変・browserを回帰。
+
+**全Exit達成によりPhase 03 COMPLETE。** 03.6を同じ実装ブランチへcommit / 通常pushし終了する。
+PR・main統合・Phase 04以降は未実施・未承認。通常版外部source / weights非同梱、デモは仕様決定のみを維持。
+UniK3Dのlicense条件不確実性と過去停止履歴を保持し、個別local研究承認を再配布許諾へ拡張しない。
+
+Final static validation: Markdown34件 / local links・anchors323件 / Python AST53件、errors 0。
+JSONとdiff whitespaceも検証。最終read-only並行reviewでもblockerなし。

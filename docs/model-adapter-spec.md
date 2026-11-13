@@ -1,6 +1,8 @@
 # Model adapter specification
 
-Status: schema `1.0` の最小型と MoGe adapter / manifest を Phase 01A で実装。
+Status: Phase 03 COMPLETE。3代表variant / native CPU E2Eとschema1.1の明示multi-view fake契約を受入。
+旧single schema1.0 / PredictionRequest互換を維持。対応範囲は[capability matrix](model-capability-matrix.md)。
+履歴: schema `1.0`の最小型とMoGe adapter / manifestをPhase 01Aで実装。
 fake tests と MoGe の CPU 実推論・depth 保存を確認済み。GPU は未検証。
 01B の区間計測・fingerprint は共通 worker が担当し adapter signature は維持。
 02A geometry保存・検証と03.1 discovery / variant解決は末尾の実装契約を参照。

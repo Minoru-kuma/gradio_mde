@@ -1,6 +1,8 @@
 # Environment strategy
 
-Status: Phase 01A で独立環境 `mde-moge`、定義、Resolver / Conda launcher を追加。
+Status: Phase 03でMoGe / DA3 / UniK3Dを独立環境に準備し、明示CPUのnative E2Eを確認。
+再現条件・版・未検証範囲は[capability / reproduction matrix](model-capability-matrix.md)を参照。
+履歴: Phase 01Aで独立環境 `mde-moge`、定義、Resolver / Conda launcher を追加。
 Conda subprocess の fake tests と MoGe CPU 実推論は確認済み。01Bで環境再作成・
 process group 停止・計測・fingerprint・CPU regression を検証。GPU 互換性は未検証。
 作成手順と固定版は [MoGe README](../models/moge/README.md)、実測状態は [PLANS](../PLANS.md)。
@@ -166,7 +168,7 @@ container 等を追加する場合も Environment と ExecutionBackend を混ぜ
 Phase 01A: 初期モデルの pin、minimal worker packaging、launcher と 1 画像の実機推論。
 Phase 01B: cancel / timeout、基本計測、詳細 fingerprint、環境再作成手順の検証。
 Phase 03: 3 環境の独立性、capability / runtime matrix。Phase 07–08: module、node driver、offline cache、
-共有 prefix と node-local prefix の選択。複数モデル / micromamba / cluster profile は未設定。
+共有 prefix と node-local prefix の選択。複数モデルのLocal target mapは03.3で実装済み。micromamba / cluster profileは未設定。
 
 ## Phase 01B measurement and fingerprint
 

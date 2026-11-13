@@ -2,8 +2,8 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03.5受入PASS / commit・通常push後に03.6へ（2026-11-12）**。
-  Phase 03全体はCOMPLETEではなく03.6未着手。
+- Current work: **Phase 03 COMPLETE / 全Exit達成（2026-11-13）**。
+  03.5は`0fa251b4b4fb9880025e3fb0f84ad88724fbdc01`でcommit・通常push済み。03.6統合受入・全Exit監査成功。03.6 commit / 通常push後に終了し、次Phaseを開始しない。
 - Authorization: 2026-11-11のユーザー指示により03.1〜03.6を順番に実装・独立環境構築・検証。
   各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
   `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
@@ -20,6 +20,30 @@
 - 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、関連仕様。
   以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
 - main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
+
+## Phase 03.6 integration acceptance plan — 2026-11-12
+
+- Purpose / scope: 03.1〜03.5の受入・通常push後、3つの独立worker環境と代表single-viewを最終sourceで統合検証する。
+  同じRunner / LocalBackendとvariant別checkpoint mapを利用し、UI / core / backendへモデル名分岐を追加しない。
+- Order: 既存browser受入を3モデルへ拡張 → offline browser / 実CPU・保存Run確認 → 必要なCLI / geometry照合 →
+  capability matrix・環境再作成条件を明文化 → 全回帰・静的検証・全Exit監査 → 03.6 commit / 通常push。
+- Validation: MoGe / DA3 / UniK3Dを明示CPUで順次実行しprefix分離、shape / scale / units、実runtime宣言、
+  predict1回・unload、保存結果再読込hash / mtime不変を検証。既存2session busy / cancel / timeout、Results・Run管理も回帰。
+  Python socket guardとbrowser routeで外部通信を拒否し、準備済み環境での動作を確認する。
+- Documentation: tested / conditional / unsupported / untestedを区別。3固定source・checkpoint・環境定義 / lockと
+  幾何convention、再作成手順・未検証条件をmatrixから追跡可能にする。未実測GPU・他variant・clean再作成を成功にしない。
+- Risks / rollback: UI切替の設定漏れ、wire1.1と旧1.0の互換、raw書換え、native出力意味の誤認を検査。
+  新検証は隔離Run rootで行い、既存環境・weights・Runを変更しない。失敗時は原因範囲を修正しExit達成前にCOMPLETEとしない。
+  UniK3Dの条件不確実性と限定承認を維持。デモpackage・実同梱・配布、PR / main統合、Phase 04以降は行わない。
+- Results / acceptance: **PASS / Phase 03全Exit達成**。最終full139件 / 132成功 / browser opt-in7 skip（209.238秒）、
+  別browser7件全成功（180.328秒）、target5件成功。3モデル実CPU / 別prefix・同じBackendで成功。
+  3depth + UniK3D Pointsの4Runは現source_digest一致、native baseline配列完全一致、各新Backend2 + CLI2 collect不変。
+  MoGe native geometry / JPEG browser4表示・保存再起動も成功。旧4Run各2collect不変、旧01B1件local不在。
+  初回fullはcontrol Python誤使用でNumPy不足6 errors / 35 skips、失敗logを保持し正しいUI Pythonで再実行成功。
+  source / weights / env本体をGitへ含めず、通常版・demo仕様とUniK3D限定承認を維持。
+  全Exit対応は[03.6 evidence](docs/phases/phase-03.md#036-integration-acceptance-evidence--2026-11-13)、
+  未検証範囲・再作成条件は[capability matrix](docs/model-capability-matrix.md)。
+  read-only並行監査で新blockerなし。03.6 commit / 通常pushを行い、PR / main統合・Phase 04以降に進まず終了。
 
 ## Phase 03.5 implementation plan — 2026-11-12
 
@@ -910,7 +934,7 @@ Tests、Exit criteria、Known risks、Decisions deferred to later phases を維�
 | [00](docs/phases/phase-00.md) | clean-start の正式確認 | 調査記録・共通契約・段階計画の整合 | COMPLETE |
 | [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | COMPLETE、01A / 01B exit 達成 |
 | [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | COMPLETE（02A〜02D全Exit達成） |
-| [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 実装中（03.1、Exit未達） |
+| [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | COMPLETE（03.1〜03.6・全Exit達成） |
 | [04](docs/phases/phase-04.md) | 03 | Runner から MLflow、失敗時にも結果保存 | 未着手 |
 | [05](docs/phases/phase-05.md) | 03・04 | 同じ single inference に基づく比較評価 | 未着手 |
 | [06](docs/phases/phase-06.md) | 01–05 | Mock backend で非同期・状態・再収集を検証 | 未着手 |
