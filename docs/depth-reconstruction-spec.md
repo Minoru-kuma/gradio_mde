@@ -18,6 +18,8 @@ Kが欠落した旧Runでも、定義済みinput→depth写像があり、明示
 unknown mapping・不正K・未準備・推定失敗は理由付きエラー。固定FOV・仮Kで代用せず、Depth / RawDepthは利用できる。
 
 Kはfiniteで正のfx/fyを持つpinhole `[3,3]`、OpenCV x right / y down / z forward。
+最下行は厳密に `[0,0,1]`、K[1,0]は厳密に0とする。微小な非ゼロ成分も拒否し、黙って丸めない。
+skew K[0,1]と画像外principal pointは許容する。
 float32化した後も再検証し、overflow / focal underflowを拒否する。source / depth gridと所属空間を記録する。
 `known_camera`は`K`、`grid: [H,W]`、`grid_space: source | depth`、`pixel_center: integer | half`、
 `camera_model: pinhole`、`camera_frame: opencv_x_right_y_down_z_forward`を指定する。
@@ -64,10 +66,16 @@ cacheは記録されたprovider / 設定に対する保存結果として再利�
 
 ray生成・range正規化はfloat64で行い、小さい有限focalでもfloat32 norm overflowで原点へ潰さない。
 最終保存はfloat32で、valid depth画素の点がfiniteで表現できない場合は生成を拒否する。
-`pinhole-backprojection` version1でz-depthは`K^-1[x,y,1] * depth`、rangeはunit rayへdepthを掛ける。
+`pinhole-backprojection` version2でz-depthは`K^-1[x,y,1] * depth`、rangeはunit rayへdepthを掛ける。
 K由来（known / model native / estimated）、source K・grid_space・変換行列・depth grid K、provider / calibration artifact refを
 点群・mesh identityへ含める。元のframe / units / scaleを維持し、finite-positive depthと既存maskでinvalidを除く。
-`grid-triangulation` version1の既存相対閾値でinvalid・深度不連続・長い辺・退化faceを除く。閉曲面を作る処理ではない。
+深度由来meshは`grid-triangulation` version2で、version1と同じ相対閾値によりinvalid・深度不連続・長い辺・退化faceを除く。閉曲面を作る処理ではない。
+
+保存前とpoint / mesh cache再読込時、有効画素でZとz-depthをrtol=1e-6 / atol=0で検証する。
+小さい深度の不一致を絶対許容差で隠さない。rangeはZと同一視しない。
+旧version1のdepth由来point / meshは修正済みとして再利用せず、新version2を別keyへ生成する。
+旧generation / historyを削除・上書きしない。native Points由来meshはversion1のまま。
+K-only calibration cacheはversion1を維持し、読込時にも厳密なpinhole検証を適用して不正Kを拒否する。
 
 保存先・atomic publication・generation history / current pointer・破損拒否・明示再生成・exportは既存機構を使う。
 K cacheも同じ`derived/<key>/<generation>/geometry.npz` / manifest。raw / WorkerResult / JobResultにrefを追加しない。
@@ -85,3 +93,10 @@ ResultsのPoint Cloud / Meshに既知K入力を追加し、sourceかdepthかを�
 実DA3 CPUのnative Kとdepth-only + GeoCalibを、点群・mesh・保存・browser・モデルなし再読込まで検証する。
 実測Run ID・最終回帰・未検証条件はPhase 03の03.7受入記録に記載する。GPU・他OS / arch・distorted camera・別variant・
 精度 / 複数視点 / lock別prefix再作成は未検証。既存viewerの262,144 output pixels上限を維持する。
+
+## Deferred P3 — Backend configuration coupling
+
+最終レビューでCameraEstimatorがbackend.manager.resolver.profilesを直接参照・変更することを確認した。
+公開execute_taskを実装してもmanagerを持たないBackendでは初期化がAttributeErrorになる。
+現在のLocal経路を阻害しない設計改善事項として保持する。将来、環境profile登録を起動時の構成処理 / Environment層へ移し、
+CameraEstimatorを公開Backend契約だけに依存させる。今回のP2修正にはBackend再設計・Slurm実装を含めない。

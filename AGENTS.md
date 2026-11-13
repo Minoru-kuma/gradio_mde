@@ -18,6 +18,8 @@
    DA3 native K調査、既知→native→GeoCalibのK優先、独立GeoCalib環境、derived点群・2.5D mesh・実CPU / browser検証を実施。
    GeoCalibは通常版・MoGeデモへ同梱しない。03.1〜03.6 COMPLETE履歴とraw / 旧Run不変を維持。
    2026-11-13に03.7も全受入達成でCOMPLETE。03.7のcommit / 通常pushで終了する。
+   最新の追加指示で最終レビューP2のK検証・Z整合性・cache修正と回帰検証を承認。同じブランチへcommit / 通常pushする。
+   P3は非阻害の設計改善として文書化し、Backend再設計を行わない。
    PR / main統合・Phase 04以降は引き続き未承認。
    履歴: 直前の2026-11-12指示はハーネス・関連文書更新のみで、モデル作業は開始していなかった。
    今後のlicense判断は下記13の全Phase共通方針に従う。UniK3Dのlicense表記差異・checkpoint適用条件未確認は維持。

@@ -339,3 +339,30 @@ GeoCalib source・weights・環境を通常版 / MoGeデモへ同梱せず、Uni
 
 03.7 final static validation: Markdown37件 / local links・anchors367件 / Python AST61件、errors 0。
 JS syntax / JSON / target設定 / diff whitespace成功。並行read-only最終監査で実装blockerなし、READMEの旧状態も履歴として整合。
+
+## Final review P2 correction — 2026-11-13
+
+03.1〜03.7 COMPLETEの履歴を保持した修正。レビューで既知Kの微小非ゼロ最下行を受理し、
+z-depth 2.5からZ=1.8625の点を保存できるP2を再現した。Kの構造要素を厳密検証し、
+生成・point / mesh再読込時に有効z-depthとZの整合性を検証する。深度由来geometryのversion2で旧cacheを分離し、
+raw / JobResult・旧generationを上書きしない。native Pointsは従来どおり扱う。
+P3のBackend内部依存は[非阻害の設計改善](../depth-reconstruction-spec.md#deferred-p3--backend-configuration-coupling)として記録し、今回再設計しない。
+受入検証PASS。PR / main統合・Phase 04以降には進まない。
+
+- 数値 / Results 24件成功（48.504秒）。境界K拒否、skew / off-centre / small focalの正当K、
+  保存前Z不一致拒否、digest-validな不正point / mesh cache拒否、旧version1の保持とversion2生成を確認。
+- 最終全回帰154件 / 146成功 / browser opt-in8 skip（376.926秒）。別browser8件全成功（307.309秒）。
+  MoGe / DA3 / UniK3D、GeoCalib、既知K override、再起動・管理・session分離を含む。
+- DA3 native K Run `0323298e-d02f-46c8-a770-a885a9f1e9d5`、GeoCalib Run `81d7dae4-53a9-4e47-be87-ce8758f7a909`。
+  source_digest `5c44ea17be60ecca0a5d64aea7268b75502d546f6fb256eb0ccd6d0db41bf52d`を最終sourceと照合。
+  各63,504点 / 124,193面、保存Zと有効depthは完全一致。native depth / Kは従来の固定API probeと完全一致。
+  version2再利用・モデル環境なし再読込・ZIP、新Backend2 + CLI2 collectで全file hash / mtime不変。
+- 同Backend別環境のMoGe `9f33248a-d6df-4ffe-bcfb-bcf59b061c47`、DA3 `f7b2422c-ee0c-4a91-93b2-4c15d1af20a8`、
+  UniK3D `ae903908-6f42-41f3-bb15-39e2c3766ce5`のdepthは既存baselineと完全一致、各4collect不変。
+- 現存旧4Runも新Backend2 + CLI2 collectでhash / mtime不変。旧01Bの1Runはlocal不在で未検証。
+- ローカル証拠: `.local/validation/phase-03-p2-numeric.log` / `phase-03-p2-regression.log` / `phase-03-p2-browser.log`、
+  `phase-03-p2-readback.json` / `phase-03-p2-three-model-readback.json` / `phase-03-p2-compatibility.json`。
+  browser外部通信試行・page errorなし。既存event-loop ResourceWarningは残る。
+- 静的検証: Markdown37件・local links / anchors370件・Python AST61件、errors 0。
+  diff whitespace成功。独立read-only差分レビューでblockerなし、数値5件成功（0.159秒）。
+- 未検証: GPU成功・他OS / arch・別環境再作成・metric accuracy。license / 配布方針・既存条件不確実性は変更しない。

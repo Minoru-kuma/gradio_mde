@@ -78,7 +78,7 @@ def backproject(depth, k, kind):
     # Normalize rays in float64: a finite float32 K can still produce rays
     # whose squared length overflows float32 and collapses range points to 0.
     y, x = np.indices(depth.shape, dtype=np.float64)
-    rays = np.stack((x, y, np.ones_like(x)), axis=-1) @ np.linalg.inv(np.asarray(k,dtype=np.float64)).T
+    rays = np.stack((x, y, np.ones_like(x)), axis=-1) @ np.linalg.inv(pixel_k(k)).T
     if kind == "ray_distance":
         length=np.linalg.norm(rays,axis=-1,keepdims=True)
         if not np.isfinite(length).all() or (length<=0).any():
@@ -87,6 +87,14 @@ def backproject(depth, k, kind):
     elif kind != "z_depth":
         raise ValueError("Back-projection unavailable: unsupported depth kind")
     return np.asarray(rays * depth[..., None], dtype="<f4")
+
+
+def validate_reconstructed_points(points, depth, valid, kind):
+    if not np.isfinite(points[valid]).all():
+        raise ArtifactIntegrityError('Derived points exceed finite float32 range; check camera K and depth')
+    if kind == 'z_depth' and not np.allclose(
+            points[..., 2][valid], depth[valid], rtol=1e-6, atol=0):
+        raise ArtifactIntegrityError('Derived points Z / z-depth mismatch')
 
 
 def triangulate(points, depth, valid, parameters):
@@ -382,16 +390,16 @@ class ResultsService:
             payload["origin"] = "model points (saved raw)"
         else:
             k,camera_provenance=self._camera(run,result,output,source,known_camera)
-            identity={**identity,'camera':camera_provenance}
+            identity={**identity,'camera':camera_provenance,'version':'2'}
             point_identity = {**identity, "algorithm": "pinhole-backprojection", "parameters": {}}
             def reconstruct():
                 with np.errstate(over='ignore', invalid='ignore', divide='ignore'):
                     reconstructed=backproject(depth,k,metadata['depth_kind'])
-                if not np.isfinite(reconstructed[valid]).all():
-                    raise ValueError('Derived points exceed finite float32 range; check camera K and depth')
+                validate_reconstructed_points(reconstructed,depth,valid,metadata['depth_kind'])
                 return {'points':np.where(valid[...,None],reconstructed,np.nan).astype('<f4')}
             arrays, generated, reuse = self.derived.get(run, point_identity, reconstruct)
             points = arrays["points"]
+            validate_reconstructed_points(points,depth,valid,metadata['depth_kind'])
             payload.update(origin="derived points from saved depth + pixel K", point_cache_reused=reuse,
                            camera=camera_provenance)
         if not np.isfinite(points[valid]).all():
@@ -401,6 +409,8 @@ class ResultsService:
             arrays, generated, reuse = self.derived.get(run, identity,
                 lambda: {"points": points, "faces": triangulate(points, depth, valid, identity["parameters"])}, force=regenerate)
             points, faces = arrays["points"], arrays["faces"]
+            if "points" not in output:
+                validate_reconstructed_points(points,depth,valid,metadata['depth_kind'])
             payload.update(origin="derived mesh from " + payload["origin"], cache_reused=reuse)
         # RGB mapping is deliberately conservative. Do not guess resize/crop.
         rgb = None

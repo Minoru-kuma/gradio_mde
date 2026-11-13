@@ -2,6 +2,7 @@
 
 ## Current authorization and status
 
+- Current follow-up: Phase 03最終レビューP2修正・検証（PASS、commit / 通常pushで終了）。下記COMPLETEは元のstage受入履歴。
 - Current work: **Phase 03.7 Depth-only 3D Reconstruction COMPLETE（2026-11-13）**。
   03.1〜03.6 COMPLETE（2026-11-13）の履歴・受入は維持。03.7は独立した追加stageとして全受入を達成した。commit / 通常push後に終了する。
   履歴: 03.5は`0fa251b4b4fb9880025e3fb0f84ad88724fbdc01`、03.6は`1ce8c8470b5fc39030ee9d41e8274fbee98ea753`でcommit・通常push済み。
@@ -23,6 +24,26 @@
 - 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、関連仕様。
   以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
 - main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
+
+## Phase 03 final review P2 correction — 2026-11-13
+
+- Scope: ユーザー承認のP2修正。既存ブランチを継続し、03.1〜03.7 COMPLETEの受入履歴を保持する。
+- Plan: pinhole Kの構造要素を厳密検証 → z-depth / derived Z整合性を生成・再読込時に検証 →
+  depth由来point / meshのalgorithm versionを2へ更新 → 境界fixture・旧cache隔離・正常K回帰 → 全回帰 / browser / 旧Run不変性。
+- Compatibility: raw / JobResult / 旧Run・native Pointsは変更しない。旧derived generationは保持し、version1を修正済みとして再利用しない。
+  calibration K cacheは読込時の厳密検証を適用する。推定失敗時の仮K fallbackなし。
+- P3: CameraEstimatorのBackend内部依存を非阻害の設計改善として文書化し、Backend再設計は行わない。
+- Completion gate: 検証結果を記録してcommit / 通常push。PR / main統合・Phase 04以降なし。
+- Status: PASS。数値 / Results 24件成功（48.504秒）、最終full154件 / 146成功 / opt-in8 skip（376.926秒）、
+  別browser8件全成功（307.309秒）。独立read-only差分レビューもblockerなし、数値5件成功。
+- Real validation: DA3 native K / GeoCalib各63,504点・124,193面、保存Zは有効depthと完全一致。
+  3モデルdepthは既存baselineと完全一致。各Runを新Backend2 + CLI2 collectしhash / mtime不変。
+  保存Runのモデルなし再読込・version2再利用・ZIPを確認。現存旧4Runも各4collect不変。
+- Evidence / limits: `.local/validation/phase-03-p2-{numeric,regression,browser}.log`、
+  `phase-03-p2-readback.json` / `phase-03-p2-three-model-readback.json` / `phase-03-p2-compatibility.json`。
+  browser外部通信試行・page errorなし。既存event-loop ResourceWarningは残る。
+  GPU成功・他OS・環境再作成・精度評価は今回未検証。旧01B1Runはlocal不在のため実Run再検証なし。
+  詳細は[Phase 03修正記録](docs/phases/phase-03.md#final-review-p2-correction--2026-11-13)。
 
 ## Phase 03.7 Depth-only 3D Reconstruction — implementation plan
 

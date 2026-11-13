@@ -315,3 +315,6 @@ DA3-SMALLのnative Kをoptional出力として使い、既知K → 保存native 
 depthからderived点群・2.5D meshを生成します。相対scaleを維持し、raw Run / JobResultは変更しません。
 [操作・契約](docs/depth-reconstruction-spec.md)、[独立GeoCalib準備](models/geocalib/README.md)を参照してください。
 GeoCalibは通常版・MoGeデモ版に同梱せず、固定FOVによる代用は行いません。03.1〜03.6のCOMPLETE履歴は維持します。
+
+Phase 03最終レビューのP2修正でpinhole Kの構造を厳密検証し、深度由来point / meshはversion2へ分離します。
+旧derivedは保持し、有効z-depthとZの整合性を生成・再読込時に検証します。詳細は上記03.7仕様を参照してください。

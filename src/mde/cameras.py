@@ -10,7 +10,7 @@ def pixel_k(value):
         raise ValueError('Camera K must be a numeric 3x3 matrix')
     k = np.asarray(raw, dtype=np.float64)
     if (not np.isfinite(k).all() or min(k[0,0],k[1,1]) <= 0
-            or not np.allclose(k[2],[0,0,1],rtol=0,atol=1e-6) or abs(k[1,0]) > 1e-6):
+            or not np.array_equal(k[2],[0,0,1]) or k[1,0] != 0):
         raise ValueError('Invalid finite positive pinhole camera K')
     return k
 

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import time
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import zipfile
 
 from mde.contracts import ArtifactIntegrityError, BackendBusy
@@ -16,6 +16,8 @@ from tests import test_local_contract as local_contract
 from tests import test_results as results_tests
 
 PROJECT=local_contract.PROJECT
+BOUNDARY_K = [[0.001,0,0],[0,100,0],[0.000001,0,1]]
+
 HAS_NUMERIC=all(importlib.util.find_spec(m) for m in ('numpy','PIL'))
 
 
@@ -37,6 +39,26 @@ class CameraNumericTests(unittest.TestCase):
             with self.assertRaises(ValueError):align_camera({**cam,'K':invalid},{},[200,320],[140,150])
         with self.assertRaisesRegex(ValueError,'transform'):
             align_camera(cam,{'image_to_output':{'type':'unverified'}},[200,320],[140,150])
+
+    def test_pinhole_structure_is_exact_before_and_after_grid_conversion(self):
+        import numpy as np
+        from mde.cameras import align_camera, pixel_k
+        from mde.geometry import FRAME
+        from mde.results import backproject
+        camera={'K':BOUNDARY_K,'grid':[256,256],'grid_space':'depth',
+                'pixel_center':'integer','camera_model':'pinhole','camera_frame':FRAME}
+        for bad in (BOUNDARY_K, [[100,0,0],[1e-12,100,0],[0,0,1]],
+                    [[100,0,0],[0,100,0],[0,1e-12,1]],
+                    [[100,0,0],[0,100,0],[0,0,1+1e-12]]):
+            with self.assertRaisesRegex(ValueError,'pinhole'):pixel_k(bad)
+            with self.assertRaisesRegex(ValueError,'pinhole'):
+                align_camera({**camera,'K':bad},{},[256,256],[256,256])
+            with self.assertRaisesRegex(ValueError,'pinhole'):
+                backproject(np.ones((2,256),dtype='float32'),bad,'z_depth')
+        # Legitimate skew, off-centre principal point and small focal remain valid.
+        good=[[.001,.25,-20],[0,100,123],[0,0,1]]
+        converted,_=align_camera({**camera,'K':good},{},[256,256],[256,256])
+        np.testing.assert_array_equal(backproject(np.ones((2,256),dtype='float32'),converted,'z_depth')[...,2],1)
 
     def test_float32_overflow_underflow_and_equal_size_grid_ambiguity_are_rejected(self):
         import numpy as np
@@ -131,6 +153,61 @@ class ReconstructionTests(unittest.TestCase):
         est.identity.return_value={'fixture':'camera-v2','seed':1}
         different=view.view(h.run_id,'Mesh');self.assertNotEqual(different['derived']['key'],mesh['derived']['key']);self.assertEqual(est.estimate.call_count,2)
         self.assertEqual(before,self.snapshot(run))
+
+    def test_boundary_k_rejected_without_publishing_or_mutating_raw(self):
+        from mde.results import ResultsService
+        h,_,_=self.make_run(('depth',));run=self.store.root/h.run_id
+        before=self.snapshot(run);camera={**self.estimator().estimate.return_value,'K':BOUNDARY_K}
+        with self.assertRaisesRegex(ValueError,'pinhole'):
+            ResultsService(self.store,self.runner.collect).view(h.run_id,'Mesh',known_camera=camera)
+        self.assertFalse(list((run/'derived').glob('*/*/manifest.json')))
+        self.assertEqual(before,self.snapshot(run))
+
+    def test_z_mismatch_rejected_before_publication_and_on_point_and_mesh_cache_read(self):
+        import numpy as np
+        from mde.results import ResultsService
+        h,result,_=self.make_run(('depth','intrinsics'));run=self.store.root/h.run_id
+        view=ResultsService(self.store,self.runner.collect);before=self.snapshot(run)
+        depth=np.load(run/result.outputs[0]['depth']['path'])
+        bad=np.zeros((*depth.shape,3),dtype='<f4');bad[...,2]=depth*.745
+        with patch('mde.results.backproject',return_value=bad):
+            with self.assertRaisesRegex(ArtifactIntegrityError,'Z / z-depth'):
+                view.view(h.run_id,'Point Cloud')
+        self.assertFalse(list((run/'derived').glob('*/*/manifest.json')))
+        point=view.view(h.run_id,'Point Cloud');mesh=view.view(h.run_id,'Mesh')
+        # Digest-valid caches can still contain numerically invalid geometry.
+        mesh_identity=mesh['derived']['identity']
+        view.derived.get(run,mesh_identity,lambda:{'points':bad,'faces':np.empty((0,3),dtype='<u4')},force=True)
+        with self.assertRaisesRegex(ArtifactIntegrityError,'Z / z-depth'):view.view(h.run_id,'Mesh')
+        view.derived.get(run,point['derived']['identity'],lambda:{'points':bad},force=True)
+        with self.assertRaisesRegex(ArtifactIntegrityError,'Z / z-depth'):view.view(h.run_id,'Point Cloud')
+        self.assertEqual(before,self.snapshot(run))
+
+    def test_version_one_bad_geometry_is_preserved_but_never_reused(self):
+        import numpy as np
+        from mde.results import ResultsService, MESH_PARAMETERS
+        h,result,_=self.make_run(('depth','intrinsics'));run=self.store.root/h.run_id
+        view=ResultsService(self.store,self.runner.collect)
+        # Capture the exact dependencies before publishing any current geometry.
+        identities=[]
+        def capture(run,identity,generate,**kwargs):
+            identities.append(identity);raise RuntimeError('capture identity')
+        with patch.object(view.derived,'get',side_effect=capture):
+            with self.assertRaisesRegex(RuntimeError,'capture identity'):view.view(h.run_id,'Mesh')
+        bad=np.zeros((256,256,3),dtype='<f4');bad[...,2]=1.8625
+        old_point={**identities[0],'version':'1'}
+        old_mesh={**old_point,'algorithm':'grid-triangulation','parameters':MESH_PARAMETERS}
+        for identity in (old_point,old_mesh):
+            arrays={'points':bad}
+            if identity['algorithm']=='grid-triangulation':arrays['faces']=np.empty((0,3),dtype='<u4')
+            view.derived.get(run,identity,lambda:arrays)
+        before={str(p):(sha256_file(p),p.stat().st_mtime_ns) for p in (run/'derived').glob('*/*/*') if p.is_file()}
+        mesh=view.view(h.run_id,'Mesh');self.assertFalse(mesh['cache_reused'])
+        self.assertEqual(mesh['derived']['identity']['version'],'2')
+        self.assertTrue(view.view(h.run_id,'Mesh')['cache_reused'])
+        for path,expected in before.items():self.assertEqual((sha256_file(Path(path)),Path(path).stat().st_mtime_ns),expected)
+        with np.load(run/mesh['derived']['output']['path']) as payload:
+            np.testing.assert_array_equal(payload['points'][...,2],np.load(run/result.outputs[0]['depth']['path']))
 
     def test_estimation_failure_has_no_fixed_fov_or_complete_geometry(self):
         from mde.results import ResultsService

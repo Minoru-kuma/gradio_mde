@@ -50,7 +50,7 @@ z_depthは `K^-1[x,y,1] * depth`、ray_distanceはrayをunit length化してdept
 
 ## Mesh and persistence contract
 
-algorithm `grid-triangulation` version `1`。LOD / downsamplingなし。
+algorithm `grid-triangulation`はnative Points由来でversion `1`、深度逆投影由来でversion `2`。LOD / downsamplingなし。
 すべての頂点がvalidなgrid cellのみ2三角形にする。各faceのすべての辺について:
 
 - depth差 ≤ **0.05 × face内最小depth**（relative、元depth unit）
@@ -82,7 +82,9 @@ directoryを同一filesystem内でatomic renameする。complete generationだ�
 identity / path / digest / dtype / shape / index boundsを検証する。途中stagingは保持する。
 壊れたcomplete cacheは明示エラー、上書き・自動削除をしない。明示再生成UIは02D管理Serviceを利用する。
 複数generation、current pointer、削除後fallbackと公開失敗の候補除外は [管理仕様](run-management-spec.md#derived-identity-publication-and-selection) を参照。
-バックプロジェクションはalgorithm `pinhole-backprojection` version `1`、同じ保存/検証方式。
+バックプロジェクションはalgorithm `pinhole-backprojection` version `2`、同じ保存/検証方式。
+旧version1は保持するが修正済み成果物として再利用しない。厳密K検証と有効z-depth / Z整合性の生成・再読込検証は
+[03.7仕様](depth-reconstruction-spec.md)を参照。
 単一application processを対象とし、multi-process調停・電源断後のdurabilityは保証しない。
 
 ## Offline operation and limits
