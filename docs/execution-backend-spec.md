@@ -282,3 +282,44 @@ requested outputsは条件digestにも含む（既定depth-onlyのdigest入力�
 JobSpecの旧[depth]制限を拡張し、single-view / single-attempt / cpu・cuda:0 / float32の制限は維持。
 新profile・geometry保存後のcollectは同じBackend境界で行い、cancel / timeout / busyを変更しない。
 terminal JobResultはimmutable。02BのUI / sessionは上記の実装境界。数値progress契約は追加せずunavailableとする。
+
+## Phase 03.1 model metadata snapshot
+
+Runnerは実効variantを共通ModelInfo経由で解決し、device / dtype / parameters / capabilityと
+single-view PNG / RGB制約を検査してJobSpecへsnapshotする。
+`model_ref.manifest`は元manifest、`model_ref.variant`は全体置換・fallback後の実効値。
+optionalな`environment_id`指定をvariantの候補と照合し、1候補のみ従来fallbackを許す。
+CLIは同じ解決結果でtarget profileを構成する。Backendにモデル名分岐は追加しない。
+Job schema / attempt制約 / status / busy / cancel / timeout / 保存済みcollect契約は維持する。
+
+## Phase 03.3 per-job target resolution
+
+WorkerManager accepts an optional model_id/variant_id checkpoint map and resolves it using the saved
+job snapshot. Target configuration remains outside JobSpec; Backend still receives model-independent
+contracts and does not branch on model names. CLI and Gradio composition roots share the same mapping
+contract. Explicit CLI overrides affect only the selected job. Local busy / cancel / timeout / collect
+and raw / terminal result immutability remain unchanged. See [target configuration](target-configuration.md).
+
+## Phase 03.5 multi-view terminal boundary
+
+The same submit / status / cancel / collect operations execute one batch Job in one independent worker.
+Multi-view inputs are explicitly gated by the model request kind, view-count constraints and common
+worker protocol1.1; no model-name dispatch or backend-specific model code is added.
+The optional JobResult.scene ArtifactRef is carried from the worker report and checked during terminal
+collect alongside every view and metadata document. It is absent from legacy results when unspecified.
+Failed batches publish no successful partial views / scene. Cancel / timeout / process cleanup remain
+Job-wide, and timing covers one adapter predict call and all requested view artifacts.
+
+## Phase 03.7 auxiliary camera tasks
+
+ExecutionBackend.execute_task(reference, request_path, result_path, work_dir, timeout_seconds=180) is an optional
+bounded synchronous operation; unsupported backends raise UnsupportedOperation. It does not create or rewrite an inference JobResult.
+LocalBackend shares its admission slot with inference: new concurrent tasks/submissions return BackendBusy,
+while identical existing inference submissions retain their idempotent handle. WorkerManager resolves the task's
+independent logical environment and definition digest, and the common mde.task_worker imports only the configured
+provider. Task JSON schema1.0 requires explicit CPU, input content SHA validation and a separate result.
+Python/torch/environment fingerprint and timing are observed in the worker and retained in calibration provenance.
+Success, failure and timeout confirm process-group cleanup; uncertain cleanup retains the busy guard. There is
+no task queue, active recovery or UI cancellation for calibration. Private task request/result/logs stay under
+ignored .local/auxiliary-tasks; published calibration is a validated derived generation.
+Details: [03.7 specification](depth-reconstruction-spec.md).

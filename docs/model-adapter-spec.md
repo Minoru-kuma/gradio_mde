@@ -1,9 +1,12 @@
 # Model adapter specification
 
-Status: schema `1.0` の最小型と MoGe adapter / manifest を Phase 01A で実装。
+Status: Phase 03 COMPLETE。3代表variant / native CPU E2Eとschema1.1の明示multi-view fake契約を受入。
+旧single schema1.0 / PredictionRequest互換を維持。対応範囲は[capability matrix](model-capability-matrix.md)。
+履歴: schema `1.0`の最小型とMoGe adapter / manifestをPhase 01Aで実装。
 fake tests と MoGe の CPU 実推論・depth 保存を確認済み。GPU は未検証。
 01B の区間計測・fingerprint は共通 worker が担当し adapter signature は維持。
-02A geometry保存・検証は末尾の実装契約を参照。複数モデルは将来仕様。
+02A geometry保存・検証と03.1 discovery / variant解決は末尾の実装契約を参照。
+実モデル追加とUI切替等はPhase 03の後続段階。
 関連: [Architecture](architecture.md)、[Execution](execution-backend-spec.md)、
 [Environment](environment-strategy.md)、[Run Directory](run-directory-spec.md)。
 
@@ -17,6 +20,19 @@ worker は選択された entrypoint だけを import する。モデル追加�
 想定構成は `adapter.py`、`manifest.json`、`environment.yml`、README、contract tests。
 upstream package のコード全体をコピーするより、検証した revision の既存 API を薄く包む。
 既存の独立スクリプトが得られた場合は、その load / infer / export 部分を優先して再利用する。
+
+### Publication boundary
+
+通常版の公開・配布の対象はプラットフォーム本体と自作Adapterであり、外部モデルのソースコード・checkpointは原則同梱・再配布しない。
+利用者が公式配布元から別途準備したモデルをAdapterが呼び出す。manifestや環境定義には公式参照・固定版・digestを記録する。
+参考コードの再利用を外部モデル実装の公開物への取り込みと同一視せず、第三者コードの取込みは出典と条件を個別に扱う。
+各配布元の利用条件・未確認事項は下記の共通方針で記録・判断する。詳細は[公開・配布仕様](distribution-policy.md)。
+
+デモ版は固定MoGe-2 ViT-S Normal 1種類の実装・weights・独立依存環境を提供する構成とする。
+同梱対象は通常版と分けたbuild profile / 外部recipeのデータで指定し、実行時は同じPlugin契約とtarget設定を用いる。
+core / UI / backendへデモ用モデル名分岐を追加せず、既存のsource revision / checkpoint digest検査を緩和しない。
+配布形式を通したsource provenanceの保持、全依存の配布条件と対象OSでの環境可搬性は未検証事項として記録する。
+今回の仕様決定はAdapter signature / schema / 実装や、他モデルの同梱範囲を変更しない。
 
 ## ModelInfo and manifest
 
@@ -34,12 +50,26 @@ ModelInfo は JSON で表現可能な metadata。schema の検証と adapter imp
 | `parameter_schema` | 型、範囲、enum、default、説明、required、依存条件 |
 | `supported_devices`, `supported_dtypes` | 宣言値。実行可否は worker preflight で再検証 |
 | `input_constraints` | input view 数、image mode、サイズ、camera model の制約 |
-| `license`, `weights_license`, `citations` | upstream code / weights の出典。利用条件は採用時に確認 |
+| `license`, `weights_license`, `citations` | code / weights別の条件・出典。判断は下記の共通方針を参照 |
 
 manifest は runtime にモデルを load するための Python を含めない。parameter schema は
 JSON Schema の検証可能な subset を選定し、未知の引数は拒否する。値を shell に展開しない。
 Registry は plugin ID の重複、entrypoint の欠落、未知の必須 schema major をエラーにする。
 環境未作成はモデル発見失敗と区別し、UI には「未準備」として表示する。
+
+### License review and provenance
+
+全Phase・全モデルの運用は[AGENTSの共通方針](../AGENTS.md#license-review-and-decisions)に従う。
+公式LICENSE / README / model card等のURL・revision・確認日、ソースとcheckpointそれぞれの確認結果・
+不明点、予定する利用行為と用途・判断根拠をplugin READMEや調査記録に残す。
+条件が明確で予定用途が範囲内なら通常進め、表記差異・情報不足だけで独立adapter / fake検証を停止しない。
+取得・利用等に直接影響する不明点は行為別に用途・リスクを整理し、必要に応じユーザー判断を求める。
+明確な禁止との衝突・重大な権利リスクは該当作業を停止する。作者への照会・個別許諾は全モデル必須ではない。
+商用利用・重み再配布・公開package同梱はlocal研究利用と別に判断する。
+
+ソースのlicenseを根拠なくweightsへ転記せず、未確認値や不一致を推測で確定しない。
+不確実性はdocsに保持する。今回の方針更新はmanifest schema・必須field・adapter signature・
+Registry検証を変更せず、公開状況・capability宣言・技術テスト成功を利用許諾の根拠にはしない。
 
 ## Capabilities
 
@@ -99,6 +129,22 @@ adapter は upstream の eval / inference mode、model preprocessing / postproce
 提供するが、モデルごとに runtime の定義を変えない。warm worker は将来の追加である。
 初期の predict timing は adapter の predict 全体（固有の前後処理と CPU 出力への変換を含む）とし、
 pure network forward time と区別する。比較時は処理 scope を同じ key の metadata に記録する。
+
+### Phase 03.4 runtime capability preflight
+
+workerはload成功後・入力読込 / predict前に`LoadedModelInfo.capabilities`を照合する。
+非空mapでは、要求した各出力の明示宣言が必要。欠落・unsupportedは失敗としpredictを呼ばない。
+map / entry / status / conditionの型不正、非有限値やJSON非互換metadataもpreflight失敗にする。
+非要求出力のunsupportedは実行を妨げない。supported / conditionalは許容し、conditionalはwarningを残す。
+conditionの文字列を実行したり、load時に未確定の入力条件を満たしたと推定したりしない。
+predict後の要求出力presence、shape / dtype / units / geometry検証は従来どおり必須である。
+
+map全体が空の場合は旧adapterの未宣言と区別し、warning付きで従来の推論・出力検証を続ける。
+部分mapの要求欠落をmanifestから補完しない。新adapterはload時点で分かる能力を明示する。
+正常な照合結果をoptionalな`execution.runtime_capability_check`へ保存する。
+`declaration`は`declared`または`legacy_undeclared`、`requested_outputs`は要求一覧、`capabilities`は
+独立したJSON snapshot。旧Runのfield欠如を拒否せず、schema major / profile / signatureは変更しない。
+照合失敗は通常のworker preflight失敗として記録し、finallyでunloadする。
 
 ## MDEOutput
 
@@ -243,3 +289,124 @@ native K数値と式をmetadataに保持する。RGB対応はidentityとして�
 確認根拠: [固定MoGe infer](https://github.com/microsoft/MoGe/blob/07444410f1e33f402353b99d6ccd26bd31e469e8/moge/model/v2.py)、
 [固定utils3d denormalize_intrinsics](https://github.com/EasternJournalist/utils3d/blob/3fab839f0be9931dac7c8488eb0e1600c236e183/utils3d/torch/transforms.py)。
 実測・Exit証拠は [02A](phases/phase-02/phase-02a.md) に記録する。
+
+## Phase 03.1 discovery and effective variant metadata
+
+2026-11-11実装。source checkoutの`models/*/manifest.json`をdirectory順に探索する。
+`ModelRegistry.discover()`はvalidな`models`とdirectory ID別`diagnostics`を返す。
+`list_models()`はvalid metadata一覧、`get_model(id)`は選択metadataを返し、不正・不在を拒否。
+他directoryの不正manifestは診断に残しvalidモデルの利用を妨げない。
+model ID重複はdirectory不一致のmanifestも含め探索全体を拒否する。
+環境の存在・upstream install・weights可用性はdiscoveryで検査せず、未準備と不正metadataを区別する。
+Registryはadapter / torch / numeric librariesをimportしない。
+
+既存`variant(id)`は元の宣言を返す。追加の`effective_variant(id)`は独立したsnapshotを返し、
+`capabilities`、`parameter_schema`、`supported_devices`、`supported_dtypes`、`input_constraints`、
+`environment_refs`をvariant優先で項目ごと全体置換する。未指定だけmodel値へfallbackし、deep mergeしない。
+`environment(variant_id, environment_id)`は1候補なら従来どおり省略可能、複数候補なら明示IDを要求する。
+logical IDのtarget設定解決はEnvironmentResolverの責務。未登録環境はworker起動前に拒否する。
+
+manifest major、directory / model ID一致、variant重複・default参照、entrypoint構文、capability status、
+環境ID・相対定義path・protocol major、device / dtype一覧、view数とparameter schemaを検証する。
+未知optional metadataは保持する。entrypointのimport可否はworkerで検証する。
+scalar subsetはobject / properties / required / additionalProperties=falseと
+integer / number / boolean / string、enum、minimum / maximum、default、title / description。
+従来fixtureのobject type / additionalProperties省略は許容し、未知parameterは常に拒否する。
+未対応schema keyword、型違いdefault / enum、非有限数、逆転bounds、未知requiredを拒否する。
+conditionalの`condition`は説明文として保持し実行しない。03.1はstatusの事前判定と
+既存workerの要求出力presence検証を使用。03.4で上記のload後runtime能力照合を追加した。
+
+Runner / CLI / controllerは実効metadataでdevice / dtype / parameters / requested outputsを検証する。
+現在の入力契約は1view PNG / RGB、実行契約はcpu / cuda:0・float32のまま。
+Gradioの動的なmodel / variant切替とcontrols更新は03.3、追加出力とmulti-viewは03.4 / 03.5。
+JobSpec.model_ref.variantへ実効snapshotを保存し、元manifestもそのまま保持する。
+adapter signature、schema major、既存serialization profiles、旧Run readerは変更しない。
+
+
+## Phase 03.2 DA3 native depth-only plugin
+
+`models/da3/` adds DA3-SMALL in an independent CPU environment. Registry / Runner / UI / Backend
+contain no DA3-specific branch or imports. CLI explicitly selects cpu / float32 and a local checkpoint
+**directory**; interpretation of that location belongs entirely to the plugin.
+The adapter verifies both fixed config and weights, source revision, config equality and strict shared-tensor loading.
+Native float32 z-depth is serialized as relative / arbitrary with `01A-depth-only`, without K / points synthesis.
+Optional outputs and multi-view remain unsupported in this integration until later gates.
+See [DA3 plugin](../models/da3/README.md) for source / weights / license / precision / native geometry evidence.
+No adapter signature, output schema, serialization profile or legacy Run reader changed in 03.2.
+
+## Phase 03.3 application selection
+
+Model / variant controls now consume Registry effective metadata per browser session. The selected
+adapter still loads only inside its worker; no adapter signature, manifest major, output profile or
+legacy Run reader changes. Local checkpoint paths are selected by model_id/variant_id in the
+[target configuration](target-configuration.md), never by model name branches in core / UI / Backend.
+Parameter names, defaults and optional-output choices are rebuilt on model / variant changes.
+Server session tickets reject callbacks from replaced controls, including a switch away and back.
+
+## Phase 03.4 native UniK3D CPU plugin
+
+The pinned Small adapter now verifies prepared local checkpoint/config files, official source revision and
+strict state loading in a separate CPU environment. Native distance is canonical ray_distance; native
+Points are transposed without K synthesis or backprojection. Scale / units are preserved as unknown.
+Existing 01A / 02A profiles support these outputs; no new output type or numeric profile is introduced.
+Rays / confidence / pose / intrinsics / normals / model mask remain unsupported in this integration, so
+requests are rejected and unrequested outputs are not serialized. Native keys are provenance, not promises
+that every native tensor is exported. The checkpoint-free synthetic seam remains for numeric tests.
+Source / weight license facts and the scoped research decision remain in the
+[investigation](unik3d-investigation.md); operational approval is not a rights-holder license grant.
+
+## Phase 03.5 multi-view request and scene contract
+
+The existing `PredictionRequest(view_id, image, parameters, requested_outputs)` remains unchanged.
+`ExperimentRunner.submit_views(model_id, ordered_png_paths, **single_view_options)` prepares an ordered
+input list. A single path still dispatches the legacy request. Two or more paths dispatch a separate
+`MultiViewPredictionRequest(views, parameters, requested_outputs)`, where `views` is an ordered tuple
+of immutable `PredictionView(view_id, image)` records. Each image is worker-local RGB uint8 HWC.
+This is one model prediction call for one Job, not separate Benchmark jobs.
+
+Multi-view requires all three explicit opt-ins: variant `multi_view` capability supported / conditional,
+`input_constraints.request_kind: multi_view_v1` with compatible min/max_views, and environment
+`worker_protocol_version: 1.1` for the current implementation. The declaration is a minimum required
+worker version and is checked against the actual supported upper bound 1.1 (1.2 is rejected before Run
+creation and by worker JobSpec parsing). Stable record-schema minor extensions and unknown optional
+metadata do not by themselves imply new worker execution capabilities. Worker load-time capabilities must also explicitly allow `multi_view`;
+legacy empty maps do not authorize a new batch interface. Conditional strings are not evaluated by core.
+All three current real plugins remain single-view; this stage's multi-view evidence uses a fake adapter.
+
+Multi-view JobSpec uses schema **1.1** and `inference.request_kind: multi_view_v1`. Older workers that
+support only the single-view protocol do not support this feature, even though the major is still 1.
+New common worker code is required. The legacy one-view Job / request / paths / numeric profiles remain
+1.0 compatible; no stored Run is migrated. IDs are assigned in input order as `view-0001`, `view-0002`, ... .
+The ordered IDs and checksums enter the request digest; equal image contents do not collapse distinct views.
+
+`PredictionBatch.views` must contain each input ID exactly once, with no unknown ID. Return order can differ;
+worker normalizes serialization order to input order. Missing / duplicate / unknown IDs fail before writing
+numeric artifacts. Every returned depth and requested optional output receives the same existing numerical
+and provenance validation independently, including when view dimensions differ. A failed batch does not
+publish successful partial outputs; diagnostic partial files may remain and are never reused or overwritten.
+
+`PredictionBatch.scene_metadata` is a finite JSON object. A multi-view result always saves a scene record;
+a nonempty scene object from a single-view result can also use the new scene wire format. Scene export uses
+schema1.1 and `output/<attempt>/scene.json` with run_id, attempt_id, ordered view_ids and model-provided metadata.
+An optional `reference_view_id` must name an input view. Optional scale_type / depth_unit must be consistent
+with each other and all view metadata; optional camera_frame must match the standard camera frame.
+No reference, shared transform or identity pose is invented. A reference ID alone does not assert estimated
+camera poses. Pose tensors remain unsupported in the current serialization profiles; a future exposed pose
+must retain the camera-to-world convention and declared scene reference / scale.
+
+Per-view extras and unknown scene fields round-trip as opaque JSON. A key named `path` does not make an
+opaque JSON object an artifact reference. Only formally registered ArtifactRefs are read / validated /
+exported; this stage adds the formal scene ref, not a generic arbitrary-array extras exporter.
+`JobResult.scene` is optional, is omitted from legacy wire records when None, and is preserved through
+worker, backend terminal result, new-instance collect and export. See the Run Directory specification.
+
+## Phase 03.7 optional native K and calibration provider
+
+DA3-SMALL fixed CameraDec supplies native pixel K on its native depth grid. The adapter supports optional
+intrinsics alongside required depth, using the existing geometry profile. It exports no Points or pose; derived
+backprojection remains application-side. Default depth-only CLI is unchanged. K is preserved numerically,
+matching the fixed official integer-grid exporter, and input-to-output OpenCV resize is recorded as affine.
+GeoCalib is a separate camera-only task definition under models/geocalib, not a fabricated depth ModelAdapter or
+a fourth entry in model discovery. The common auxiliary worker/backend uses its explicit provider entrypoint.
+All provider-specific load/predict/cleanup and fixed source/checkpoint validation stay inside its model directory.
+See [reconstruction contract](depth-reconstruction-spec.md) and [GeoCalib evidence](geocalib-investigation.md).

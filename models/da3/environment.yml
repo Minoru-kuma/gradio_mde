@@ -1,0 +1,24 @@
+name: mde-da3
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11.14
+  - pip=25.0.1
+  - setuptools=75.8.0
+  - wheel=0.45.1
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cpu
+      - torch==2.6.0+cpu
+      - torchvision==0.21.0+cpu
+      - numpy==1.26.4
+      - pillow==11.1.0
+      - opencv-python-headless==4.10.0.84
+      - huggingface-hub==0.28.1
+      - safetensors==0.5.3
+      - einops==0.8.1
+      - omegaconf==2.3.0
+      - addict==2.4.0
+      - imageio==2.37.0
+      - tqdm==4.67.1
+# Native depth-only path, not upstream CLI/export extras. Install pinned source --no-deps.

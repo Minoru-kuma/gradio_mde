@@ -2,8 +2,32 @@
 
 Status: Phase 00 COMPLETE。Phase 01A の最小経路を実装し、fake tests を確認済み。
 MoGe の明示 CPU E2E と成果物検証、Local robustness / CPU regression により
-01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02Cは2026-10-27に全Exit達成でCOMPLETE、02Dも全Exit達成でCOMPLETE。Phase 03以降は未承認。
+01A / 01B / Phase 01 COMPLETE。GPU は未検証。02AはCOMPLETE。02BのGradio操作は全Exit達成でCOMPLETE、02Cは2026-10-27に全Exit達成でCOMPLETE、02Dも全Exit達成でCOMPLETE。Phase 03は2026-11-13に03.1〜03.6と全Exitを達成しCOMPLETE。追加承認された03.7も別受入の全Exitを達成しCOMPLETE。Phase 04以降は未承認。
 以下の全体図には将来設計も含む。
+
+## License decision policy
+
+全Phase・全モデルの判断は[AGENTSの共通方針](../AGENTS.md#license-review-and-decisions)を正本とする。
+非商用の研究・検証を主用途とし、ソース / checkpointの条件・不明点・予定行為を分けて記録する。
+条件内の利用は通常進め、不確実性だけで独立作業を一律停止しない。直接影響する行為は用途・リスクを整理し、
+必要に応じユーザー判断を求める。禁止との衝突や重大な権利リスクは該当作業のみ停止する。
+作者への照会は共通必須条件にせず、商用 / 重み再配布 / 公開package同梱はlocal研究利用と別に判断する。
+これは開発運用の方針であり、Model / Environment / Backendの責務やschemaに新しい許可判定を追加しない。
+Phase承認、技術的受入、重大な安全性・互換性問題の停止条件は維持する。
+
+## Publication and model provisioning
+
+通常版の公開・配布対象はプラットフォーム本体と自作Adapter。外部モデルsource / checkpointは原則同梱・再配布せず、
+利用者が公式配布元から必要なモデルを別途準備し、各配布元の条件に従う構成とする。
+自作のmanifest / environment定義 / 準備scriptで取得先と固定版・digest・条件の出典を案内する。
+local研究用の準備と配布物への同梱は分け、license不確実性は上記の共通方針で影響範囲を限定して判断する。
+詳細は[公開・配布仕様](distribution-policy.md)。既存の責務分離・実装実績・Phaseの承認やExit条件は維持する。
+
+デモ版は固定MoGe-2 ViT-S Normal 1種類の実装・weights・独立依存環境を提供する構成とする。
+通常版とは分離したbuild profile / 外部recipeのデータで同梱対象・版・配置・帰属表示を指定し、既存Pluginを利用する。
+デモ用のモデル名分岐をcore / UI / backendへ追加しない。依存環境の提供形式・source provenance保持・OS別packingと
+全依存の配布条件は検証待ちであり、現在のConda prefixコピーをportableと扱わない。
+この構成決定では他モデルをデモへ追加せず、今回の仕様更新でpackageを生成・同梱・配布していない。
 
 ## Repository investigation
 
@@ -254,3 +278,71 @@ server-side State tokenとgenerationでhandle / cancel / result selectionを分�
 PNG制限、pin / offline条件、callback / lifecycleの詳細は [Gradio Inference](gradio-inference.md)。
 保存schemaは変更せず、Runner.collectのsummary publicationを同instance内で直列化して
 同内容の再collectをread-onlyにした。raw / 確定JobResultを変更しない。
+
+## Phase 03.1 implemented plugin discovery
+
+Registryにmetadata-only directory探索・一覧・不正manifest診断・重複ID拒否を追加。
+ModelInfoの実効variant解決をRunner / CLI / controllerが共有する。
+Environment / Backend / workerの責務は維持し、core / UI / backendにモデル名分岐を追加しない。
+source checkoutのdirectory追加だけでfake pluginを発見・実行できる。
+model別target設定と動的UIは03.3、geometry拡張とmulti-viewは03.4 / 03.5で追加予定。
+詳細は [Model adapter](model-adapter-spec.md#phase-031-discovery-and-effective-variant-metadata)。
+
+
+## Phase 03.3 implemented application boundary
+
+Gradio now selects model / variant metadata per session and rebuilds schema controls without model imports.
+Server configuration tickets and accepted-job snapshots keep model / parameters / checkpoint selections separate.
+A single Runner / Backend / admission slot serves every browser; selection events do not queue inference.
+`mde.targets` reads local target configuration; WorkerManager resolves per-variant checkpoint locations from JobSpec.
+ModelAdapter still owns native conversion and digest verification, while Environment / Backend own execution.
+CLI legacy flags and existing Run readers remain compatible. See [target configuration](target-configuration.md)
+and [Gradio contract](gradio-inference.md#phase-033-model--variant-switching).
+03.1 / 03.2 / 03.3 acceptance passed. The instruction to stop at 03.3 is historical;
+work resumed for 03.4, initially stopped at the UniK3D license-evidence adoption gate, then resumed
+independent adapter / synthetic geometry work under the revised stop conditions.
+See [investigation and resume conditions](unik3d-investigation.md).
+Historically 03.4 had only an injected synthetic runtime and no production manifest / real bridge.
+A later scoped user decision allowed fixed Small acquisition and noncommercial local CPU research, while source / checkpoint terms remain unresolved.
+The documentation-only update itself did not release the hold. The subsequent action-specific decision is recorded
+in the investigation; redistribution / public bundling / commercial use remain outside that decision.
+Depth / native points reuse existing profiles; core / UI / backend and schema are unchanged.
+03.4 native Small CPU E2E and native Points validation now pass. 03.5 multi-view contracts now pass fake acceptance; 03.6 integration and all Phase 03 Exit criteria pass. See the [capability matrix](model-capability-matrix.md) for tested conditions and limits.
+
+## Phase 03.4 runtime capability preflight
+
+The resumed implementation adds model-independent capability checks after load and before predict.
+A nonempty runtime map must explicitly permit every requested output; malformed, missing or unsupported
+declarations fail before prediction. Empty maps retain legacy behavior with a warning. Conditional
+declarations still require actual output validation. The optional execution.runtime_capability_check
+records a validated JSON snapshot. Existing profiles, schema major and old Run readers remain compatible.
+The UniK3D checkpoint decision is scoped separately from this independent work; subsequent native CPU E2E passed.
+
+## Phase 03.4 native Small integration
+
+The self-authored UniK3D plugin wraps a separately installed, pinned official source and prepared local
+checkpoint. CPU-only torch / float32, source revision and two file digests are checked before native inference.
+Native distance and Points use existing profiles with unknown units / scale; no pinhole K or Points are synthesized.
+Unsupported native rays / confidence / pose are not exported. Their absence does not require a new profile
+for this accepted depth / Points integration. Existing UI / Registry / Runner / Backend remain model-independent.
+See the [plugin](../models/unik3d/README.md) and [03.4 acceptance](phases/phase-03.md#034-acceptance-evidence--pass).
+
+## Phase 03.5 explicit multi-view boundary
+
+A separate MultiViewPredictionRequest preserves the legacy single-view adapter interface. Ordered PNG
+inputs use schema1.1 and explicit model / request-kind / required-worker capabilities. The common worker
+checks all returned IDs before serialization and binds every output / RGB source by view_id.
+Per-view numerical profiles are unchanged; the new formal scene JSON ref survives terminal collect and export.
+Opaque unknown JSON is preserved without implicit file reads. New readers accept old single-view Runs
+without migration, while older one-view workers are not claimed to support this new execution feature.
+The current viewer is an explicitly identified first-view preview; real multi-view model/UI integration is deferred.
+
+## Phase 03.7 camera and derived geometry boundary
+
+DA3 optional native K conversion stays inside its adapter. Core camera helpers validate explicit source/depth
+grids and pixel transforms; Results reconstructs only derived Points / 2.5D mesh. Known K precedes native K,
+then an explicitly configured calibration provider. Existing native Points remain unchanged. GeoCalib source
+and weights live in a fourth independent camera environment; its API is only imported in an auxiliary worker.
+ExecutionBackend's optional task method shares LocalBackend admission with inference. No core / UI / backend
+model-name branches, fabricated depth models, raw mutation or redistribution are introduced.
+See [03.7 contract](depth-reconstruction-spec.md).

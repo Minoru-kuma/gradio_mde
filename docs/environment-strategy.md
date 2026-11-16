@@ -1,6 +1,8 @@
 # Environment strategy
 
-Status: Phase 01A で独立環境 `mde-moge`、定義、Resolver / Conda launcher を追加。
+Status: Phase 03でMoGe / DA3 / UniK3Dを独立環境に準備し、明示CPUのnative E2Eを確認。
+再現条件・版・未検証範囲は[capability / reproduction matrix](model-capability-matrix.md)を参照。
+履歴: Phase 01Aで独立環境 `mde-moge`、定義、Resolver / Conda launcher を追加。
 Conda subprocess の fake tests と MoGe CPU 実推論は確認済み。01Bで環境再作成・
 process group 停止・計測・fingerprint・CPU regression を検証。GPU 互換性は未検証。
 作成手順と固定版は [MoGe README](../models/moge/README.md)、実測状態は [PLANS](../PLANS.md)。
@@ -75,6 +77,24 @@ provisioning は明示的な準備作業とし、Registry の一覧表示や推�
 checkpoint は設定した cache または local path から読む。研究室 node の外部通信は不明なので、
 事前取得と offline loading ができる adapter を優先する。推論 Job の中で最新版を download しない。
 
+準備するソース・依存packageとcheckpointの利用条件は別に確認し、
+[AGENTSの共通方針](../AGENTS.md#license-review-and-decisions)で予定行為ごとに判断する。
+情報不足だけで非影響の設計・fake検証を停止せず、取得・利用に直接関係する不明点は用途・リスクを整理し、
+必要に応じユーザー判断を求める。local研究用cacheの準備と、重み再配布・公開package同梱は別に判断する。
+この判断方針は自動取得の承認や既存個別保留の解除を意味せず、環境分離・digest・runtimeの技術的検証を代替しない。
+
+通常版の公開・配布時は本体・自作Adapterと環境定義 / 準備手順を提供し、外部モデルsource / checkpointは原則同梱・再配布しない。
+利用者が各公式配布元の条件に従って必要なモデルを別途準備する。Git除外領域にある取得済source / weights / cacheや
+構築済モデル環境を配布物へ混ぜず、local研究用の準備と配布を区別する。
+公式配布元からの明示的な準備scriptはこの構成で利用できる。詳細は[公開・配布仕様](distribution-policy.md)。
+
+デモ版は固定MoGe-2 ViT-S Normal 1種類の実装・weightsと必要な依存環境を提供する構成を例外として正式決定した。
+通常版から分離したbuild profile / 外部recipeのデータで対象OS / arch、版、runtime・resource配置、LICENSE / NOTICEを管理する設計とする。
+本体applicationとMoGe workerの環境分離を維持し、対象platformで再構成・検証する。現在のConda prefix丸コピーの可搬性は未検証。
+MoGeAdapterのinstalled source revision検査を保持できるprovenance提供方式も未確認であり、local wheel導入だけでVCS情報が残るとはしない。
+CPU-only buildの採用やCUDA / NVIDIA依存を含むpacking方式、全依存の再配布条件・NOTICE確認は今回実施していない。
+この設計方針の文書化は、実環境bundle・package生成・配布や、他モデルの同梱を開始するものではない。
+
 ## Conda and pip responsibilities
 
 Conda は Python と環境基盤、採用した native library を管理する。Conda にない upstream package や
@@ -148,7 +168,7 @@ container 等を追加する場合も Environment と ExecutionBackend を混ぜ
 Phase 01A: 初期モデルの pin、minimal worker packaging、launcher と 1 画像の実機推論。
 Phase 01B: cancel / timeout、基本計測、詳細 fingerprint、環境再作成手順の検証。
 Phase 03: 3 環境の独立性、capability / runtime matrix。Phase 07–08: module、node driver、offline cache、
-共有 prefix と node-local prefix の選択。複数モデル / micromamba / cluster profile は未設定。
+共有 prefix と node-local prefix の選択。複数モデルのLocal target mapは03.3で実装済み。micromamba / cluster profileは未設定。
 
 ## Phase 01B measurement and fingerprint
 
@@ -205,3 +225,58 @@ geometry用のNumPyはworker環境の既存依存、controlのgeometry readerは
 02A serialization_secondsは要求されたnumeric artifactsの変換・NPY保存・geometry値検証・checksumを
 含むscopeを各metricに明記する。01A形式の保存metricのscopeを変更せず読み戻す。
 CPUなのでCUDA allocator値は省略、GPU / driver互換は未検証。
+
+## Phase 03.1 variant environment selection
+
+metadata discoveryは環境を起動・作成せず、未準備でもmanifestを一覧できる。
+実効variantの`environment_refs`で1候補なら省略時に採用し、複数候補では明示IDを要求する。
+Runner.submitのoptional `environment_id`とCLIの`--environment-id`で選択する。
+既存`--conda-env / --conda-prefix / --checkpoint`は選択した単一jobのoverrideとして維持。
+logical環境IDを先頭候補で推測せず、対象profileがなければworker起動前に拒否する。
+03.1の追加fake pluginは2 logical IDを既存の同じtest環境へ割り当てる契約テストであり、
+実モデルの独立した2環境を検証した証拠ではない。実モデル追加は03.2以降で行う。
+複数モデルのtarget環境 / checkpoint mapとUIの未準備表示は03.3で追加予定。
+
+
+## Phase 03.2 DA3 CPU environment
+
+DA3 uses its own logical `mde-da3` and dedicated Conda prefix. Its environment.yml pins Python 3.11.14,
+torch 2.6.0+cpu / torchvision 0.21.0+cpu and native inference dependencies; a platform-specific
+[resolved lock](../models/da3/requirements.lock) records the installed transitive versions and immutable source.
+The pinned source is installed --no-deps; native network / processors avoid upstream API export extras.
+No changes to MoGe / Gradio environments. Model discovery works without preparing the new prefix.
+Checkpoint preparation explicitly downloads fixed weights / config; worker inference reads verified local files only.
+CPU CLI and offline-boundary execution succeed. GPU and lock-based recreation remain unverified.
+Details: [DA3 preparation and evidence](../models/da3/README.md).
+
+## Phase 03.3 target maps and per-job checkpoint isolation
+
+The optional [target file](target-configuration.md) binds logical IDs to names / prefixes and
+model_id/variant_id to local checkpoint paths. WorkerManager resolves against the selected JobSpec.
+In map mode it removes inherited MDE_CHECKPOINT_PATH before applying the exact key; no previous model's
+path is retained. Legacy single-job CLI checkpoint / environment overrides remain available.
+UI legacy flags and offline-cache fallback are scoped to its initial model / default variant.
+Preparation metadata is checked without adapter imports; runtime / digest validation stays in the worker.
+The two real models continue using independent environments and their original pinned dependencies.
+
+## Phase 03.4 third independent CPU environment
+
+UniK3D Small uses a separate `mde-unik3d` environment definition and native inference lock in its
+[plugin directory](../models/unik3d/README.md). Python3.11.14 / torch2.6.0+cpu / NumPy2.2.2 were tested
+without changing MoGe / DA3 / UI environments. Official utils imports require wandb / matplotlib even
+for native inference; they are installed in this model environment only and no tracking is initialized.
+Full upstream training / evaluation extras and a clean recreation of this new lock are not claimed.
+The fixed source and checkpoint are prepared separately from official distributors, never bundled in the
+platform. Source / checkpoint terms remain uncertain and the local research action has a recorded user decision.
+
+## Phase 03.7 independent camera environment
+
+GeoCalib calibration uses a fourth independent worker environment, mde-geocalib, without adding dependencies to
+UI / MoGe / DA3 / UniK3D. It is an auxiliary camera role and is not a fourth depth model. Python3.11.14, CPU
+torch2.6.0+cpu / torchvision0.21.0+cpu, NumPy1.26.4, Kornia0.8.0 and the official fixed source are recorded in
+[environment.yml](../models/geocalib/environment.yml) / [requirements.lock](../models/geocalib/requirements.lock).
+The initial headless OpenCV substitute worked natively but did not satisfy upstream package metadata; it was
+replaced only in this new environment with official opencv-python4.10.0.84. Final pip check succeeds.
+Resolved package / Conda fingerprint is observed in actual calibration workers and saved as derived provenance.
+Clean lock recreation on a second prefix, GPU and other platforms remain unverified.
+Preparation, local target configuration and nonbundling: [GeoCalib README](../models/geocalib/README.md).

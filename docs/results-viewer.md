@@ -50,7 +50,7 @@ z_depthは `K^-1[x,y,1] * depth`、ray_distanceはrayをunit length化してdept
 
 ## Mesh and persistence contract
 
-algorithm `grid-triangulation` version `1`。LOD / downsamplingなし。
+algorithm `grid-triangulation`はnative Points由来でversion `1`、深度逆投影由来でversion `2`。LOD / downsamplingなし。
 すべての頂点がvalidなgrid cellのみ2三角形にする。各faceのすべての辺について:
 
 - depth差 ≤ **0.05 × face内最小depth**（relative、元depth unit）
@@ -82,7 +82,9 @@ directoryを同一filesystem内でatomic renameする。complete generationだ�
 identity / path / digest / dtype / shape / index boundsを検証する。途中stagingは保持する。
 壊れたcomplete cacheは明示エラー、上書き・自動削除をしない。明示再生成UIは02D管理Serviceを利用する。
 複数generation、current pointer、削除後fallbackと公開失敗の候補除外は [管理仕様](run-management-spec.md#derived-identity-publication-and-selection) を参照。
-バックプロジェクションはalgorithm `pinhole-backprojection` version `1`、同じ保存/検証方式。
+バックプロジェクションはalgorithm `pinhole-backprojection` version `2`、同じ保存/検証方式。
+旧version1は保持するが修正済み成果物として再利用しない。厳密K検証と有効z-depth / Z整合性の生成・再読込検証は
+[03.7仕様](depth-reconstruction-spec.md)を参照。
 単一application processを対象とし、multi-process調停・電源断後のdurabilityは保証しない。
 
 ## Offline operation and limits
@@ -99,3 +101,19 @@ payloadはbase64 buffers、同時に1つの3D objectを保持、切替・compone
 material / texture / controlsをdisposeする。WebGL非対応時は初期化失敗理由を表示する。
 
 検証OS / browser / 容量実測とGPU未検証の区別は02Cの証拠を参照する。
+
+## Phase 03.5 saved multi-view boundary
+
+Saved multi-view Runs retain every input, output view and scene for collection / export. The current
+viewer previews the first input view and identifies that limited preview in its statistics; it does not
+render a combined scene or add multi-view selection controls. RGB dependencies are matched by view_id,
+so return order cannot bind a point map to another view's image. Legacy one-view display is unchanged.
+
+## Phase 03.7 depth-only reconstruction
+
+Additional camera resolution uses explicit known K, then saved native K, then a configured independent camera estimator.
+Existing native Points remain raw and take priority over reconstruction. The optional Results known-camera inputs
+choose source or depth grid explicitly. Failed calibration / unknown mapping never uses a fixed-FOV substitute.
+K-only derived generations, provenance, grid transforms and saved reuse are defined in the
+[03.7 reconstruction specification](depth-reconstruction-spec.md). Legacy Runs are not edited; without sufficient
+camera/mapping or a saved calibration they retain the defined 3D-unavailable behavior.

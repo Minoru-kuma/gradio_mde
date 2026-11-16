@@ -6,6 +6,12 @@ MoGe CPU の実推論成果物も保存・読み戻し確認済み。証拠は [
 関連: [Job contracts](execution-backend-spec.md)、[MDEOutput](model-adapter-spec.md)、
 [MLflow](mlflow-design.md)、[Slurm](slurm-integration.md)。
 
+03.4の追加診断: `execution.runtime_capability_check`はload後の能力照合が成功した場合のoptional JSON。
+`declaration: declared / legacy_undeclared`、`requested_outputs`、`capabilities` snapshotを持つ。
+旧Runのfield欠如は正常。照合失敗時は未検証snapshotを保存せず、既存のpreflight errorで報告する。
+意味は[ModelAdapter契約](model-adapter-spec.md#phase-034-runtime-capability-preflight)を参照。
+schema 1.0・既存numeric profileとraw不変の契約は変更しない。
+
 ## Identity
 
 - `run_id`: application が採番する logical inference / benchmark experiment の安定 ID。
@@ -264,3 +270,69 @@ Runner.collectのrun.json publicationはinstance lockを取り、同内容なら
 複数sessionの同時collectでtemporary fileを競合させず、再表示によるraw / result更新も行わない。
 02Cでdownload / viewer / derivedを追加、管理serviceは02D。
 詳細は [Gradio Inference](gradio-inference.md#input-and-result-compatibility)。
+
+## Phase 03.1 compatibility
+
+JobSpecのmodel_ref.variantに実効metadata snapshotを加算し、元manifestも保持する。
+旧schema 1.0 Runに実効snapshotを要求するreader変更やmigrationは行わない。
+01A-depth-only / 02A-geometry-v1のwire format、raw / 確定result不変を維持する。
+複数pluginの新instance collectも再推論せず、hash / mtime不変で検証する。
+
+
+## Phase 03.3 target configuration boundary
+
+Target names / prefixes and local checkpoint paths are configured outside the immutable JobSpec.
+Jobs retain logical environment / model / variant and content identities; runtime fingerprint continues to
+record the actual selected Python environment. No layout, profile, required output or raw/result semantics change.
+Model switching creates a fresh Run, while opening / collecting saved Runs performs no inference or migration.
+The two real CPU UI Runs and old saved Runs are checked for hash / mtime immutability after repeated reads.
+
+## Phase 03.5 multi-view records
+
+Single-view JobSpec writers retain schema1.0 and `view-0001` layout. Multi-view Jobs explicitly use
+schema1.1 / inference.request_kind=multi_view_v1 and require the new common worker and declared protocol1.1.
+The worker currently supports required protocol1.0 / 1.1, records actual version1.1 in execution metadata,
+and rejects a required future version1.2. Generic record-schema major compatibility remains unchanged;
+known request kinds and required worker features determine execution support, not merely a 1.x label.
+Each input / output view uses its assigned `view-NNNN` directory. One attempt remains the only supported
+attempt. All input IDs / hashes are included in the ordered request digest.
+
+The existing 01A-depth-only / 02A-geometry-v1 numerical profiles apply independently to every view.
+`metadata.json.views` and `outputs` contain all view metadata in input order. Header, shape, validity,
+units, provenance, path and checksum checks cover all views, not just the first.
+
+A new optional `scene` ArtifactRef appears in WorkerReport / JobResult and the metadata document:
+
+```json
+{
+  "schema_version": "1.1",
+  "run_id": "<Run ID>",
+  "attempt_id": "attempt-0001",
+  "view_ids": ["view-0001", "view-0002"],
+  "metadata": {"reference_view_id": "view-0001", "scale_type": "relative", "depth_unit": "arbitrary"}
+}
+```
+
+This is the content of `output/attempt-0001/scene.json`, registered as application/json with size / SHA-256.
+The scene ref is mandatory for completed multi-view results. Its exact identity, order and optional
+reference / scale / unit fields are validated, and the ref must agree across worker, metadata and terminal
+records. A nonempty single-view model scene also emits the new 1.1 result / metadata / scene format;
+existing plugins returning empty scene metadata continue writing the legacy format.
+
+Missing scene fields in old Runs are normal and are not rewritten. `JobResult.scene=None` is omitted from
+wire output. New readers support legacy records and the opt-in multi-view extension; old single-view
+workers / readers are not claimed to understand multiple views. No raw migration is performed.
+Unknown scene / extras metadata remains opaque JSON rather than an implicit file reference. Formally
+registered scene and per-view artifacts, plus every original input, are included by Run export.
+
+## Phase 03.7 derived calibration
+
+Raw Run / JobSpec / WorkerResult / JobResult remain immutable. The existing derived schema1.0 gains an additional
+algorithm, single-image-calibration version1, with a float32 intrinsics[3,3] NPZ member instead of points/faces.
+Its output path remains derived/key/generation/geometry.npz. Cache readers validate finite positive pinhole K,
+dtype/shape, SHA, identity, publication and selection before reuse. Existing points / mesh generation formats
+remain unchanged; older readers are not claimed to understand the new K-only algorithm. No Run migration occurs.
+Optional manifest.provenance records actual task runtime/fingerprint. Reconstruction identity records K source,
+source/output grids and grid_space, integer/half centers, explicit affine transform, source/checkpoint/seed,
+calibration output ref and original input/depth dependencies. Existing history / atomic publication / export
+includes this generation. See [03.7 specification](depth-reconstruction-spec.md).

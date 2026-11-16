@@ -53,7 +53,11 @@ def rows(stream, fmt):
 
 
 def validate_geometry(run, report):
-    output = report["outputs"][0]
+    for output in report['outputs']:
+        validate_geometry_view(run, report, output)
+
+
+def validate_geometry_view(run, report, output):
     metadata = output["metadata"]
     profile = report["execution"].get("serialization_profile", "01A-depth-only")
     job_requested = normalize_outputs(read_json(contained_path(run, "job.json"))["inference"]["requested_outputs"])
@@ -81,7 +85,7 @@ def validate_geometry(run, report):
         dtype = "bool" if key in ("mask", "model_mask") else "float32"
         unit = metadata["depth_unit"] if key == "points" else "pixel" if key == "intrinsics" else "unitless"
         if (not isinstance(ref, dict) or ref not in report["artifacts"]
-                or ref.get("path") != f"output/{ATTEMPT_ID}/views/{VIEW_ID}/{key}.npy"
+                or ref.get("path") != f"output/{ATTEMPT_ID}/views/{output['view_id']}/{key}.npy"
                 or ref.get("media_type") != "application/x-npy"
                 or ref.get("shape") != shapes[key] or ref.get("dtype") != dtype or ref.get("unit") != unit):
             raise ArtifactIntegrityError(f"Invalid {key} artifact reference")

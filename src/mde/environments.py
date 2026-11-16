@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .storage import contained_path, sha256_file
+from .storage import read_json
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,11 @@ class CondaLauncher:
         target = ["--prefix", profile.prefix] if profile.prefix else ["--name", profile.name]
         return [self.executable, "run", "--no-capture-output", *target,
                 "python", "-m", "mde.worker", "--job", str(job_path), "--run-dir", str(run)]
+
+    def task_argv(self, profile, request_path, result_path):
+        target = ["--prefix", profile.prefix] if profile.prefix else ["--name", profile.name]
+        return [self.executable, "run", "--no-capture-output", *target, "python", "-m", "mde.task_worker",
+                "--request", str(request_path), "--result", str(result_path)]
 
 
 @dataclass
@@ -99,11 +105,14 @@ class WorkerProcess:
 
 class WorkerManager:
     def __init__(self, project_root: Path, resolver: EnvironmentResolver, launcher=None,
-                 checkpoint: Path | None = None):
+                 checkpoint: Path | None = None, *, checkpoints: dict[str, Path] | None = None):
         self.project_root = Path(project_root).resolve()
         self.resolver = resolver
         self.launcher = launcher or CondaLauncher()
+        if checkpoint is not None and checkpoints is not None:
+            raise ValueError('Use a per-variant checkpoint map or a single-job checkpoint override')
         self.checkpoint = checkpoint
+        self.checkpoints = checkpoints
 
     def start(self, reference: dict, job_path: Path, run: Path) -> WorkerProcess:
         if os.name != "posix":
@@ -121,6 +130,14 @@ class WorkerManager:
         environment["PYTHONUNBUFFERED"] = "1"
         environment["PYTHONDONTWRITEBYTECODE"] = "1"
         environment["MDE_CONTROL_PREFIX"] = sys.prefix
+        if self.checkpoints is not None:
+            # Resolve against the immutable selected job, never shared UI state or
+            # a process-global checkpoint left over from another model.
+            environment.pop("MDE_CHECKPOINT_PATH", None)
+            model = read_json(job_path)["model_ref"]
+            key = f'{model["model_id"]}/{model["variant"]["variant_id"]}'
+            if key in self.checkpoints:
+                environment["MDE_CHECKPOINT_PATH"] = str(Path(self.checkpoints[key]).resolve())
         if self.checkpoint:
             environment["MDE_CHECKPOINT_PATH"] = str(Path(self.checkpoint).resolve())
         logs = run / "logs" / "attempt-0001"
@@ -129,4 +146,23 @@ class WorkerManager:
                                        cwd=self.project_root, env=environment,
                                        stdout=stdout, stderr=stderr, start_new_session=True,
                                        stdin=subprocess.DEVNULL)
+        return WorkerProcess(process)
+
+    def start_task(self, reference, request_path, result_path, work_dir):
+        profile = self.resolver.resolve(reference)
+        definition = contained_path(self.project_root, reference["definition_ref"])
+        if sha256_file(definition) != reference["definition_digest"]:
+            raise ValueError("Auxiliary environment definition digest mismatch")
+        if profile.prefix and Path(profile.prefix).resolve() == Path(sys.prefix).resolve():
+            raise ValueError("Auxiliary task must use an independent environment")
+        environment = os.environ.copy()
+        environment.pop("MDE_CHECKPOINT_PATH", None)
+        environment["PYTHONPATH"] = os.pathsep.join([str(self.project_root / "src"), str(self.project_root), environment.get("PYTHONPATH", "")])
+        environment["PYTHONUNBUFFERED"] = "1"
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        environment["MDE_CONTROL_PREFIX"] = sys.prefix
+        with (work_dir / "stdout.log").open("xb") as stdout, (work_dir / "stderr.log").open("xb") as stderr:
+            process = subprocess.Popen(self.launcher.task_argv(profile, request_path, result_path),
+                cwd=self.project_root, env=environment, stdout=stdout, stderr=stderr,
+                start_new_session=True, stdin=subprocess.DEVNULL)
         return WorkerProcess(process)

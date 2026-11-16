@@ -11,7 +11,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from .contracts import ArtifactIntegrityError, ATTEMPT_ID, SCHEMA_VERSION, VIEW_ID, check_schema
+from .contracts import (ArtifactIntegrityError, ATTEMPT_ID, SCHEMA_VERSION, VIEW_ID,
+                        JobSpec, check_schema, view_id_for_index)
 
 
 def sha256_file(path: Path) -> str:
@@ -53,6 +54,15 @@ def read_json(path: Path) -> dict:
     if not isinstance(value, dict):
         raise ValueError("JSON record must be an object")
     return value
+
+
+def json_metadata(value, name):
+    if not isinstance(value, dict):
+        raise ValueError(f'{name} must be a JSON object')
+    try:
+        return json.loads(json.dumps(value, allow_nan=False))
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError(f'{name} must contain finite JSON metadata') from error
 
 
 def run_path(root: Path, run_id: str) -> Path:
@@ -111,26 +121,8 @@ def inspect_depth(path: Path) -> dict:
     return {"shape": list(shape), "dtype": "float32"}
 
 
-def validate_outputs(run: Path, report: dict) -> None:
-    outputs = report.get("outputs", [])
-    if len(outputs) != 1 or outputs[0].get("view_id") != VIEW_ID:
-        raise ArtifactIntegrityError("Expected exactly one output view")
-    output = outputs[0]
+def validate_depth_output(run, output):
     depth = output["depth"]
-    artifacts = report.get("artifacts", [])
-    paths = set()
-    prefix = f"output/{ATTEMPT_ID}/"
-    for ref in artifacts:
-        validate_artifact(run, ref)
-        if not ref["path"].startswith(prefix) or ref["path"] in paths:
-            raise ArtifactIntegrityError("Wrong attempt or duplicate artifact path")
-        paths.add(ref["path"])
-    expected_depth = f"{prefix}views/{VIEW_ID}/depth.npy"
-    expected_metadata = f"{prefix}metadata.json"
-    if depth["path"] != expected_depth or expected_metadata not in paths:
-        raise ArtifactIntegrityError("Missing required depth / metadata artifact reference")
-    if depth not in artifacts:
-        raise ArtifactIntegrityError("Depth reference missing or inconsistent with artifact list")
     path = contained_path(run, depth["path"])
     if sha256_file(path) != depth["sha256"] or path.stat().st_size != depth["size_bytes"]:
         raise ArtifactIntegrityError("Depth integrity mismatch")
@@ -153,19 +145,87 @@ def validate_outputs(run: Path, report: dict) -> None:
         raise ArtifactIntegrityError("Invalid camera frame")
     if metadata.get("output_size") != {"height": info["shape"][0], "width": info["shape"][1]}:
         raise ArtifactIntegrityError("Output dimensions mismatch")
+
+
+def validate_scene_metadata(metadata, view_ids, view_metadata=None):
+    if not isinstance(metadata, dict):
+        raise ValueError('Scene metadata must be an object')
+    reference = metadata.get('reference_view_id')
+    if reference is not None and reference not in view_ids:
+        raise ValueError('Scene reference_view_id is not an input view')
+    units = {'metric': 'm', 'relative': 'arbitrary', 'unknown': 'unknown'}
+    if 'scale_type' in metadata and metadata['scale_type'] not in units:
+        raise ValueError('Unknown scene scale type')
+    if 'depth_unit' in metadata and metadata['depth_unit'] != units.get(metadata.get('scale_type')):
+        raise ValueError('Scene scale / unit mismatch')
+    if 'camera_frame' in metadata and metadata['camera_frame'] != 'opencv_x_right_y_down_z_forward':
+        raise ValueError('Invalid scene camera frame')
+    for view in view_metadata or []:
+        for key in ('scale_type', 'depth_unit', 'camera_frame'):
+            if key in metadata and metadata[key] != view.get(key):
+                raise ValueError(f'Scene / view {key} mismatch')
+
+
+def validate_outputs(run: Path, report: dict) -> None:
+    spec = JobSpec.from_dict(read_json(contained_path(run, 'job.json')))
+    expected_ids = [source['view_id'] for source in spec.inputs]
+    outputs = report.get('outputs', [])
+    if not isinstance(outputs, list) or any(not isinstance(output, dict) for output in outputs):
+        raise ArtifactIntegrityError('Invalid output views')
+    if [output.get('view_id') for output in outputs] != expected_ids:
+        raise ArtifactIntegrityError('Output view identities / input order mismatch')
+    artifacts = report.get('artifacts', [])
+    paths = set()
+    prefix = f'output/{ATTEMPT_ID}/'
+    for ref in artifacts:
+        validate_artifact(run, ref)
+        if not ref['path'].startswith(prefix) or ref['path'] in paths:
+            raise ArtifactIntegrityError('Wrong attempt or duplicate artifact path')
+        paths.add(ref['path'])
+    expected_metadata = f'{prefix}metadata.json'
+    if expected_metadata not in paths:
+        raise ArtifactIntegrityError('Missing metadata artifact reference')
+    for source, output in zip(spec.inputs, outputs):
+        expected_depth = f"{prefix}views/{output['view_id']}/depth.npy"
+        depth = output['depth']
+        if depth.get('path') != expected_depth or depth not in artifacts:
+            raise ArtifactIntegrityError('Missing or inconsistent depth artifact reference')
+        if output.get('metadata', {}).get('original_size') != source['original_size']:
+            raise ArtifactIntegrityError('Original input dimensions / output provenance mismatch')
+        validate_depth_output(run, output)
+        json_metadata(output.get('extras', {}), 'View extras')
+    scene = report.get('scene')
+    if len(expected_ids) > 1 and scene is None:
+        raise ArtifactIntegrityError('Missing multi-view scene reference')
+    if scene is not None:
+        if (int(report['schema_version'].split('.')[1]) < 1 or not isinstance(scene, dict)
+                or scene not in artifacts or scene.get('path') != f'{prefix}scene.json'
+                or scene.get('media_type') != 'application/json'):
+            raise ArtifactIntegrityError('Invalid scene artifact reference')
+        document = read_json(contained_path(run, scene['path']))
+        check_schema(document)
+        if (int(document['schema_version'].split('.')[1]) < 1
+                or document.get('run_id') != report['run_id'] or document.get('attempt_id') != report['attempt_id']
+                or document.get('view_ids') != expected_ids):
+            raise ArtifactIntegrityError('Scene identity / view order mismatch')
+        try:
+            validate_scene_metadata(document.get('metadata'), expected_ids, [output['metadata'] for output in outputs])
+        except ValueError as error:
+            raise ArtifactIntegrityError(str(error)) from error
     from .geometry import validate_geometry
     validate_geometry(run, report)
     document = read_json(contained_path(run, expected_metadata))
     check_schema(document)
-    if document.get("run_id") != report["run_id"] or document.get("attempt_id") != report["attempt_id"]:
-        raise ArtifactIntegrityError("Metadata identity mismatch")
-    if document.get("views") != [metadata]:
-        raise ArtifactIntegrityError("Metadata / output mismatch")
-    worker_execution = dict(report["execution"])
-    for key in ("backend_job_id", "exit_code", "manager_instance", "process_cleanup"):
+    if document.get('run_id') != report['run_id'] or document.get('attempt_id') != report['attempt_id']:
+        raise ArtifactIntegrityError('Metadata identity mismatch')
+    if document.get('views') != [output['metadata'] for output in outputs] or document.get('scene') != scene:
+        raise ArtifactIntegrityError('Metadata / output or scene mismatch')
+    worker_execution = dict(report['execution'])
+    for key in ('backend_job_id', 'exit_code', 'manager_instance', 'process_cleanup'):
         worker_execution.pop(key, None)
-    if document.get("execution") != worker_execution:
-        raise ArtifactIntegrityError("Runtime metadata mismatch")
+    if document.get('execution') != worker_execution:
+        raise ArtifactIntegrityError('Runtime metadata mismatch')
+
 
 
 def validate_artifact(run: Path, ref: dict) -> None:
@@ -216,18 +276,18 @@ def validate_job_files(run: Path, spec) -> None:
     for relative in ("job.json", f"attempts/{spec.attempt_id}/job.json"):
         if read_json(contained_path(run, relative)) != spec.to_dict():
             raise ArtifactIntegrityError("Persisted JobSpec mismatch")
-    source = spec.inputs[0]
-    path = contained_path(run, source["path"])
-    if sha256_file(path) != source["sha256"]:
-        raise ArtifactIntegrityError("Input checksum mismatch")
-    if "source" in source:
-        original = source["source"]
-        original_path = contained_path(run, original["path"])
-        if original_path.stat().st_size != original["size_bytes"] or sha256_file(original_path) != original["sha256"]:
-            raise ArtifactIntegrityError("Original input checksum mismatch")
-    width, height = inspect_png(path)
-    if source["original_size"] != {"width": width, "height": height}:
-        raise ArtifactIntegrityError("Input dimensions mismatch")
+    for source in spec.inputs:
+        path = contained_path(run, source["path"])
+        if sha256_file(path) != source["sha256"]:
+            raise ArtifactIntegrityError("Input checksum mismatch")
+        if "source" in source:
+            original = source["source"]
+            original_path = contained_path(run, original["path"])
+            if original_path.stat().st_size != original["size_bytes"] or sha256_file(original_path) != original["sha256"]:
+                raise ArtifactIntegrityError("Original input checksum mismatch")
+        width, height = inspect_png(path)
+        if source["original_size"] != {"width": width, "height": height}:
+            raise ArtifactIntegrityError("Input dimensions mismatch")
 
 
 class RunStore:
@@ -245,4 +305,13 @@ class RunStore:
         shutil.copyfile(image, run / "input" / "views" / VIEW_ID / "image.png")
         write_json(run / "run.json", {"schema_version": SCHEMA_VERSION, "run_id": run_id,
                    "selected_attempt_id": ATTEMPT_ID, "status": "QUEUED"})
+        return run
+
+    def prepare_views(self, run_id, images):
+        run = self.prepare(run_id, images[0])
+        for index, image in enumerate(images[1:], 2):
+            view_id = view_id_for_index(index)
+            for relative in (f'input/views/{view_id}', f'output/{ATTEMPT_ID}/views/{view_id}'):
+                (run / relative).mkdir(parents=True)
+            shutil.copyfile(image, run / f'input/views/{view_id}/image.png')
         return run

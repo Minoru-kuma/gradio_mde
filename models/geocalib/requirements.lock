@@ -1,0 +1,27 @@
+# Linux x86_64 / Python 3.11.14; CPU wheels require https://download.pytorch.org/whl/cpu
+# Resolved after official opencv-python replacement; separate-prefix lock recreation untested.
+contourpy==1.3.3
+cycler==0.12.1
+filelock==4.2.10
+fonttools==4.68.0
+fsspec==2026.9.0
+geocalib @ git+https://github.com/cvg/GeoCalib.git@1dedb29f94fc11b896c5f572005978aeebccd67f
+Jinja2==3.1.6
+kiwisolver==1.5.1
+kornia==0.8.0
+kornia_rs==0.2.0
+MarkupSafe==3.0.4
+matplotlib==3.10.0
+mpmath==1.3.0
+networkx==3.6.1
+numpy==1.26.4
+opencv-python==4.10.0.84
+packaging==26.3
+pillow==11.1.0
+pyparsing==3.3.3
+python-dateutil==4.0.0
+sympy==1.13.1
+torch==2.6.0+cpu
+torchvision==0.21.0+cpu
+typing_extensions==4.16.0
+tzdata==2026.6

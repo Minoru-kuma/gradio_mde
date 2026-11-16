@@ -1,0 +1,204 @@
+# UniK3D adoption investigation — Phase 03.4
+
+Status: **03.4 acceptance PASS — native Small CPU depth / Points E2E and regression verified**.
+History: work resumed after 03.3, then initially stopped before installation, weight download or
+implementation because the applicable license evidence was unresolved. The subsequent user instruction
+revises that blanket stop: independent adapter / synthetic tests / geometry validation may proceed.
+This records conflicting labels and missing information, not a conclusion that use is prohibited.
+The 2026-11-12 documentation-only update applies the project-wide
+[license decision policy](../AGENTS.md#license-review-and-decisions). It preserves the findings and
+historical stop decisions below; it does not acquire weights, implement a runtime or execute a model.
+
+## Scope and source identity
+
+The selected candidate is UniK3D Small (`unik3d-vits`), following the Phase 03 plan to establish the third
+model's depth-only CPU E2E before extending optional artifacts. During the initial investigation official source was inspected only in
+Git-ignored storage, not copied into production or installed. Later scoped local installation is recorded below.
+
+| Item | Verified reference / declaration |
+| --- | --- |
+| Source | [`29f7862f3c3ee79c53ef0153dfc901ce511df575`](https://github.com/lpiccinelli-eth/UniK3D/tree/29f7862f3c3ee79c53ef0153dfc901ce511df575), latest source commit observed during this investigation |
+| Candidate checkpoint | [`lpiccinelli/unik3d-vits` at `80a99bfeb8d983ca6af27125fd83c88b891e75ad`](https://huggingface.co/lpiccinelli/unik3d-vits/tree/80a99bfeb8d983ca6af27125fd83c88b891e75ad) |
+| Safetensors | Hub LFS declaration: `model.safetensors`, 141,789,264 bytes, SHA-256 `9f977d058961146582931c136cf2ce44964cff3153dae7823dd1209223489bc6` |
+| Config | `config.json`, retrieved from that checkpoint revision, 3,672 bytes, measured SHA-256 `5b5b7d5c6884fdb1c5f2fbf58dfaa6beb81d5ccff3dbcead4632f81eb32ad131` |
+| Model card | `README.md`, retrieved from that checkpoint revision, 390 bytes, measured SHA-256 `0d65739e516d91cd2eb8252f8833ab2b9a1e9b6a1e09a9cacd4e79e68f74848d` |
+
+At the initial investigation the safetensors body was **not downloaded**, so its digest was then only
+a published declaration. After the scoped user decision below, the actual body and config were acquired
+into Git-ignored local research storage and both measured digests matched the recorded declarations.
+This changes the acquisition / verification state, not the unresolved license applicability findings.
+
+## License evidence and unresolved applicability
+
+| Primary source | Observation |
+| --- | --- |
+| [Fixed repository LICENSE](https://github.com/lpiccinelli-eth/UniK3D/blob/29f7862f3c3ee79c53ef0153dfc901ce511df575/LICENSE) | CC BY-NC-SA 4.0 text |
+| [Fixed model source header](https://github.com/lpiccinelli-eth/UniK3D/blob/29f7862f3c3ee79c53ef0153dfc901ce511df575/unik3d/models/unik3d.py) | CC BY-NC-SA 4.0 label |
+| [Fixed README license section](https://github.com/lpiccinelli-eth/UniK3D/blob/29f7862f3c3ee79c53ef0153dfc901ce511df575/README.md#license) | CC BY-NC 4.0 label; describes software and links the different LICENSE text |
+| [Fixed package metadata](https://github.com/lpiccinelli-eth/UniK3D/blob/29f7862f3c3ee79c53ef0153dfc901ce511df575/pyproject.toml) | CC BY-NC 4.0 label |
+| [Fixed Small model card](https://huggingface.co/lpiccinelli/unik3d-vits/blob/80a99bfeb8d983ca6af27125fd83c88b891e75ad/README.md) | Library / tags and a documentation placeholder; no explicit license field or terms |
+| Official Small / Base / Large Hub metadata and file listings | No license in cardData, and no LICENSE / NOTICE file observed |
+| [Author's project page](https://lpiccinelli-eth.github.io/pub/unik3d/) | Links code and models; no additional model-license terms found on the inspected page |
+
+The other checkpoint refs observed were Base `c65bb3a8a4fa981a06ee9286ce847aebe7f66fe2` and
+Large `008aa54308b8bc142f74c9c7b098833aaede06bd`. These metadata checks do not establish their permissions.
+A proposed license edit on a Hub PR ref was not treated as terms applying to the fixed released checkpoint.
+Public availability / ungated download does not resolve the missing applicability evidence.
+
+No `weights_license` value has been guessed. Initially no real variant was registered and the E2E gate
+was unmet; the native connection below records the later implementation separately. The licensing uncertainty remains unresolved.
+
+## Work-specific stop conditions — revised user instruction
+
+This table preserves the case status during the documentation-only task, before the scoped user decision
+and native connection below. It is not a blanket rule for all models; those later records supersede its
+acquisition / runtime hold entries. Independent work remains subject to Phase / task authorization.
+
+| Work | Current treatment |
+| --- | --- |
+| Independently authored adapter lifecycle, native-layout array conversion, synthetic fixtures, geometry and existing-reader tests | Continue without importing or copying upstream implementation or loading weights |
+| Real checkpoint acquisition, use or redistribution (including inference from an existing local copy) | Existing case-specific hold remains. Reconsider the affected action under the common policy using intended use / risk assessment and any needed user decision; this update does not release the hold |
+| Production registration, real runtime bridge and independent UniK3D environment | Still unimplemented; this documentation-only update does not begin these steps. Synthetic execution is not adoption evidence |
+| Work conflicting with an explicit prohibition or presenting a major rights risk | Stop the affected work and report the specific conflict / risk; do not assume missing information is a prohibition |
+| 03.5 / 03.6 | Gate remains closed pending all 03.4 acceptance conditions, including real-model E2E |
+
+Public accessibility and a source-license label do not by themselves resolve checkpoint applicability.
+This is a record of missing evidence, not a legal determination or permission to use the checkpoint.
+
+## Technical observations — source only, no execution claim
+
+These paragraphs retain the initial source-only investigation, before the later native connection below.
+
+The fixed `UniK3D.infer` performs native preprocessing and returns points, rays, confidence, depth and
+distance. Its source defines depth from points' z coordinate and distance from the points' norm;
+rays are normalized after native postprocessing. These are distinct quantities, especially for wide-angle
+or non-pinhole cameras. A future adapter must select and document the canonical depth meaning without
+inventing pinhole K, reconstructing native Points from depth, or discarding directions by assuming positive z.
+The independent synthetic contract now chooses native **distance** as canonical `ray_distance` and
+transposes native points `[1,3,H,W]` to `[H,W,3]`, preserving negative or zero z directions.
+It validates distance against norm(points), and native z-depth against points.z if present.
+It neither invents K nor reconstructs points, changes scale, resamples, or converts range to z.
+Nonfinite / nonpositive distances or nonfinite points become invalid depth / vectors; computed validity
+is not exposed as a native model mask. Real tensors, camera frame, scale and precision remain unverified.
+
+The package requires Python >=3.11 and declares NumPy >=2, torch >=2.4, torchvision >=0.19, and other
+training / visualization / extension dependencies. The README includes an explicit CPU example alongside
+CUDA installation requirements. This is source evidence only: no CPU import, memory, runtime, package
+subset or independent environment has been validated. Existing MoGe / DA3 / UI environments are unchanged.
+
+## Independent implementation boundary
+
+Historical scope before native connection (see the current [adapter README](../models/unik3d/README.md)):
+at that stage default `load()` reported the checkpoint hold before
+path access or framework import. Only an explicitly injected, independently authored fixture runtime
+with no checkpoint can exercise the load / predict / unload contract. No production manifest is
+installed, so Gradio and CLI discovery do not advertise a runnable UniK3D variant.
+The synthetic runtime runs in an existing test environment; it is not a third independent model environment.
+Depth and points reuse `01A-depth-only` / `02A-geometry-v1`. Schema, core, UI and backend are unchanged.
+Rays / confidence / pose serialization and new profiles remain outstanding. Generic runtime-capability
+checks are now implemented independently in the resumed 03.4 work; see the
+[preflight contract](model-adapter-spec.md#phase-034-runtime-capability-preflight).
+
+## Checkpoint resume gate and next steps
+
+Historical gate wording (2026-11-11), preserved as the earlier decision rather than the current common rule:
+
+> Resume adoption when authoritative author-provided terms or permission establish the license applicable
+> to the selected checkpoint and clarify the differing source labels for the intended research integration.
+
+Current operation (2026-11-12): follow the [AGENTS common policy](../AGENTS.md#license-review-and-decisions).
+Distinguish source and checkpoint conditions and record official sources, the intended action / purpose,
+uncertainty, risks and decision basis. Clear terms covering the intended use allow ordinary authorized work;
+uncertain terms directly affecting acquisition or use call for a scoped assessment and user judgment when needed.
+Unknown terms neither establish unrestricted permission nor prove a prohibition.
+The existing UniK3D checkpoint hold remains in place in this documentation-only change. Its reconsideration
+does not universally require direct author contact or individual permission: additional official documentation
+may supply evidence, and high-value author questions may be proposed to the user if needed.
+Commercial use, weight redistribution and public-package bundling require separate assessment from local research.
+An operational user decision is not a grant of rights by the rights holder.
+
+No external message or permission request has been sent to the authors.
+
+After an action-specific decision to resume, record the decision, applicable conditions and any remaining
+uncertainty, establish an independent environment and runtime
+bridge, verify local weights / config digests, and complete the depth-only CLI → Runner → Backend → worker
+E2E. Required optional outputs must also be verified against actual native outputs before their acceptance.
+Independent fixture preparation may precede these steps; it does not satisfy the real-model E2E.
+03.4 remains incomplete and 03.5 remains gated on 03.4 acceptance.
+
+Questions prepared for the authors (not sent; optional clarification proposals, not mandatory gates for all models):
+
+1. For source revision `29f7862...`, should integration follow CC BY-NC or CC BY-NC-SA 4.0?
+   Which files / components have different terms, if any, and where is the authoritative clarification?
+2. What license applies to `unik3d-vits` checkpoint revision `80a99bf...` and its config, and does it
+   differ for Base / Large? Please identify a model card / license document or explicit permission covering them.
+3. Under those terms, what attribution / notices and redistribution conditions apply to a research
+   integration, local checkpoint cache, shared lab environment and any distributed checkpoint copy?
+4. Are inference outputs or a hosted research demo subject to additional conditions, and how should
+   noncommercial scope and any share-alike obligations be documented for this intended use?
+
+Local investigation evidence is under `.local/validation/phase-03-4-unik3d-*`; it is excluded from Git.
+The earlier investigation commit changed documentation only and ran no new implementation / inference tests.
+The current independent implementation has separate verification results in [Phase 03](phases/phase-03.md).
+
+## Scoped decision on resume — 2026-11-12
+
+Phase 03.4 implementation has resumed after the documentation-only task. The general resume instruction
+does not itself release the existing checkpoint hold. The following assessment is prepared for a scoped
+user decision under AGENTS rule 13.4; it does not assert permission or a prohibition.
+
+| Action | Intended use / evidence / remaining uncertainty | Current treatment |
+| --- | --- | --- |
+| Independent adapter / generic worker preflight / synthetic tests | No real weights or copied upstream implementation needed; existing contracts apply | Continue within resumed Phase 03.4 |
+| Acquire fixed Small checkpoint into Git-ignored local cache and use for explicit CPU research E2E | Noncommercial local research only; fixed revision and published size / digest are recorded above. Source has NC versus NC-SA labels; applicability to the checkpoint is not established. The current official [model card](https://huggingface.co/lpiccinelli/unik3d-vits) was rechecked on 2026-11-12 and supplied no additional explicit terms. Public download is not evidence of unlimited permission. The remaining risk is uncertain authorization / obligations for this exact checkpoint | Pending a specific user decision: retain the hold, or authorize this narrow research action with the uncertainty recorded. No body download or inference before that decision |
+| Redistribute weights, bundle them in a public package, publish a demo or use commercially | Changes purpose / audience and may introduce different obligations; not required for current CPU validation | Not authorized by a local research decision; assess separately |
+
+No explicit checkpoint prohibition was established by this investigation; absence of such evidence does
+not establish a license. If a clear restriction conflicting with an action is found, stop that action and report it.
+A user decision would authorize our work scope, not grant rights on behalf of the rights holder.
+Direct author contact remains an optional proposal; no inquiry has been sent.
+
+### Scoped user decision — acquisition and local research use
+
+The user answered: 「不確実性を記録し、上記の取得・ローカル研究利用を進める」.
+This is a specific operational decision to acquire the pinned Small checkpoint and use it for
+noncommercial, local CPU research validation. The prior general-resume hold was maintained until this
+answer; that acquisition / local-use hold is now superseded for the specified action only.
+The conflicting source labels and unresolved checkpoint applicability remain unchanged. This is not
+a finding that the rights holder granted a license. Redistribution, public-package bundling, public demos
+and commercial use are outside this decision. No author inquiry has been sent.
+
+The earlier hold descriptions and review questions above are preserved as the decision history.
+At the time of this decision the synthetic-only guard still existed. It was subsequently replaced with
+the verified local-checkpoint loader in the native connection below; fixture injection remains checkpoint-free.
+
+## Native connection evidence — 2026-11-12
+
+The scoped user decision was acted on using a dedicated `.local/envs/mde-unik3d` CPU environment.
+Official source revision identity and local weights / config size / SHA-256 were verified. Strict native
+safetensors loading succeeded. torch 2.6.0+cpu, torchvision 0.21.0+cpu and NumPy 2.2.2 are separate from
+MoGe / DA3 / UI environments. Full dependency / reproduction scope is in the plugin README.
+
+A local pip clone of the earlier partial investigation repository failed because of unavailable promisor
+blobs; installing the same fixed commit from the official remote succeeded. The first native import then
+exposed mandatory wandb / matplotlib imports through utils/__init__.py; real packages were added to the
+dedicated environment, with no upstream stubs or source edits. Official KNN-evaluation and disabled-CUDA-autocast
+warnings are retained in logs. No xformers / triton / Gradio is installed or required for the tested CPU path.
+
+Depth-only CLI Run `2f40b740-11d1-4bdb-9b7a-e287bbeed832` and depth + Points Run
+`87615672-90ef-44cb-9f3c-9b4239372223` completed through the shared worker / backend contracts.
+Canonical range and native Points matched a separate official native invocation exactly, without K
+synthesis or backprojection. Range is float32 [256,256], all 65,536 pixels valid, unknown scale / units.
+No negative-z pixels occurred in this sample; those directions are covered by synthetic fixtures.
+Each saved Run collected twice with all hashes / mtimes unchanged; Python socket egress guards were
+active with no external connection attempts. These runs do not establish metric accuracy or GPU behavior.
+
+Evidence is under `.local/validation/phase-03-4-unik3d-*`. Final regression / acceptance results are in
+the Phase 03 record. Redistribution / public bundling / commercial use remain outside the research decision.
+
+The final supported manifest Run is `04826895-b67d-42fa-8314-02751be35d1c`, source_digest
+`23e50c71c8d69733a85d44cba08b3d2b599af8a8fa6e19acb532b6e4a4c18abe`. Values matched the verified
+native outputs, and two new CLI collects preserved every file hash / mtime. Targeted25 tests and the
+full129-test suite (122 passed, 7 browser skips) succeeded. The existing depth / Points profiles suffice
+for this stage; unsupported unrequested rays / confidence / pose need no new profile.
+03.4 acceptance is PASS; 03.5 / 03.6 and overall Phase 03 completion remain pending.

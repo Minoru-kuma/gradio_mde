@@ -37,7 +37,11 @@ class UIBoundaryTests(unittest.TestCase):
             events = app.config["dependencies"]
             self.assertGreaterEqual(len(events), 5)
             self.assertTrue(all(e["queue"] is False for e in events))
-            self.assertTrue(all(e["trigger_mode"] == "once" for e in events))
+            for event in events:
+                if event['trigger_mode'] == 'always_last':
+                    self.assertTrue(all(target[1] in ('input', 'change', 'load') for target in event['targets']))
+                else:
+                    self.assertEqual(event['trigger_mode'], 'once')
             # No inference listener owns status or Results outputs. One timer is
             # the sole writer, so poll HTTP responses cannot overtake one another.
             polls = [e for e in events if any(target[1] == "tick" for target in e["targets"])]

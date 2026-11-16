@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "task_kind": "pinhole-camera-v1",
+  "task_id": "geocalib-pinhole",
+  "entrypoint": "models.geocalib.adapter:calibrate",
+  "upstream_url": "https://github.com/cvg/GeoCalib",
+  "upstream_revision": "1dedb29f94fc11b896c5f572005978aeebccd67f",
+  "checkpoint": {
+    "url": "https://github.com/cvg/GeoCalib/releases/download/v1.0/geocalib-pinhole.tar",
+    "release_tag": "v1.0",
+    "asset_id": 191236355,
+    "size_bytes": 116074121,
+    "sha256": "86d6aeacd8bbd974c59ce39f61854e00d36911c732ad89be471476fd708722ac",
+    "digest_source": "locally observed official asset; publisher digest not listed"
+  },
+  "environment_ref": {"environment_id": "mde-geocalib", "definition_ref": "models/geocalib/environment.yml"},
+  "method": "GeoCalib pinhole focal optimization; native original-grid K; principal point assumed image center, not estimated; gravity not exported",
+  "preprocessing": "official ImagePreprocessor resize short edge 320 / crop divisible by 32; official undo_scale_crop returns original pixel grid",
+  "source_license": "Apache-2.0",
+  "weights_license": "CC-BY-4.0"
+}

@@ -2,21 +2,632 @@
 
 ## Current authorization and status
 
-- Current work: **Phase 03 — 調査・計画・設計中 / production実装未着手**。
-- Authorization: 2026-11-09の最新ユーザー指示によりPhase 03の調査と段階的実装計画の整理のみ承認。
-  production実装、環境構築・weights取得・新モデル実推論、mainへの反映は行わない。
-  同日の追加指示により、今回の計画を含め各作業の完了・検証後は作業ブランチへcommit / 通常pushする。
+- Current follow-up: Phase 03最終レビューP2修正・検証（PASS、commit / 通常pushで終了）。下記COMPLETEは元のstage受入履歴。
+- Current work: **Phase 03.7 Depth-only 3D Reconstruction COMPLETE（2026-11-13）**。
+  03.1〜03.6 COMPLETE（2026-11-13）の履歴・受入は維持。03.7は独立した追加stageとして全受入を達成した。commit / 通常push後に終了する。
+  履歴: 03.5は`0fa251b4b4fb9880025e3fb0f84ad88724fbdc01`、03.6は`1ce8c8470b5fc39030ee9d41e8274fbee98ea753`でcommit・通常push済み。
+  今回は03.7のcommit / 通常pushで終了し、次Phaseを開始しない。
+- Authorization: 最新の追加指示で03.7の実装・独立GeoCalib環境・実CPU / browser検証を承認。
+  2026-11-11の03.1〜03.6承認とCOMPLETE履歴を維持。03.7も受入完了後に同じブランチへcommit / 通常pushする。
+  各段階の受入成功後にcommit / 同名remoteへ通常pushし、結果と残課題を報告する。
+  `codex/phase-03-implementation`をPhase 03完了まで継続使用する。
+  最新の追加指示「再開して」により03.4から再開。03.3まで完了して停止する指示は当時の履歴として保持する。
+  2026-11-12の最新指示で03.4実装・検証を再開。直前の文書更新限定指示は履歴として保持する。
+  license判断は[AGENTS共通方針](AGENTS.md#license-review-and-decisions)に従う。
+  ユーザーが固定Small checkpointの取得・非商用local CPU研究利用を個別承認。不確実性は維持し、
+  UniK3Dの再配布・公開同梱・商用利用は含めない。03.4実E2E未達で03.5へ進まない。
 - Phase 00 / 01 / 01A / 01B / 02A / 02B / 02C / 02D / Phase 02 COMPLETE。
-- Phase 03実装、04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
-- Start evidence: fetch成功。最新origin/mainは `8a6d5082ecf64eb9b9bcb8c668c41c0c3f145333`
-  （02D PR #1統合）。開始時の `codex/phase-02d-run-management` はcleanでmainの1 commit前、
-  tree差分なし。競合・範囲外差分なしを確認し最新origin/mainから
-  `codex/phase-03-plugin-planning` を作成した。
-- 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、下記関連仕様。
-  AGENTS / README / 他仕様の「03未承認」は今回指示前の状態。最新指示は計画・設計のみを許可する。
-  以下の02D以前の承認・main反映方針は当時の履歴であり今回の承認ではない。
-- 新規作業は作業ブランチ、main直接編集・commit禁止。remoteの追加更新・競合・範囲外変更は
-  上書きせず停止・報告。force push禁止。
+- PR作成・main統合・Phase 04–08、Tracking / Benchmark / Slurm / queue / active recoveryは未承認。
+- Start evidence: fetch成功。最新origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`
+  （Phase 03計画PR #2統合）。開始時の計画ブランチはcleanでmainとtree差分なし。
+  最新origin/mainから指定の実装ブランチを作成。競合・範囲外差分なし。
+- 正本: [AGENTS.md](AGENTS.md)、本計画、[Phase 03](docs/phases/phase-03.md)、関連仕様。
+  以下の2026-11-09の計画限定承認と02D以前の承認状態は当時の履歴として保持する。
+- main直接編集・commit、force push禁止。remoteの追加更新・競合・範囲外変更は停止・報告。
+
+## Phase 03 final review P2 correction — 2026-11-13
+
+- Scope: ユーザー承認のP2修正。既存ブランチを継続し、03.1〜03.7 COMPLETEの受入履歴を保持する。
+- Plan: pinhole Kの構造要素を厳密検証 → z-depth / derived Z整合性を生成・再読込時に検証 →
+  depth由来point / meshのalgorithm versionを2へ更新 → 境界fixture・旧cache隔離・正常K回帰 → 全回帰 / browser / 旧Run不変性。
+- Compatibility: raw / JobResult / 旧Run・native Pointsは変更しない。旧derived generationは保持し、version1を修正済みとして再利用しない。
+  calibration K cacheは読込時の厳密検証を適用する。推定失敗時の仮K fallbackなし。
+- P3: CameraEstimatorのBackend内部依存を非阻害の設計改善として文書化し、Backend再設計は行わない。
+- Completion gate: 検証結果を記録してcommit / 通常push。PR / main統合・Phase 04以降なし。
+- Status: PASS。数値 / Results 24件成功（48.504秒）、最終full154件 / 146成功 / opt-in8 skip（376.926秒）、
+  別browser8件全成功（307.309秒）。独立read-only差分レビューもblockerなし、数値5件成功。
+- Real validation: DA3 native K / GeoCalib各63,504点・124,193面、保存Zは有効depthと完全一致。
+  3モデルdepthは既存baselineと完全一致。各Runを新Backend2 + CLI2 collectしhash / mtime不変。
+  保存Runのモデルなし再読込・version2再利用・ZIPを確認。現存旧4Runも各4collect不変。
+- Evidence / limits: `.local/validation/phase-03-p2-{numeric,regression,browser}.log`、
+  `phase-03-p2-readback.json` / `phase-03-p2-three-model-readback.json` / `phase-03-p2-compatibility.json`。
+  browser外部通信試行・page errorなし。既存event-loop ResourceWarningは残る。
+  GPU成功・他OS・環境再作成・精度評価は今回未検証。旧01B1Runはlocal不在のため実Run再検証なし。
+  詳細は[Phase 03修正記録](docs/phases/phase-03.md#final-review-p2-correction--2026-11-13)。
+
+## Phase 03.7 Depth-only 3D Reconstruction — implementation plan
+
+- Authorization / branch: ユーザーの追加指示で03.7のみを承認。既存`codex/phase-03-implementation`を継続。
+  03.1〜03.6のCOMPLETE / commitsを維持し、03.7受入後にcommit / 通常push。PR / main統合・Phase 04以降なし。
+- Start: HEAD `1ce8c8470b5fc39030ee9d41e8274fbee98ea753`、作業ツリーclean。
+  GitHub connectorで最新main `e22322d5acc8ce7603b38d36311fc39ea56f6135`を確認。local origin/mainと一致。
+- Purpose / scope: 単眼depth-onlyから、根拠あるKと共通逆投影でderived点群・可視表面2.5D meshを作る。
+  native Pointsと区別し、raw Run / JobResult / 旧Runを変更しない。既存DerivedStore・Results・再利用・管理を使う。
+- Order: (1) DA3固定source / SMALL checkpointのnative Kをsource・実CPUで調査。取得可能ならadapterで厳密変換・optional保存。
+  (2) GeoCalib公式固定source / checkpoint、sourceとweightsの条件・依存・CPUを調査し独立環境を準備。
+  (3) 既知K → 保存native K → GeoCalib推定Kの選択・grid変換・provenance / cache契約を仕様化し実装。
+  (4) 共通逆投影・既存triangulationへ接続。(5) fixture→実DA3 CPU→保存・再読込・browser→既存回帰→Exit監査。
+- Boundary: モデル固有処理は各models directory、UI / core / backendにモデル名分岐なし。
+  GeoCalibは別環境・明示準備・Backend経由で実行し、UIにtorch / 外部modelを導入しない。
+  通常版 / MoGeデモ版にsource・weights・環境を同梱しない。推論時の自動download / installなし。
+- K / geometry: source画像grid・pixel-center・resize / crop / paddingの変換を記録しdepth gridへKを写す。
+  既知K・native Kを推定より優先。native Pointsがある既存Runの挙動を維持。
+  K推定失敗・未準備・不正値は理由付きエラーとし固定FOV / 仮Kへfallbackしない。
+  相対depthはrelative / arbitraryのまま、pose推定・multi-view統合・閉曲面生成を含めない。
+- Acceptance:
+  - [x] DA3-SMALL固定版のnative K可否を実CPUで確定しsource / 値・shape / gridの根拠を記録。
+  - [x] GeoCalib固定source・checkpoint SHA / size・ライセンス区別・独立依存定義・実CPU calibrationを確認。
+  - [x] 既知→native→推定Kの優先順位、pixel center・非正方形resize / crop fixture、失敗時の非捏造を検証。
+  - [x] z / range逆投影、相対scale、invalid / depth discontinuityの点群・2.5D meshをfixtureで検証。
+  - [x] K由来 / 手法 / source・weights版 / grid変換・depth依存digestをderived identityへ保存。
+    同条件reuse・条件差分離・破損拒否・再起動読込・export・raw / terminal hashとmtime不変を確認。
+  - [x] 実DA3 CPU→点群・mesh→保存 / 新service再読込 / Results browserを検証。GeoCalib fallbackも実CPUで検証。
+  - [x] MoGe / UniK3D・旧Run・single / multi-view契約・管理 / browserの必要回帰、静的links / JSON / diff確認。
+- Risks / stop: native camera head欠如、pixel center誤解、resize grid不整合、calibration失敗、checkpoint条件・CPU依存。
+  不確実性を記録して影響を限定し、明確な禁止との衝突・重大な技術互換性問題を推測で解消しない。
+  実E2E未達では03.7 COMPLETEとしない。旧Runを補修・rawにderived refsを後付けしない。
+- Design refinement: GeoCalibはdepthを捏造するModelAdapterとして登録せず、汎用auxiliary task workerのK-only返値を
+  既存ExecutionBackendの追加optional method経由で実行。同じLocalBackendのadmissionを共有し、model推論との並走・queueを作らない。
+  DerivedStoreはK-only NPZの検証を加算し、既存generation / history / digest / exportを再利用。K推定cacheは画像・版・環境digestをidentityにする。
+  native Kは既存geometry profileのoptional intrinsics、既知KはResultsの明示入力。既存native Points優先を維持する。
+  新DA3はOpenCVの二段resizeをinteger-pixel affineとして記録。unknown mappingを推測せず推定Kの適用を拒否する。
+- Investigation: DA3固定SMALLのCameraDecと実CPUの252×252 / 126×252 Kを確認。native GLBのinteger meshgridに従いK値は不変。
+  initialprobeはPYTHONPATH不足で失敗後、明示repo pathとoffline guardで再実行成功。remote fetch再試行も成功、main / branch更新なし。
+- Results: **PASS / 03.7 COMPLETE**。最終full150件 / 142成功 / browser opt-in8 skip（312.084秒）、別browser8件全成功（254.132秒）。
+  native K・GeoCalib双方のDA3 CPU→derived点群63,504点 / mesh124,193面→再読込・browser・ZIPを確認。
+  native depth / Kは独立公式API probeと配列完全一致。source_digestも最終sourceと一致。
+  3新Runを各新Backend2 + CLI2collectし全file hash / mtime不変。旧4Run各2collect不変、旧01B1件local不在。
+  既存3実モデルも同じBackend / 別環境で成功、depth baseline完全一致、各4collect不変。
+  GeoCalib source / weights条件・SHA固定、safe / strict889state、独立CPU環境・最終pip check成功。
+  先行full149件成功後、grid曖昧性 / float32 overflow・range norm / 冪等性を修正して最終150件を再実行。
+  初回browser1件のFile再upload手順エラーは別sessionへ修正し、8件を最終sourceで再実行成功。
+  初回headless OpenCV代替のpip metadata不足は新GeoCalib環境だけofficial opencv-pythonへ変更して解消。
+  最終証拠は[03.7 phase record](docs/phases/phase-03.md#037-depth-only-3d-reconstruction--additional-stage)、
+  [reconstruction spec](docs/depth-reconstruction-spec.md)、[GeoCalib調査](docs/geocalib-investigation.md)。
+  GPU / distorted / 他OS / lock別prefix再作成 / 幾何精度 / pose / multi-viewは未検証・scope外。
+  以下の03.1〜03.6は当時の受入履歴。
+
+## Phase 03.6 integration acceptance plan — 2026-11-12
+
+- Purpose / scope: 03.1〜03.5の受入・通常push後、3つの独立worker環境と代表single-viewを最終sourceで統合検証する。
+  同じRunner / LocalBackendとvariant別checkpoint mapを利用し、UI / core / backendへモデル名分岐を追加しない。
+- Order: 既存browser受入を3モデルへ拡張 → offline browser / 実CPU・保存Run確認 → 必要なCLI / geometry照合 →
+  capability matrix・環境再作成条件を明文化 → 全回帰・静的検証・全Exit監査 → 03.6 commit / 通常push。
+- Validation: MoGe / DA3 / UniK3Dを明示CPUで順次実行しprefix分離、shape / scale / units、実runtime宣言、
+  predict1回・unload、保存結果再読込hash / mtime不変を検証。既存2session busy / cancel / timeout、Results・Run管理も回帰。
+  Python socket guardとbrowser routeで外部通信を拒否し、準備済み環境での動作を確認する。
+- Documentation: tested / conditional / unsupported / untestedを区別。3固定source・checkpoint・環境定義 / lockと
+  幾何convention、再作成手順・未検証条件をmatrixから追跡可能にする。未実測GPU・他variant・clean再作成を成功にしない。
+- Risks / rollback: UI切替の設定漏れ、wire1.1と旧1.0の互換、raw書換え、native出力意味の誤認を検査。
+  新検証は隔離Run rootで行い、既存環境・weights・Runを変更しない。失敗時は原因範囲を修正しExit達成前にCOMPLETEとしない。
+  UniK3Dの条件不確実性と限定承認を維持。デモpackage・実同梱・配布、PR / main統合、Phase 04以降は行わない。
+- Results / acceptance: **PASS / Phase 03全Exit達成**。最終full139件 / 132成功 / browser opt-in7 skip（209.238秒）、
+  別browser7件全成功（180.328秒）、target5件成功。3モデル実CPU / 別prefix・同じBackendで成功。
+  3depth + UniK3D Pointsの4Runは現source_digest一致、native baseline配列完全一致、各新Backend2 + CLI2 collect不変。
+  MoGe native geometry / JPEG browser4表示・保存再起動も成功。旧4Run各2collect不変、旧01B1件local不在。
+  初回fullはcontrol Python誤使用でNumPy不足6 errors / 35 skips、失敗logを保持し正しいUI Pythonで再実行成功。
+  source / weights / env本体をGitへ含めず、通常版・demo仕様とUniK3D限定承認を維持。
+  全Exit対応は[03.6 evidence](docs/phases/phase-03.md#036-integration-acceptance-evidence--2026-11-13)、
+  未検証範囲・再作成条件は[capability matrix](docs/model-capability-matrix.md)。
+  read-only並行監査で新blockerなし。03.6 commit / 通常pushを行い、PR / main統合・Phase 04以降に進まず終了。
+
+## Phase 03.5 implementation plan — 2026-11-12
+
+- Start / gate: 03.4 PASS、`f337bf568a24d4b89f23c38d9b5c8654094f7d27`通常push済み。
+  並行配布文書は`0786272`、デモ仕様は`59d2cef4acb1749b8c92401abf83c6caff73acb2`で通常push済み。
+  cleanな同じブランチで03.5へ進む。origin/mainは`e22322d5acc8ce7603b38d36311fc39ea56f6135`。
+- Scope / evidence: contracts / worker / storage / geometryにone-view固定、Runnerは単一hash / recordを構築し、
+  Backendは既存field以外をterminalへ伝搬しないことを確認。既存3 adapterはview_id / imageを読む。
+  旧Requestを改変せず、別のMultiViewPredictionRequestとordered PredictionView tupleを追加する。
+  実モデルmulti-view / multi-view入力UI / queueは今回必須にしない。fake2viewで共通契約を確認する。
+- Version / opt-in: single-viewのwire schema1.0、旧PredictionRequest / CLI / path / profilesを維持。
+  新multi-view Job / report / metadataはschema1.1。manifestのmulti_view、input_constraints.request_kind=multi_view_v1、
+  environmentのworker_protocol_version=1.1を明示する。最低必要worker版を実対応上限1.1と照合し1.2を拒否する。
+  Genericなrecord schemaの同major未知optional互換は維持し、実行能力を1.xというlabelだけから推定しない。古いworker互換とは主張しない。
+  Legacy空runtime能力は複数viewでは許可せず、明示的なmulti_view能力とRequest対応を要求する。
+- API / storage: Runner.submit_views(model_id, ordered PNG paths, ...)を追加し、submit(single)は同じ内部処理へ委譲。
+  全inputのID / hashを順序付きでdigestへ入れ、view-0001 / 0002...を共通採番。全inputの型・checksum・サイズを検証。
+  predictは1回、返却view ID集合の欠落 / 重複 / 未知IDを保存前に拒否し、保存順は入力順に正規化する。
+  数値検証・geometry profileは全viewへ同じ既存契約を適用。異なるviewのshapeを混同しない。
+- Scene: existing PredictionBatch.scene_metadataをfinite JSONとして保存。scene.jsonはschema1.1、run / attempt、
+  view_ids、model-provided metadataを持つ。reference_view_idがある場合は入力IDを参照し、scale / unitがあれば整合を検証。
+  reference未指定は未指定のまま、identity pose / Kを補わない。現profileではpose tensorを保存しない。
+  optional JobResult.scene ArtifactRefをBackend経由で保持し、Noneは旧wireへ出さない。全refとmetadata / worker / terminalを照合。
+  未知extras / scene metadataはopaque JSONとして保持し、pathというkeyだけで任意fileを参照しない。
+- UI / export boundary: Resultsは先頭view previewを維持し、RGB sourceはview_idで対応付ける。
+  multi-view selection / scene renderingは実装しない。Run管理 / ZIPは全views・inputs・sceneを保持し、rawを書き換えない。
+- Order: 本計画 / 仕様更新 → types / schema / Runner / Store → runtime gate / worker → validators / Backend / reader →
+  fake2view正常・順序反転・異常 / scene・extras・refs / export / legacy回帰 → docs証拠 → 03.5成功commit / 通常push。
+- Validation: 別shapeのfake2view、1predict、input順IDとoutput対応、missing / duplicate / unknown ID、second-view破損、
+  runtime multi_view未宣言・unsupported拒否、scene referenceとchecksum / path異常、unknown JSON roundtrip。
+  新instance / CLI collect・ZIPで全fileを検証しhash / mtime不変。既存3モデルはsingle-only宣言を維持する。
+- Risks / rollback: first-viewのみの検証を残さず、sceneがterminalで失われないよう明示field化する。
+  1.0のraw移行なし、single CLI / JPEG provenance / cancel / timeout / derived readersの既存回帰を維持。
+  失敗batchを成功部分として公開しない。新interfaceは通常修正commitで戻せる。Phase 04以降 / PR / main反映なし。
+- Results / 03.5 acceptance: **PASS**。別shape2view fake、返却逆順・ID対応、欠落 / 重複 / 未知ID、second input / depth / points破損、
+  scene参照・scale / unit・JSON異常、runtime multi_view未宣言 / unsupported、未知extras / scene roundtrip、ZIP全view保持を確認。
+  future required worker1.2はRun準備前・JobSpec読込時に拒否。並行read-only reviewのprotocol指摘へ対応済み。
+  初回検証はfixtureが入力PNGをRunRootに置いていたため「root空」検査が失敗し、Run directory未生成を確認する形へ修正。
+  初回fullはpreview test内class名誤記で1件失敗し、実在ResultsServiceへ修正して単独成功。
+  最終full139件 / 132成功 / browser opt-in7 skip（218.558秒）。multi-view対象10 tests成功（42.071秒）、
+  nonempty single-scene版の追加検証も成功（最終fullに含む）。
+- Retained fake E2E: Run `380684a3-942f-4e08-a8f5-6ba17f043a94`、schema1.1、shape[2,3] / [4,5]、1predict。
+  native response逆順でも保存IDは入力順、scene.reference_view_id / unknown extras保持。
+  新Backend2collect + 新CLI2collect + ZIP exportで全file hash / mtime不変。Python egress guard下で成功。
+  source_digest `38d43538bfa00f9c77b0c53c2f9982898d1dc47378700d81cafe4b77fe380490`。
+- Legacy actual CPU: MoGe Run `58345407-fbf7-4397-a720-4bcec045f5fe`、single wire1.0 / scene field省略 / native値は
+  同CPU条件の既存MoGe出力と配列完全一致。2CLI collect不変。旧4Run各2collect不変、旧01B1件はlocal不在で未検証。
+- Evidence: `.local/validation/phase-03-5-final-regression.log` / `phase-03-5-compatibility.json` / `phase-03-5-moge-check.json` /
+  `phase-03-5-evidence/acceptance.json`。ZIPはfake Run export検証でありdemo packageではなく、実model weightsを含まない。
+  静的検証 / diff検査は成功、最終件数はphase文書へ記録。
+- Unverified / next: 実モデルmulti-view / multi-view入力UI / pose tensor export / generic typed-extra array exporterは未実装で
+  この段階の必須ではない。browser opt-in・3実モデル統合回帰 / matrix照合は03.6で行う。
+  03.5 commit / 通常push成功後に03.6へ進み、全Exitを満たすまでPhase 03 COMPLETEとしない。
+
+## Demo edition specification update — 2026-11-12
+
+- Purpose / decision: 通常版は本体・自作Adapterを配布し外部モデルsource / weightsを非同梱とする方針を維持。
+  デモ版は**MoGe-2 ViT-S Normalの固定1種類のみを同梱する構成**を正式決定し、
+  [公開・配布仕様](docs/distribution-policy.md#demo-edition--moge-2-vit-s-normal)へ実装・weights・依存環境の提供方法を整理する。
+- Scope / order: Phase 03進行中の仕様更新のみ。最新AGENTS / README / 配布仕様 / MoGe README・manifestを確認 →
+  本計画 → 通常版・デモ版と過去判断を分離して文書整合 → 内容 / links・anchors・fences / 差分・履歴保持を検証 →
+  既存`codex/phase-03-implementation`へcommit / 通常push → 元のPhase 03作業へ戻る。
+  今回デモpackage生成・weightsの実同梱・実配布・PR作成・main反映・Phase 04以降は行わない。
+- Fixed model: `models/moge/manifest.json`の`moge` / `moge-2-vits-normal`を採用。sourceは
+  `07444410f1e33f402353b99d6ccd26bd31e469e8`、weightsはHub revision `26b477f41595707c5db6770294c0d1721e8ed4ed`の
+  `model.pt`、SHA-256 `79a16621928c2bf0ed04659218c55c01075e950507f40bb3332fb4c873d3e1dc`。
+  2026-11-12の公式read-only確認でMoGe LICENSEはMicrosoft MIT＋Apache-2.0全文、DINOv2由来headerもMeta / Apache-2.0、
+  固定Hub card / APIはMIT、utils3d固定LICENSEはMIT。記録は`.local/validation/demo-policy-license-review.json`。
+  専用weights LICENSE / NOTICE fileの不在は観測として記録し、禁止条件と同一視しない。必要な帰属表示を配布物へ対応付ける。
+- Packaging design: 通常版から分離したbuild profile / 外部recipeのデータで対象model・variant・source pin・checkpoint・依存環境・
+  帰属表示一覧を指定する。MoGe実装とweightsをbuild時に公式配布元から準備し、デモ専用の独立環境・resourceとして収める構成。
+  既存Registry / target設定 / ModelAdapter / ExecutionBackendを利用し、core / UI / backendへモデル名分岐を追加しない。
+  対象OS / arch、runtimeの提供媒体、CPU / CUDA build等の具体的なpacking方法は未検証の設計事項として残す。
+  現在のConda prefix丸コピーの可搬性や、全依存の再配布可否・NOTICE確認を検証済みと扱わない。
+  MoGeAdapterのdirect_url.jsonによるsource revision検査を維持できる配布provenanceの提供・読戻しも未確認。
+  local wheel導入でVCS情報が残るとは推定せず、既存検査の削除・緩和を前提にしない。
+- History / boundaries: 従来の通常版非同梱方針と、当時モデル同梱デモを決定・配布していなかった履歴を保持。
+  今回はMoGeデモの構成決定という差分のみで、既存実装・検証実績・Phase承認を維持する。
+  UniK3D Smallの個別承認は非商用local CPU研究利用のまま。UniK3D / DA3 / 他MoGe variant・checkpointをデモへ追加しない。
+- Verification / risk / rollback: 文書7件のみを変更し、model code / manifest / environment定義 / tests / rawを変更しない。
+  版・digestと公式条件の参照、通常版とデモ版の境界、必要なLICENSE / NOTICE / 帰属表示と未確認事項を検証する。
+  依存全体の配布条件や可搬性をsource / weightsのlicenseだけで保証しない。不確実性は該当行為で判断し、開発全体を停止しない。
+  文書変更は通常の修正commitで戻せる。Git操作は親側で直列化する。
+- Results: 変更は既存Markdown7文書のみ。Markdown33件 / local links・anchors294件 / fences検証はerrors 0、
+  `git diff --check`成功。AGENTS規則2〜13、PLANSの既存公開方針・Phase実装 / 調査履歴、READMEの実装状況・モデル実績、
+  Architectureの既存調査・Phase履歴、ModelAdapter / Environmentの技術契約とUniK3Dの配布制限は変更前commit `f337bf5`と比較して一致。
+  デモのsource / variant / checkpoint revision・SHA-256はMoGe manifestと照合し一致。
+  記録: `.local/validation/demo-policy-2026-11-12-static.json` / `demo-policy-license-review.json`。
+  モデルcode / manifest / tests / 環境定義・rawの変更、デモpackage生成・実同梱・配布、実装suite・モデル推論は今回未実施。
+  対象OS / packing形式、全依存の再配布・NOTICE、source provenanceの配布後検証は未確認事項として記録した。
+  commit / 通常pushは親側で直列化し、結果をGit履歴・同名remote refで確認した後、元のPhase 03作業へ戻る。
+
+## Parallel publication policy documentation — 2026-11-12
+
+- Purpose / scope: Phase 03.4実装・検証とは並行する文書作業として、MGE Experiment Platformの公開・配布対象を
+  プラットフォーム本体と自作Adapterに整理する。外部モデルのソースコード・学習済みcheckpointは原則同梱・再配布せず、
+  利用者が各公式配布元の条件に従って別途準備する構成を[公開・配布仕様](docs/distribution-policy.md)に記録する。
+- Authorization / boundaries: 今回の公開・配布方針タスクは文書更新のみ。既存のPhase 03.4再開、
+  固定UniK3D Small checkpointの取得・非商用local CPU研究利用の個別承認、過去の調査・停止判断・実績を維持する。
+  研究用のGit除外領域への準備と、配布物への同梱は別行為として扱う。公開方針の記述は実公開・配布作業の開始ではない。
+- Order: 最新AGENTS / PLANS / READMEと関連仕様を確認 → 本計画を追記 → 共通方針 / 配布仕様 / 利用案内を整合 →
+  内容・links / anchors / fences・差分・履歴保持を検証 → 親の実装差分と区別してcommit / 同名remoteへ通常push。
+  既存の`codex/phase-03-implementation`を継続し、Git操作は並行せず親側で直列化する。
+- Decisions: 配布物は本体・自作Adapter・準備定義 / 出典metadataを基本とし、外部モデル実体は公式配布元から利用者が準備。
+  利用条件はモデル / source / checkpointごとに各配布元へ従う。不明確さだけで開発全体を停止せず、影響する行為を限定して判断する。
+  明確な禁止条件・権利上の問題は無視せず、未確認事項を記録する。外部モデルを同梱しないことだけで利用条件が不要とは扱わない。
+- Validation / risk / rollback: 変更はAGENTS / PLANS / README / Architecture / ModelAdapter / Environmentと新しい配布仕様のみ。
+  既存Three.js等の非モデル依存asset、コード / tests / manifests、raw / 保存schemaは変更しない。
+  root配布licenseの選定や実release artifactの作成・同梱検査を実施済みとは記載しない。文書差分は通常の修正commitで戻せる。
+  PR作成・main反映・Phase 04以降への移行なし。
+- Results: 文書担当の変更はMarkdown7件のみ。Markdown33件 / local links・anchors278件 / fences検証はerrors 0、
+  対象差分の`git diff --check`成功。AGENTS規則1〜13、PLANSのcurrent authorizationと既存Phase実装・調査履歴を
+  変更前commit `e704417`と比較して一致を確認。記録は`.local/validation/distribution-policy-2026-11-12-static.json`。
+  文書担当ではコード / tests / manifests変更、モデル取得・実推論、release artifact構築・実配布は実施していない。
+  並行するPhase 03.4の実装・実機検証は上記current workと個別実装記録で管理する。
+  文書のcommit / 通常pushは親側で直列化し、確定SHA・push結果はGit履歴と同名remote refで確認する。
+
+## Phase 03.4 resumed implementation — 2026-11-12
+
+- Start / authorization: latest fetch成功、cleanな既存ブランチを継続。HEAD / remoteは
+  `770be8caeaff993280492e952d383fb0837198a2`、origin/mainは`e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま。
+  最新のPhase 03再開指示により、直前の文書のみという今回作業制限を履歴に移す。PR / main反映・Phase 04以降なし。
+- Scope / order: 未実装だった03.4の共通runtime capability照合を先行。既存仕様確認 → 契約・計画更新 →
+  workerのload後 / predict前の汎用preflight → 単体 / fake subprocess / 既存回帰・旧Run不変 → docs → commit / 通常push。
+  並行してUniK3Dの行為別用途・リスクを文書化し、個別checkpoint保留に必要なユーザー判断を求める。
+  判断前に実checkpointへ触れず、回答待ちでも技術的に独立した作業は継続する。
+- Runtime contract: LoadedModelInfo.capabilitiesの非空mapはload時点の明示宣言として扱う。
+  要求出力の欠落 / unsupported / 不正な型・statusはpredict前に失敗。supported / conditionalは進め、
+  conditionalの文章は実行せず、要求出力のpresence / shape等は従来どおりserialize時に検証する。
+  既存adapterの空mapはlegacy未宣言としてwarning付きで受け入れ、従来の出力検証を維持する。
+  このfallbackはmap全体が空の場合のみで、部分宣言の欠落をmanifestから補完しない。
+  検証済みsnapshotとlegacy / declaredの区別をoptionalなexecution.runtime_capability_checkへ保存する。
+  旧Runはfield欠如を受容し、必須field / schema major / serialization profile / adapter signatureを変更しない。
+- Verification: 同一fake manifestをruntimeでunsupported / missing / malformedに変更してpredict未実行・unload実行を確認。
+  conditionalの成功と要求欠落失敗、非要求unsupportedの許容、空mapの旧adapter互換、未知のJSON metadata保持を検証。
+  同一Backendの再利用・旧Run collect・raw hash / mtime不変、controlのtorch / adapter非importを維持する。
+- UniK3D scoped decision: 固定Small checkpoint約142MBのlocal取得・非商用研究推論と、再配布 / 公開同梱を分ける。
+  sourceのNC / NC-SA表記差異とcheckpoint条件未確認を維持。現行の公式model cardでも追加の明示条件は見当たらない。
+  [行為別評価](docs/unik3d-investigation.md#scoped-decision-on-resume--2026-11-12)に根拠・不確実性・選択肢を記録。
+  作者へ連絡しない。個別保留の変更は具体的なユーザー判断なしに推定しない。
+- Risks / rollback: runtime宣言の強制でlegacy adapterを壊さないよう空map互換を維持。
+  壊れたruntime宣言をwireへ漏らさず、predict前失敗でもfinallyでunloadする。モデル名のcore分岐なし。
+  optionalな診断fieldのみ追加し、旧rawを移行・上書きしない。通常の修正commitで戻せる。
+- Gate: 実checkpoint未使用、03.4実モデルE2E未達。03.5 / 03.6は開始しない。
+- Scoped user decision: 提示した用途 / リスクに対し「不確実性を記録し、上記の取得・ローカル研究利用を進める」と回答。
+  この判断で固定Small checkpointのlocal取得・CPU研究推論を進める。権利者の許諾が確認されたという意味ではない。
+  再配布・公開同梱・商用利用は依然範囲外。作者への連絡は行わない。
+- Results (independent preflight): 対象11 tests成功（26.571秒）。全suite127件 / 120成功 / browser opt-in 7 skip（175.067秒）。
+  既存ログにもあるUI event-loop ResourceWarningを今回も観測、テスト失敗なし。
+  旧Run4件を各2回CLI collectし全hash / mtime不変。旧01B Run1件はlocal directory不在で未検証。
+  実CPU: MoGe `1cad5ed8-488d-457e-9847-8d8069f4c686`、DA3 `07b9015e-3f1a-425a-8d98-f03354852ab8`成功。
+  いずれもruntime宣言照合済み / 2回collect hash・mtime不変 / unload済み。Python socket egress guard有効・外部接続試行なし。
+  過去保存値との差はMoGe max abs 1.9073486328125e-6、DA3 1.5497207641601562e-6で、過去値とbitwise一致とはしない。
+  同一条件（OMP_NUM_THREADS=2）の変更前commit `770be8c`をGit除外領域へ隔離して比較したところ、両モデルとも配列完全一致 / max abs 0。
+  隔離baseline RunはMoGe `fc34480e-1590-44b6-9c23-5450c47d730c`、DA3 `07269a6f-3298-4f30-8248-71d8e4f6d22f`。
+  ログ / 集計: `.local/validation/phase-03-4-resume-{targeted,regression}.log`、`phase-03-4-resume-{compatibility,cpu,static}.json`。
+  静的検証はMarkdown32件 / links・anchors267件 / Python AST49件、errors 0、diff whitespace検査成功。
+  未検証: この時点のUniK3D実checkpoint・独立環境・実E2E、今回browser / GPU。独立部分の進捗commit後に下記の実モデル接続へ進む。
+
+### 03.4 UniK3D Small native connection — scoped research decision
+
+- Authorization: 上記の個別回答に基づき、固定Small checkpointの取得・非商用local CPU研究検証を行う。
+  sourceのNC / NC-SA表記差異とcheckpoint適用条件の未確認は維持。再配布・公開同梱・商用利用は未承認。
+- Candidate / evidence: source / checkpoint revision・宣言SHAは既存調査を継承し、実fileのsize / SHAを取得後に測定する。
+  固定inferはRGB uint8 CHWとresolution_level [0,10)を受け、original gridにpostprocessしたdistance / points / depthを返す。
+  Small + resolution_level=0をCPU smokeの既定とする（公式の最小resolution区間、config pixels_min=200000 / max=600000）。
+  依存import graphにはtorch / torchvision / NumPy / timm / scipy / cv2 / einops / Hubが必要。
+  Small encoderはxformersをoptional importし、未導入 / CPUでは公式PyTorch SDPA経路を選ぶ。tritonはnative inferの必須importではない。
+  CPU専用torchを採用し、UI / training extrasを省いたimport経路を実環境で検証する。
+- Order: 専用Conda prefix `.local/envs/mde-unik3d`を新設 → pin済CPU依存 / source --no-deps install → import・native constructor →
+  明示準備scriptで固定weights / config取得・hash検証 → adapterのoffline native runtime・scalar parameters・manifest →
+  fake / 数値 / strict checkpointテスト → depth-only CLI E2E → native Points照合・既存profile保存 → 回帰・docs・03.4 gate。
+  既存base / MoGe / DA3 / UI環境は変更せず、weights / wheels / sourceはGitへ追加しない。
+- Runtime / storage: cpu / float32のみを明示しCUDA fallbackなし。nativeからCPU float32配列を受け、
+  distance→ray_distance / Points CHW→HWCを維持。native frame / grid / scaleは根拠と実tensorの照合結果を記録し、未確認のmを補わない。
+  checkpoint IOはlocal prepared directoryのみ、実推論でdownloadしない。source revisionと2file digests、strict state keysを照合する。
+  synthetic fixture seamを保持し、production runtimeとsynthetic metadataを区別する。rays等は不要求なら保存せず仮K・Points生成なし。
+- Validation / risk: constructorのimport時依存・shared state keys・CPU資源・native dtypeを実測。根拠なく依存互換・精度を主張しない。
+  明確な禁止との衝突、重大なCPU / schema / geometry互換障害は該当作業を停止・報告する。
+  新prefix / pluginを独立して修正でき、旧Run移行やraw書換えなし。03.4実E2E未達では03.5に進まない。
+- Results / 03.4 acceptance: **PASS**。source pin / independent CPU environment / measured weight+config digests / strict load確認。
+  torch2.6.0+cpu / torchvision0.21.0+cpu / NumPy2.2.2、native model35,436,684 parameters。
+  sourceのutils/__init__がwandb / matplotlibを必須importするため実依存を追加（tracking初期化なし）。
+  partial local cloneからのpip導入はpromisor blob不足で失敗し、同じ固定commitの公式remote installで成功。
+  初回import不足をstub / source改変で回避せず、専用prefixにwandb0.19.6 / matplotlib3.10.0を追加してnative構築・推論成功。
+  upstreamのKNN評価extension未導入 / CUDA autocast無効のwarningを記録。実推論はcpu / float32、Gradio / xformers / tritonなし。
+- Actual E2E: depth-only Run `2f40b740-11d1-4bdb-9b7a-e287bbeed832`、depth+Points Run
+  `87615672-90ef-44cb-9f3c-9b4239372223`、最終manifestのdepth+Points Run `04826895-b67d-42fa-8314-02751be35d1c`。
+  range / Points float32 [256,256] / [256,256,3]、65,536 valid、native scale / unitはunknownで保存。
+  別の公式native直接実行とdistance / Pointsが配列完全一致。最終Runも同値で、source_digestは
+  `23e50c71c8d69733a85d44cba08b3d2b599af8a8fa6e19acb532b6e4a4c18abe`。
+  全3Runを新CLIで各2回collectしraw全file hash / mtime不変、predict各1回 / unload確認。
+  Python非loopback socket guard有効、外部接続試行なし。サンプルのnegative-zは0 pixel、負z / z=0はfake数値検証。
+- Contracts: 対象25 tests成功（31.094秒）、全suite129件 / 122成功 / opt-in browser7 skip（248.243秒）。
+  最終metadataのsupported宣言は実E2E再確認。旧Run4件各2collect不変、旧01Bの1件はlocal不在で未検証。
+  source / weightsはGit除外確認済み。静的links / AST・diff検査も成功（最終件数はphase文書）。
+- Review / optional decision: 03.4の「必要optional」は今回既存depth / native Pointsのみで成立。
+  既存02A profileがray_distanceとPoints norm整合性を検証するため新profileは追加しない。
+  rays / confidence / pose等はunsupported・不要求を保存せず要求を拒否し、仮K / 逆投影 / identity poseを補わない。
+  正本の「unsupported / 不要求の欠如は正常」と一致し、並行read-only reviewでもblockerなし。
+- Unverified / next: 新UniK3Dのbrowser、GPU、他variant / resolution、metric accuracy・units、camera入力、
+  full upstream training / evaluation / pip check、新lock別prefix再作成は未検証。
+  次は03.4 commit / 通常push完了後に03.5のmulti-view契約を順番どおり進める。Phase 03 COMPLETEではない。
+  証拠: `.local/validation/phase-03-4-unik3d-{native-compare,final-check}.json`、`phase-03-4-native-{regression.log,compatibility.json,static.json}`。
+
+
+## License policy harness update — 2026-11-12
+
+- Purpose / scope: 非商用の研究・検証を主用途とする実験基盤として、license確認を維持しつつ、
+  不確実性だけで研究開発全体を停止しない共通ルールをAGENTSに定義。全Phase・全モデル・関連依存に適用する。
+  今回はAGENTS / PLANS / README / 関連仕様 / UniK3D記録の文書更新のみ。
+  モデル取得・実装・実推論・環境構築・依存導入・外部への連絡は行わない。
+- Start: cleanな`codex/phase-03-implementation`を継続、HEAD / remoteは
+  `94907182f1a773548fde4bbb1c1943142ca32309`。fetch成功、origin/mainは
+  `e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま、追加remote更新なし。
+- Decisions: 公式資料の出典 / revision・確認日・確認結果 / 不明点と想定用途を、ソースとcheckpointに分けて記録。
+  明確な条件内の作業は通常実施。不足 / 不一致は記録して非影響作業を継続し、取得・利用等に直接関係する
+  不明点は行為ごとの用途 / リスクを整理し必要に応じユーザー判断を求める。判断待ちは該当行為のみ保留。
+  明確な禁止との衝突・重大な権利リスクは該当作業を停止し報告。公開や不明確さを許諾 / 禁止と断定しない。
+  作者への直接照会・個別許諾は共通必須条件にせず、必要性が高ければ提案しユーザー判断を仰ぎ、無断送信しない。
+  商用利用・重み再配布・公開package同梱はlocal研究利用と別に判断する。
+- History / boundaries: 過去の調査事実・停止判断は当時の記録として保持。今後のlicense運用はAGENTS共通方針を正本とする。
+  UniK3Dの表記差異 / checkpoint適用条件未確認を維持し、既存の個別保留を今回解除しない。
+  再開の判断方法は公式資料・想定用途 / リスク整理・必要なユーザー判断であり、作者への照会だけに限定しない。
+  Phase承認・責務分離・独立環境・raw不変・受入条件・Git運用と、license以外の重大な安全性 / 互換性の停止条件は維持。
+- Order: 現状 / remote / 正本確認 → 本計画更新 → AGENTSに共通ルール → 関連仕様・案内・UniK3D運用記述を整合 →
+  文書の内容 / links・anchors・fences / diff・変更範囲・履歴保持を検証 → commit / 同名remoteへ通常push。
+- Validation: 文書の静的検証、今回差分がMarkdownのみであること、ソース / manifests / tests / 依存定義・
+  UniK3D調査事実と過去の停止記録が変更されていないことを確認。実装suite・browser・実モデル検証は今回実施しない。
+- Risks / rollback: 一般方針を既存checkpoint保留の自動解除・利用許諾の確定と誤読しないよう明記。
+  過去の一律停止表現を今後の共通ルールとして再適用せず、安全性 / 互換性gateは緩和しない。
+  文書差分は通常の修正commitで戻せる。PR作成・main反映・force pushなし。
+- Results: Markdown9文書のみの変更を確認。Markdown32件 / local links・anchors261件 / Python AST46件の
+  静的検証はerrors 0、`git diff --check`成功。AGENTS規則2〜12と規則1の非license停止・Phase / Git条件、
+  UniK3Dのsource / checkpoint identity・license調査事実、PLANSの初回停止記録・独立実装実績、phaseの受入・停止履歴を
+  変更前commitと比較して一致を確認。ソース / manifests / tests / 依存定義に差分なし。
+  記録: `.local/validation/license-policy-2026-11-12-static.json` / `license-policy-2026-11-12-scope.json`。
+  今回は文書検証のみで、実装suite・browser・モデル取得・実装・実推論・環境構築・外部照会は未実施。
+  文書を同名ブランチへcommit / 通常pushし、確定結果はGit履歴とremote refで確認する。
+
+## Phase 03 implementation record — 2026-11-11
+
+- Purpose / scope: 既存MoGe / CLI / Gradio / 旧Run / raw不変を維持し、下記03.1〜03.6を順次実装。
+  実モデル採用ではimmutable upstream / checkpoint・digest・CPU根拠を確認する。licenseはソースとweightsを
+  分けて対象行為ごとにAGENTS共通方針で判断し、表記差異・情報不足だけで独立実装・調査・テストを一律停止しない。
+  重大な安全性・互換性問題や外部障害の停止条件、技術的受入gateは維持する。
+- 03.1変更順: baseline suite / browser → metadata-only discoveryと診断 → manifest scalar schema検証 →
+  実効variant / environment選択の共通化 → Runner / CLI / 現行controllerへ適用 → fakeと既存回帰。
+- 03.1設計: variantのcapabilities / parameter_schema / devices / dtypes / input_constraints /
+  environment_refsは項目単位で全体置換、未指定のみmodel値へfallback。元manifest / variantは保持。
+  複数environmentは明示ID必須、1候補は従来fallback。conditional説明文は実行せず、
+  statusで事前検査、出力の欠如は既存workerで拒否。runtime能力照合は後段03.4で追加する。
+- 検証: directory追加の第2fakeを同一Runner / Backendで順次実行、import境界・不正manifest・
+  duplicate IDs・variant差異・未準備環境を検証。既存suite / opt-in browser、明示MoGe CPU CLI、
+  旧Run読込のhash / mtime不変を記録。GPU / 新モデルはこの段階の検証に含めない。
+- Risks / rollback: discoveryによる不正pluginの巻込み、variantの暗黙merge、曖昧な環境選択を拒否。
+  新schema major / geometry profileは03.1では追加しない。旧Runへのmigration / 上書きなし。
+  環境・weights・runsはGit管理外。段階単位の修正commitで戻し、force pushしない。
+- Completed / remaining: 実装ブランチ作成、正本確認、承認状態更新。03.1受入完了、03.2〜03.6未着手。
+
+### 03.1 acceptance evidence — PASS
+
+- 実装: metadata-only discovery / diagnostics / duplicate ID拒否、manifest scalar schema検証、
+  実効variant全体置換とenvironment選択、Runner / CLI / 現行controllerの共通解決。
+  adapter / worker protocol / serialization profilesは変更せず、新実モデルはまだ追加しない。
+- fake: `tests/fixtures/models/alternate/`のdirectory追加だけで発見・実行。
+  fake → alternate(depth + mask) → alternate別variant → fakeを同一Runner / Backendで成功。
+  parameter / capability / environmentの切替、選択adapterだけのimport、新instance collect不変を確認。
+  未登録profile / 未作成Conda prefixの失敗を不正manifestと区別し、自動installしないことを確認。
+- 実MoGe + fakeの同一instance検証: `6e2d58ec-6101-45a7-aa2f-1c220b3302b8` →
+  `3b594338-702a-4781-81a8-ab436fe651b6`、両方COMPLETED / 新instance collect hash・mtime不変。
+  一時registryに既存MoGe directoryと追加fake directoryを置いた検証。
+  このfixtureは既存単一checkpoint設定を共有し、model / variant別weights mapは03.3で追加予定。
+- 最終production sourceでMoGe CLI CPU: `a9ed78c0-314e-49cf-aec2-05fd4a1e12e1`、
+  source_digest `2e9c296bd71caba77196eebbcee4a71e1a1ee6f5d80124781e6f8ece5397a933`一致。
+  Python 3.11.14 / torch 2.6.0+cu124 / CUDA runtime 12.4 / cuda_available=false / cpu。
+  depth float32 [256,256] / z_depth / metric / m、65,536 pixel有効。
+  同一入力の01A Run `9c5b6556-30d3-43ae-827f-7bd8b0a47580`とmax absolute error=0。
+  実行と数値回帰の証拠でありmetric accuracy評価ではない。
+- 旧Run 4件（01A depth-only、02C geometry、JPEG、02D）を各2回CLI collectし全fileのhash / mtime不変。
+  01B履歴Run `f4a2052f-71da-4664-9c9f-281cca95fb41`はローカルdirectoryがなく未検証。
+  01B形式の互換性は既存contract fixtureでも検証する。
+- browser: 既存5件成功（231.693秒）。Python非loopback / DNSとbrowser外部HTTP遮断下で
+  MoGe CPU推論 / native Points・4表示・mesh / 再起動保存読込 / busy・cancel・timeout・管理操作成功。
+  CPU UI Run `4026bcb2-e92b-4068-ae10-1e4edf15e110`、native Points Run
+  `70f69f38-2473-4ede-b3fc-154204e8f8a4`（125,125 faces、predict 1回、raw不変）。
+  Chrome 154.0.8037.92 / Linux / SwiftShader、外部requests・page errorsなし。
+  browser検証中にregistryの不正JSON検査を強化したため、最終source一致の実推論証拠は上記CLIを使う。
+- baseline: control Pythonの初回suiteはNumPy不在で6 errors / 29 skip。
+  origin/mainの隔離sourceを独立UI環境で実行し88件中82成功 / 5 skip / 1 failure（266.924秒）。
+  4秒timeoutがfixture子processのreadiness前に終了した。単独再実行1成功（4.268秒）。
+  baseline browser 3件成功（187.534秒）。変更後の初回suiteも同じtimeout fixtureだけ失敗
+  （97件中91成功 / 5 skip、364.042秒）。
+  テストのbudgetを10秒へ変更し、submitから15秒以内にstatus pollingなしでTIMEOUT・子process停止を
+  確認する方式を維持。productionのtimeout動作・既定値は変更していない。最終固定sourceのsuiteは
+  **100件中95成功 / opt-in browser 5 skip（206.751秒）**。browser 5件は上記別実行で全成功。
+- 静的検証: Markdown 28件 / local links・anchors 224件 / Python AST 35件、errors 0。
+  `git diff --check`成功。GPU・新モデル・新しい独立環境・他OS/browserは未検証。
+- 03.1受入条件達成。commit / 通常push後に03.2の代表variant・依存・checkpoint / license根拠確認へ進む。
+  終了前fetchでorigin/mainは開始時の`e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま。
+  ローカル証拠は`.local/validation/phase-03*`、生成Runと同様Git管理外。
+
+### 03.2 implementation plan and adoption investigation
+
+- 03.1 commit / push: `9e87189bb15ca09d6a627fae617b7e9499ddf4e7`、同名remoteと一致、clean tree。
+- 候補: DA3-SMALL、公式source `3d835ec1a5802d64a8b8b15f817a1ab54809bfe4`をGit管理外へ取得。
+  checkpoint `depth-anything/DA3-SMALL` revision `e08cab65ca0ec38e7826075418411ab90cab4da3`。
+  model.safetensors 137,248,940 bytes、Hub LFS SHA-256
+  `364492e38a3a06d221ac75da7f6621ada3f2361cd24fde11ba79091e9f40efcf`。
+  config.json SHA-256 `a486e29e82b7ab4a7d4cefc1ea4526cfe2ae438a572c8ca98917cfbcde7447d2`。
+  source / model cardはApache-2.0表記。現時点では採用候補、CPU実動作は未確認。
+- 根拠: 固定sourceのapi.pyは入力processor → native network → output processorを使用。
+  上位forwardはautocastを強制し、API importはexport / pose alignment依存も読み込む。
+  float32 / depth-only専用経路として公式のconfig constructor・InputProcessor・native networkを
+  直接使用する案を確認する。upstreamをpatchせず、モデル固有処理はmodels/da3内だけに置く。
+  固定GLB exporterのinverse-K ray × depthはz-depthの根拠。SMALLのscaleはrelativeとして扱い、mを付けない。
+- 手順: import graph / checkpoint構造確認 → 依存・native呼出し採用決定をdocsへ記録 →
+  独立Conda prefix `.local/envs/mde-da3`へ固定依存を構築 → plugin / manifest / checkpoint準備script →
+  GPU不要契約・CPU正式CLI E2E・新instance再collect・hash / mtime不変 → 既存回帰 → commit / 通常push。
+- 検証: 1 PNG / 明示CPU / float32 / depth-only。native depthのshape / scale / frameと保存値を照合。
+  source revision / checkpoint hash・logs / unload / runtime / source_digestを記録。
+  optional出力は03.4まで宣言を限定。multi-view実行・新UIは03.3以降。旧Run / MoGeを保持する。
+- Risks / rollback: CPU未対応、依存のimport時必須化、checkpoint key対応、preprocess grid、resource不足。
+  根拠不足や外部障害では停止・報告する。base / system / MoGe / UI環境を変更しない。
+  新pluginとGit管理外の専用prefix / weightsだけを追加し、既存rawを変更しない。
+- 未実施: 新環境構築、weights本体取得、production plugin、新実モデル推論。03.3〜03.6未着手。
+
+### 03.2 selected native integration (before implementation)
+
+| Decision | Reason / evidence | Trade-off | Future extension |
+| --- | --- | --- | --- |
+| DA3-SMALLの上記固定source / weightsを代表variantとして採用 | 公式source / Hub Apache-2.0、weights 137 MB、native SDPA実装、model cardにCPU選択例。CPU実動作はこれから確認 | metric scaleなし、GPU保証なし | 他variantは別検証 |
+| 公式InputProcessor + config constructor + DepthAnything3Netのfloat32経路 | 固定api.pyの呼出し順・model/da3.py・dinov2/layers/attention.pyで確認。上位APIはexport群もimportしautocastを強制する | 上位API全機能は利用せずnative構成・state keysを厳密照合 | confidence / pose等は03.4 |
+| checkpoint directoryにmodel.safetensorsとconfig.jsonを事前配置 | 両方の固定digestをworker load前に検証、Hub configと採用source configも照合する | local checkpoint引数はこのpluginではdirectory | model別path mapは03.3 |
+| 独立CPU環境 Python 3.11.14 / torch 2.6.0+cpu / torchvision 0.21.0+cpu | upstream Python範囲内・torch>=2、SDPAはPyTorch実装。MoGeの環境は変更しない | GPU実行はこの環境では非対応、他OS未検証 | GPU環境は別検証 |
+| process_res既定252・upper_bound_resize、depth-only / relative / arbitrary | native patch size14に整合するCPU smoke設定。公式GLB exporterは整数pixelのinvK ray×depthを使用 | 元RGBのidentity対応を主張せずK / pointsを補わない | grid / optional拡張を03.4で検証 |
+
+環境は上記案の依存解決・import・実CPU検証が必要。成功するまで03.2 PASSにしない。
+
+### 03.2 shared tensor checkpoint finding
+
+最初のCPU Run `aae4f709-fdaa-47de-892e-978c68e5ed51`はloadでFAILED。
+`load_file` → prefix除去 → PyTorch strict state_dictではaux head LayerNormの6別名をmissingと判定した。
+推論 / depth保存には進んでいない。固定sourceのdualdpt.py L132–148は同一LayerNorm objectを
+4箇所へ登録し、実際の`is`比較でも同じparameter objectであることを確認。
+checkpointのSafetensors metadataも6 alias → 保存されたindex 0の対応を持つ。
+[公式Safetensors仕様](https://huggingface.co/docs/safetensors/torch_shared_tensors)と
+導入済み0.5.3のload_model sourceで共有storage検証・真正な欠落拒否を確認した。
+
+Decision: prefixを除去せずnative modelを`model` childに持つ薄いnn.Moduleで包み、
+公式`load_model(strict=True, device=cpu)`で読込。Reason: native共有parameterとcheckpointの構造を保持。
+Trade-off: plain state_dict読込は使用しない。Future extension: 他variantも同じ厳密読込と個別検証を行う。
+ランダム補完・alias tensor複製・missingの無条件無視・upstream source変更は行わない。
+この確認は互換性調査であり、CPU E2E成功はまだ未確認。
+
+### 03.2 acceptance evidence — PASS
+
+- 代表variant: DA3-SMALL、上記source / weights pin、Apache-2.0、native float32 / 明示CPU。
+  追加はmodels/da3だけでproduction registryに発見。core / UI / backendの変更なし。
+- 独立Conda prefixをenvironment.ymlから新規構築し、固定sourceを--no-deps install。
+  native configとHub config一致、34,299,463 unique parameters。不要なAPI / exporter / MoGe / UI importなし。
+  Python 3.11.14 / torch 2.6.0+cpu / torchvision 0.21.0+cpu / CUDA runtimeなし。
+  requirements.lockに今回の推移依存とsourceを記録。lockによる再作成は未検証。
+- 正式CLI → Runner → LocalBackend → 専用workerのCPU Run
+  `541dcd67-8153-48b1-a1d4-9063b79e1435` COMPLETED。
+  float32 [252,252]、z_depth / relative / arbitrary、63,504 pixel有限・正。
+  source_digest `6f24fb9f3f5f613a5ba94ebb660e38c57ad5561ed57c9a1bbe765645bb8b0073`一致。
+  native autocast無効、depth-only既存profile、stderr空・exit 0・predict 1回・unload完了。
+- Python非loopback socket / DNS遮断下の正式推論成功。OS全体・native独自通信遮断を保証するものではない。
+  新Backendと新CLIで各2回collect、全file hash / mtime不変。Condaなしの保存結果読込も確認。
+- 共通ResultsServiceのDepth / RawDepth表示、Point Cloud / Meshの理由付きunavailableを確認。
+  K / Pointsを補完せず、表示後もraw / 確定result含む全fileのhash / mtime不変。
+  旧4Runの各2回CLI collectとhash / mtime不変も再確認（01B履歴Runのdirectory不在は継続）。
+- plugin契約5件成功（1.289秒）、共有aliasを正しく読込し真正な欠落は拒否する数値fixtureを含む。
+  最終既存全回帰は**105件中100成功 / opt-in browser 5 skip（154.074秒）**。
+  core / UI / backendは03.1以降不変のため、browserは03.1の別実行5成功を証拠とし03.2では未再実行。
+  新モデルのbrowser操作・切替は03.3の受入対象。静的リンク / AST / JSON / diff検証も実施。
+- 未検証: process_res=504、GPU / 他OS、lock再作成、native optional、multi-view、UniK3D。
+  03.2受入条件達成、commit / 通常push後に03.3へ進む。Phase 03全体はExit未達。
+  初回のshared alias読込失敗と解決根拠は前節に保持する。
+
+### 03.3 implementation plan — session model selection and target map
+
+- 前提: 03.2受入成功、commit `db525e5e67b43ae248894cc1b8ee74bd63fbfa25` / 同名remoteへ通常push済み、clean。
+- Scope / order: target JSON契約とモデル別checkpoint解決 → session別configuration ticketとsubmit snapshot →
+  metadata駆動のmodel / variant選択・controls再生成 → controller / worker / browser / 実2モデル受入 → commit / 通常push。
+- Target契約: schema 1.0、environmentsはlogical ID→nameまたはprefix、checkpointsはmodel_id/variant_id→local path。
+  相対pathは設定file directory基準。Jobへhost prefix / checkpoint pathを入れず、WorkerManagerがjob snapshotでlookup。
+  CLIの明示profile / checkpointは当該jobだけ優先。UIのlegacy flagsは初期model / variantだけに適用し、他モデルへ漏らさない。
+- UI決定: 固定Gradio 6.30.0のinstalled render APIを確認。モデル・variant選択はsession別configuration State、
+  controllerにticketを保持し、renderされたcallbackはそのmodel / variant / ticketをcaptureする。
+  検証で非queueのState変更がrenderを起動しないことを確認したため、通知はhidden JSON componentを使い、
+  正本ticketはserver sessionに保持する。
+  切替前callbackはsubmit前とupload snapshot後に拒否。共有controllerのdefault model_idを書換えない。
+  selection eventだけqueue=False / always_lastで最後の入力を直列反映。推論 / polling / cancelは従来once。
+  controls / device / dtype / outputsは実効variantから再生成し切替時に値を初期化。CPUの明示選択を維持。
+- 検証: 2browserで別model / parameters、1受理1busy、未準備表示、stale callback / checkpoint / parameter交差拒否。
+  実MoGe / DA3を同じ共有Backendで順次UI実行し別環境・出力意味を確認。cancel / timeout / 2tabs / 保存Run・全既存回帰。
+  raw / result hash・mtime不変、offline保存Run / inference、model / torch非importを確認する。
+- Risks / rollback: selection応答の順序、古いcallbackの値混入、global checkpoint漏れ、未準備の誤表示。
+  準備表示はmetadata / path可用性までとし、依存・digest・native runtime検証はworkerに残す。
+  map / UIは独立して修正可能、既存Runのmigrationなし。03.4以降は本gateの成功後に進む。
+
+### 03.3 acceptance evidence — PASS / requested stop point
+
+- 実装: metadata駆動model / variant切替・controls再生成、session別ticket、未準備表示、
+  target環境 / model_id/variant_id別weights map。CLIの単一job override・initial UIのlegacy設定を保持。
+  モデル名分岐・UI / Registryのadapter / torch import・workerのUI依存を追加していない。
+  Job / result schema、serialization profiles、raw / 確定result不変は維持。
+- schema / interface: target JSON schema 1.0、相対pathはfile directory基準。
+  Manager mapはinherited checkpointを消してexact model / variant keyで解決し、global overrideとの併用は拒否。
+  CLIの明示overrideは選択keyにだけ反映。詳細は [target configuration](docs/target-configuration.md)。
+- session契約: model変更はdefault variantへ戻し、deviceを未選択にしてschema・parameters・outputsを再生成。
+  変更ごとにserver ticketを発行し、同一通知は冪等。古いcallbackはupload保存前後で拒否。
+  受理済みjobはsnapshotで実行し、編集後もcancelは実行中の自session jobを対象とする。
+- GPU不要契約: target JSON / relative path / 未準備・不正profile / inherited checkpoint消去 / variant隔離、
+  legacy override、2session / busy / 切替中stale / 同一通知冪等・UI import境界 / event構造を確認。
+- 最終固定production sourceの全suiteは**116件中109成功 / opt-in browser 7 skip（264.524秒）**。
+  別実行browser **7件全成功（234.417秒）**: 既存5件 + 別モデル2session + 実2モデルCPU UI。
+  両検証はOMP_NUM_THREADS=2で実行。browser側はPython非loopback socket / DNSと外部HTTPを遮断。
+  Linux / Chrome 154.0.8037.92 / SwiftShader、page errors / 外部requestsなし、inference queueなし。
+- 別モデル同時clickは1受理1busyを確認。未準備variantは理由付きdisabled、切替後の値は初期化。
+  初期検証のState-change render不発・dynamic input readonlyを修正し、既存busy / cancel / timeout /
+  2tabs / native Points・4表示・管理操作・再起動保存Run読込を回帰した。
+  初期のbrowser fixture upload不足と同一選択ticket更新も修正し、最終7件を成功させた。
+- 同じshared Runner / BackendでMoGe / DA3を別browserから順次CPU実行:
+  - moge: `83f570fc-5c7f-475d-b2a0-34938bfec188`、source_digest `3db81e03ae05bbb92ec5f94dd36ec95e039a2ed7298ed6418f158e8657a61e31`一致。
+  - da3: `f109f2f0-3571-4fcb-9d0e-8ad9f9c52da3`、source_digest `84eadbb6dcfcc7387e782a3183d6a0da2d5fbd4f52e8a39c8e314d11b084f296`一致。
+
+  MoGeは専用mde-moge / torch 2.6.0+cu124、float32 [256,256] / z_depth / metric / m。
+  DA3は専用prefix / torch 2.6.0+cpu、float32 [252,252] / z_depth / relative / arbitrary。
+  既存の各環境・checkpoint pinは不変。predictは各1回、browser再読込後もhash / mtime不変。
+  さらに新Backend / 新CLIで各2回collect、全fileのhash / mtime不変・最終source一致を確認。
+- target JSONを使うDA3正式CLIもCOMPLETED。旧4Runも各2回CLI collectして全fileのhash / mtime不変。
+  01Bの履歴Run directory不在は従来どおり未検証、01B形式はfixtureで回帰。
+- docs / static: target契約・設定example・UI event / ticket・Environment / Execution / Model仕様を同期。
+  local links / anchors、AST / JSON / diff・import境界を検証。設定exampleは相対pathのみ。
+  `.local` / weights / environments / runsはGitへ追加しない。
+- 最新ユーザー指示により**03.3のcommit / 通常pushを今回の終了点とし、03.4〜03.6は未着手で停止**。
+  Phase 03全体はExit未達、COMPLETEとしない。PR作成・main統合・Phase 04以降なし。
+  未検証: UniK3D、追加optional / multi-view、実GPU、他OS/browser、DA3 lock再作成・process_res=504。
+  commit / pushの確定結果はGit履歴と同名remote refで確認する。
+
+### 03.4 initial resume and adoption gate — historical stop
+
+- Scope / authorization: 最新の再開指示により03.4〜03.6を同じブランチで順次進める。
+  03.3の受入 / commit / pushは完了済み。03.4の成功前に03.5へ進まず、PR / main統合・Phase 04以降なし。
+- Start evidence: clean tree / HEAD / 同名remoteは `d3fa6ef20c08f4ae16fff7a7ea6f24e86bc87414`。
+  最初のfetchは自動承認審査timeoutで未実行、許可された1回の再試行で成功。
+  origin/mainは `e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま。remote更新・競合・範囲外差分なし。
+- Purpose / planned order: UniK3D代表variantのsource / weights / license / CPU依存・出力根拠確認 →
+  採用gateを通過後に独立環境・depth-only E2E → 必要optionalを数値fixture / 新profile / reader / 実出力の順に追加 →
+  互換回帰・docs → 段階成功時commit / 通常push。現時点では最初の採用gateを通過していない。
+- Candidate evidence: 公式source `29f7862f3c3ee79c53ef0153dfc901ce511df575`、
+  `lpiccinelli/unik3d-vits` revision `80a99bfeb8d983ca6af27125fd83c88b891e75ad`。
+  safetensorsのHub宣言は141,789,264 bytes / SHA-256
+  `9f977d058961146582931c136cf2ce44964cff3153dae7823dd1209223489bc6`。
+  weights本体は取得しておらず、実fileのdigest照合や採用決定ではない。
+- Gate failure: source LICENSE / model source headerはCC BY-NC-SA 4.0、README / pyprojectはCC BY-NC 4.0。
+  固定Small model cardにはlicenseの明記がなく、公式Small / Base / LargeのHub metadataとfile一覧も
+  license未記載。checkpointへの適用条件とsource表記差異を確認できる作者の根拠が必要。
+  異なる条件を同一視したり、公開download可否から利用許諾を推定したりしない。
+- 実施: 公式source・固定model card / config・Hub metadata・公式project pageのread-only調査とdocs更新。
+  詳細・immutable links・config digest・候補APIと再開条件は [UniK3D adoption investigation](docs/unik3d-investigation.md)。
+- 未実施: UniK3D環境構築 / weights本体取得 / adapter追加 / 実推論、optional契約実装、新しいtests、03.5 / 03.6。
+  MoGe / DA3 / CLI / UI / raw / 保存schema / 既存環境は変更していない。既存の実行成功は03.3時点の履歴。
+- Verification / risk / rollback: 今回のtracked変更はdocsのみ。local links / anchors / fences、候補metadataと
+  固定sourceの照合、diff / file setを検証し、実装suiteやCPU / browserを再実行したとは記載しない。
+  不明なlicenseをmanifestへ確定値で記録するリスクを避け、既存Run・環境・実装への変更なし。
+  静的検証: Markdown 31件 / local links・anchors 246件 / Python AST 43件、errors 0。
+  候補metadata / 固定sourceの記述一致、`git diff --check`とdocs-only file set確認も成功。
+- Result: **03.4は未達で停止**。調査記録を作業ブランチへcommit / 通常pushし、採用条件の確認後に再開する。
+  Phase 03はCOMPLETEではない。作者の明確なlicense文書・許諾等を待ち、外部連絡は行わない。
+
+### 03.4 revised stop conditions and independent implementation — 2026-11-11
+
+- Authorization / history: 上記の調査結果と当時の一律停止を履歴として保持。最新ユーザー指示により、
+  license不確実性だけで技術的に独立した作業を止めない。実checkpoint取得・利用・再配布は保留し、
+  明確な禁止との衝突は該当作業を停止する。外部連絡は行わず作者への質問を文書化する。
+- Start: cleanな既存ブランチ、HEAD / remoteは`11fa2c589d6affb2b8e77a2a924ddc822cdcb046`。
+  fetch / ls-remote成功、origin/mainは`e22322d5acc8ce7603b38d36311fc39ea56f6135`のまま。
+- Purpose / scope: independently authored `models/unik3d/` adapterのload / predict / unloadと
+  native形式の合成NumPy出力変換を既存契約で実装。production loadはcheckpointへ触れる前に保留を明示。
+  runnable manifest / real runtime bridge / UniK3D環境構築は今回追加せず、supportedとの誤表示を防ぐ。
+- Design evidence: 固定sourceのinferはdistance=norm(points)、depth=points.zを返す。
+  canonical depthにdistanceを選びray_distanceと明記し、負のzを持つnative Pointsを保持。
+  BCHW→HWCのlayout変換のみで仮K・逆投影・resamplingをしない。実scale根拠未検証のためunknown / unknown。
+  computed validityをmodel maskと偽らずdepthのNaNに反映し、既存workerのeffective maskを利用する。
+  既存01A / 02A profile内のdepth / pointsのみ。rays / confidence / poseの保存、新profile、runtime能力照合は未実装。
+- Order: plan / 停止条件更新 → 独立adapter / 数値fixture → 隔離test registryでfake worker保存・stdlib読戻し →
+  既存回帰・旧Run不変・静的検証 → docs実績更新 → 部分進捗commit / 通常push。
+- Validation: 合成の軸方向 / 負z / 非有限値 / rangeとzの相違 / layout・dtype・grid・距離不整合・要求出力拒否、
+  lifecycleと実checkpointを開かないguard。fakeのdepth-only / points出力、失敗時cleanup、再collectのhash / mtime不変。
+  数値importは子process内に隔離しcontrol境界を保持。fake workerは既存test環境を使用し、第3実環境と数えない。
+- Risk / rollback: sourceコード・weightsの複製や依存追加なし。既存core / UI / backend / schema / rawは変更しない。
+  native API bridge・camera / metric精度・CPU動作は合成testで証明できず保留。追加plugin / testsを修正commitで戻せる。
+- Gate: 03.4は部分実装で実モデルE2E未達、03.5 / 03.6未着手、Phase 03はCOMPLETEではない。
+  実checkpoint条件の根拠確認→採用判断→独立環境 / digest確認→実depth-only E2E→必要optionalの実出力照合が残る。
+- Results: 最終suiteは121 tests / 114成功 / opt-in browser 7 skip（305.103秒）。追加UniK3D合成5 testsを含み、
+  default load / checkpoint guard、数値geometry、fake workerのdepth-only / Points、missing distance / 全無効の失敗とcleanup、
+  production非登録・unsupported拒否が成功。ログ: `.local/validation/phase-03-4-regression.log`。
+  初回fixture実行では一時registryがproject外のためsource fingerprintで拒否された。project内のGit除外領域に隔離して修正し、最終suite成功。
+  旧Run4件を各2回CLI collectし全file hash / mtime不変。旧01B Run `f4a2052f-71da-4664-9c9f-281cca95fb41`は
+  local directory不在で未検証（捏造せず記録）。ログ: `.local/validation/phase-03-4-compatibility.json`。
+  固定source HEADと取得済config / cardのSHA-256も再照合し一致。実checkpoint本体は取得・利用・再配布していない。
+  静的検証: Markdown32件 / links・anchors251件 / Python AST46件、errors 0、`git diff --check`成功。
+  今回未実行: 実UniK3D / 実モデル推論 / browser opt-in / GPU。既存環境へのinstall・変更なし。
+  今回は03.4完了commitではなく、停止条件見直しと独立部分の検証済進捗をcommit / 通常pushする。
 
 ## Phase 03 investigation and staged design — 2026-11-09
 
@@ -96,7 +707,7 @@ view配列・optional confidence・w2c extrinsicsを示すが、返値説明の(
 これらは実装時にModel adapter / Environment / Execution / Run Directory / Gradio仕様へ
 同時反映する。viewer / exportの意味やAPI変更を伴う段階ではResults Viewer / Run Management仕様も更新する。
 
-### Recommended implementation order (after separate implementation authorization)
+### Recommended implementation order (2026-11-11に実装承認済み)
 
 以下の03.1〜03.6はPhase 03内の作業区切り案で、承認済みの新phase名ではない。
 各段階を小さなレビュー単位とし、先行段階の成功後に進む。初回E2Eへ全契約拡張を詰め込まない。
@@ -143,7 +754,7 @@ UniK3Dの方が適する証拠が得られれば順序を交換する。MoGe追�
 | Decision / 提案 | Reason | Trade-off | Future extension / 判断時点と必要証拠 |
 | --- | --- | --- | --- |
 | directory manifest discoveryを先行 | 既存plugin境界を活用 | 外部package配布をまだ扱わない | package entrypoint / hot reloadは将来。今回はsource checkout |
-| depth-onlyの第2実モデルを最初の実E2Eにする | 小さな成功を優先しMoGeを保つ | optional全対応は後続 | 実装前にvariant / immutable source・weights revision / SHA-256 / license / CPU依存と資源を確認して採用決定 |
+| depth-onlyの第2実モデルを最初の実E2Eにする | 小さな成功を優先しMoGeを保つ | optional全対応は後続 | 実モデル採用前にvariant / immutable source・weights revision / SHA-256 / CPU依存と資源を確認。licenseは対象行為ごとにAGENTS共通方針で判断し、独立実装・テストは先行可 |
 | variant metadata共通解決、schemaは全体置換を推奨 | UI / Runnerの判定差を防ぐ | manifestに重複記述があり得る | 03.1前にfallback / override規則とconditionalの検証可能subsetを仕様確定 |
 | target設定に環境・weights map | adapter / Jobへhost prefixを漏らさない | 設定形式が追加になる | 03.2〜03.3前にJSON等の形式・lookup key・既存CLI overrideの優先順位とdigest記録を確定 |
 | UI model選択はsession別snapshot | 実行中のmodel / checkpoint混線防止 | controlsの再構成が必要 | 03.3前にmodel切替と実行中編集の扱い、staleイベント破棄規則を確定。read-only起動互換も確認 |
@@ -385,7 +996,7 @@ Points [256,256,3] / m、65,536 valid、points.z-depth誤差0 m、Normals / Intr
 状態は `NOT_STARTED → PLANNED → IN_PROGRESS → REVIEW_READY → COMPLETE` を基本とし、
 外部条件の不足は `BLOCKED` として理由を残す。`PLANNED` は計画文書の準備状態であり、
 production code の実装承認・開始を意味しない。実験 JobStatus とは別の管理状態である。
-文書準備だけでは実装を開始しない。02Dの承認範囲で全Exit達成済み。Phase 03以降は未承認。
+文書準備だけでは実装を開始しない。02Dは全Exit達成済み。Phase 03は2026-11-11に実装承認。Phase 04以降は未承認。
 
 各 phase 開始前に、最新のユーザー指示がその phase の実作業を承認していることを確認する。
 必要な通常作業のたびに承認を取り直す必要はないが、未指示の phase に進んではならない。
@@ -399,7 +1010,7 @@ Tests、Exit criteria、Known risks、Decisions deferred to later phases を維�
 | [00](docs/phases/phase-00.md) | clean-start の正式確認 | 調査記録・共通契約・段階計画の整合 | COMPLETE |
 | [01](docs/phases/phase-01.md) | 00 完了、最初の model / variant 選定 | 01A の最小 E2E → 01B の基本的堅牢化 | COMPLETE、01A / 01B exit 達成 |
 | [02](docs/phases/phase-02.md) | 01 | 02A geometry → 02B Inference → 02C 3D Results → 02D Run管理 | COMPLETE（02A〜02D全Exit達成） |
-| [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | 未着手 |
+| [03](docs/phases/phase-03.md) | 01・02 | 3 モデルが同じ契約を満たす | COMPLETE（03.1〜03.6・全Exit達成） |
 | [04](docs/phases/phase-04.md) | 03 | Runner から MLflow、失敗時にも結果保存 | 未着手 |
 | [05](docs/phases/phase-05.md) | 03・04 | 同じ single inference に基づく比較評価 | 未着手 |
 | [06](docs/phases/phase-06.md) | 01–05 | Mock backend で非同期・状態・再収集を検証 | 未着手 |

@@ -1,0 +1,19 @@
+name: mde-geocalib
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11.14
+  - pip=25.0.1
+  - setuptools=75.8.0
+  - wheel=0.45.1
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cpu
+      - torch==2.6.0+cpu
+      - torchvision==0.21.0+cpu
+      - numpy==1.26.4
+      - pillow==11.1.0
+      - opencv-python==4.10.0.84
+      - kornia==0.8.0
+      - matplotlib==3.10.0
+# Official pinned source installed separately --no-deps; no Gradio/model depth dependencies.

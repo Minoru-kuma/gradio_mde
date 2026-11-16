@@ -18,7 +18,7 @@ PROJECT = Path(__file__).resolve().parents[1]
 
 
 class BrowserHarness:
-    def start(self, models_root, model_id, run_root, port, checkpoint=None):
+    def start(self, models_root, model_id, run_root, port, checkpoint=None, targets=None, camera_config=None):
         import gradio as gr
         from playwright.sync_api import sync_playwright
         from mde.backends import LocalBackend
@@ -34,12 +34,17 @@ class BrowserHarness:
         info = registry.get_model(model_id)
         env_id = info.data["environment_refs"][0]["environment_id"]
         prefix = os.environ.get("MDE_TEST_CONDA_PREFIX")
-        resolver = EnvironmentResolver({env_id: EnvironmentProfile(env_id,
+        resolver = EnvironmentResolver(targets.profiles if targets else {env_id: EnvironmentProfile(env_id,
             name=None if prefix else os.environ.get("MDE_TEST_CONDA_ENV", env_id), prefix=prefix)})
-        backend = LocalBackend(self.store.root, WorkerManager(PROJECT, resolver, CondaLauncher(), checkpoint))
+        backend = LocalBackend(self.store.root, WorkerManager(PROJECT, resolver, CondaLauncher(), checkpoint,
+            checkpoints=targets.checkpoints if targets else None))
         self.runner = ExperimentRunner(registry, backend, self.store, PROJECT)
-        self.controller = InferenceController(self.runner, model_id)
-        self.app = build_app(self.controller)
+        self.controller = InferenceController(self.runner, model_id, targets=targets)
+        estimator = None
+        if camera_config is not None:
+            from mde.calibration import CameraEstimator
+            estimator = CameraEstimator(backend, PROJECT, camera_config)
+        self.app = build_app(self.controller, camera_estimator=estimator)
         self.app.launch(server_name="127.0.0.1", server_port=port, share=False, prevent_thread_lock=True,
             max_file_size=10 * 1024 * 1024, ssr_mode=False, enable_monitoring=False, quiet=True,
             theme=gr.themes.Default(font=["system-ui"], font_mono=["monospace"]), footer_links=[], run_history=False)
